@@ -1,11 +1,11 @@
 <view class="container">
   <view class="hero">
-    <view class="hero-title">水印相机</view>
-    <view class="hero-sub">选定模板 · 填写数据 · 关联照片 · 入库保存</view>
+    <view class="hero-title">外贸水印相机</view>
+    <view class="hero-sub">Product / Packaging / Loading · 拍照即带水印并入库</view>
   </view>
 
   <view class="card">
-    <view class="title">选择水印模板</view>
+    <view class="title">选择水印模板 · Pick Template</view>
     <view class="tpl-grid">
       <view
         wx:for="{{templates}}"
@@ -17,7 +17,9 @@
         <view class="tpl-name">{{item.name}}</view>
         <view class="tpl-desc">{{item.description}}</view>
         <view class="tpl-tags">
-          <text class="tag" wx:for="{{item.fields}}" wx:for-item="f" wx:key="key">{{f.label}}</text>
+          <block wx:for="{{item.fields}}" wx:for-item="f" wx:key="key" wx:for-index="idx">
+            <text class="tag" wx:if="{{idx < 5}}">{{f.label}}</text>
+          </block>
         </view>
       </view>
     </view>
@@ -28,7 +30,7 @@
       我的记录 · {{total}}
     </view>
     <view class="btn" bindtap="goCamera" style="flex:1;">
-      开始拍照
+      开始拍照 · Start
     </view>
   </view>
 

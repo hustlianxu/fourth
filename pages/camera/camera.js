@@ -85,14 +85,13 @@ Page({
     wx.getLocation({
       type: 'gcj02',
       success: (res) => {
-        // 简单地把经纬度拼到 location；如需精确地址，可接入地图 SDK
-        const location = '定位 ' + res.latitude.toFixed(4) + ',' + res.longitude.toFixed(4);
+        const location = 'Loc ' + res.latitude.toFixed(4) + ', ' + res.longitude.toFixed(4);
         const values = Object.assign({}, this.data.values, { location });
         this.setData({ values });
-        wx.showToast({ title: '已获取定位', icon: 'success' });
+        wx.showToast({ title: '位置已获取', icon: 'success' });
       },
       fail: () => {
-        wx.showToast({ title: '获取定位失败', icon: 'none' });
+        wx.showToast({ title: '获取位置失败', icon: 'none' });
       }
     });
   },
