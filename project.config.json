@@ -1,5 +1,5 @@
 {
-  "description": "水印相机小程序",
+  "description": "水印相机小程序 · 外贸场景（双语水印模板 + 本地记录）",
   "packOptions": {
     "ignore": [],
     "include": []
@@ -44,12 +44,13 @@
     "ignoreUploadUnusedFiles": true
   },
   "compileType": "miniprogram",
-  "libVersion": "2.32.3",
+  "libVersion": "3.0.0",
   "appid": "touristappid",
   "projectname": "watermark-camera",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
-  }
+  },
+  "miniprogramRoot": "./"
 }
