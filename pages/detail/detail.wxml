@@ -1,0 +1,50 @@
+<view class="container" wx:if="{{record}}">
+  <image class="big-img" src="{{record.imagePath}}" mode="widthFix" bindtap="onPreview"></image>
+
+  <view class="card">
+    <view class="row between">
+      <view class="title">{{record.templateName}}</view>
+      <view class="muted">{{timeText}}</view>
+    </view>
+
+    <view class="divider"></view>
+
+    <block wx:for="{{fields}}" wx:key="key">
+      <view class="field-row">
+        <view class="f-k">{{item.label}}</view>
+        <block wx:if="{{!editing}}">
+          <view class="f-v">{{item.value || '—'}}</view>
+        </block>
+        <block wx:else>
+          <input
+            class="f-edit"
+            value="{{editValues[item.key]}}"
+            data-key="{{item.key}}"
+            bindinput="onFieldInput"
+            placeholder="请输入"
+          />
+        </block>
+      </view>
+    </block>
+  </view>
+
+  <view class="card" wx:if="{{ocrResult || verifyIssues.length > 0}}">
+    <view class="title">识别与核验</view>
+    <view wx:if="{{ocrResult && ocrResult.hint}}" class="muted" style="margin-bottom:12rpx;">{{ocrResult.hint}}</view>
+    <view wx:if="{{verifyIssues.length === 0}}" class="f-v" style="color:#07c160;">
+      ✓ 字段与水印内容一致（或未进行 OCR）
+    </view>
+    <block wx:else>
+      <view wx:for="{{verifyIssues}}" wx:key="message" class="issue">
+        · {{item.message}}
+      </view>
+    </block>
+  </view>
+
+  <view class="row between">
+    <view class="btn secondary" bindtap="onSaveAlbum" style="flex:1;margin-right:16rpx;">保存到相册</view>
+    <view class="btn" bindtap="onEditToggle" style="flex:1;">{{editing ? '保存修改' : '编辑字段'}}</view>
+  </view>
+
+  <view class="btn danger" bindtap="onDelete" style="margin-top:16rpx;">删除本条记录</view>
+</view>

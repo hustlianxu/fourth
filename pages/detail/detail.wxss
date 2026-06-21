@@ -1,0 +1,44 @@
+.big-img {
+  width: 100%;
+  border-radius: 16rpx;
+  background: #eee;
+  margin-bottom: 16rpx;
+}
+
+.field-row {
+  display: flex;
+  padding: 12rpx 0;
+  align-items: center;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.field-row:last-child {
+  border-bottom: none;
+}
+
+.f-k {
+  width: 180rpx;
+  color: #666;
+  font-size: 26rpx;
+  flex-shrink: 0;
+}
+
+.f-v {
+  flex: 1;
+  font-size: 28rpx;
+  color: #222;
+}
+
+.f-edit {
+  flex: 1;
+  background: #f7f8fa;
+  padding: 12rpx;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+}
+
+.issue {
+  color: #d46b08;
+  font-size: 26rpx;
+  margin-top: 8rpx;
+}

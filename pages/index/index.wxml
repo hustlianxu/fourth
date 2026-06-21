@@ -1,0 +1,36 @@
+<view class="container">
+  <view class="hero">
+    <view class="hero-title">水印相机</view>
+    <view class="hero-sub">选定模板 · 填写数据 · 关联照片 · 入库保存</view>
+  </view>
+
+  <view class="card">
+    <view class="title">选择水印模板</view>
+    <view class="tpl-grid">
+      <view
+        wx:for="{{templates}}"
+        wx:key="id"
+        class="tpl-item {{selectedId === item.id ? 'selected' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onSelectTemplate"
+      >
+        <view class="tpl-name">{{item.name}}</view>
+        <view class="tpl-desc">{{item.description}}</view>
+        <view class="tpl-tags">
+          <text class="tag" wx:for="{{item.fields}}" wx:for-item="f" wx:key="key">{{f.label}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="row between">
+    <view class="btn secondary" bindtap="goList" style="flex:1;margin-right:16rpx;">
+      我的记录 · {{total}}
+    </view>
+    <view class="btn" bindtap="goCamera" style="flex:1;">
+      开始拍照
+    </view>
+  </view>
+
+  <view class="footer" bindtap="goAbout">使用说明</view>
+</view>
