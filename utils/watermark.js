@@ -1,6 +1,10 @@
 // utils/watermark.js
-// 将模板渲染为 Canvas 上的水印：生成最终图像（原图 + 水印）
-// 兼容新版 Canvas 2D 接口（外贸场景默认输出 1920 长边高清图，便于印刷与机读）
+// 外贸手写水印渲染器
+// 渲染规则：
+//   - 每一项独立成行；标签一行，内容另起一行并缩进
+//   - 西语描述 / 中文描述等长文本字段支持自动换行
+//   - 不同项之间留一行空行分隔（或由 lineHeight 的留白）
+//   - 水印块默认占图片宽的 85%，位于底部靠左
 
 function hexToRgba(hex, alpha) {
   let h = (hex || '#000000').replace('#', '');
@@ -19,11 +23,10 @@ function parseColor(color, defaultAlpha) {
 }
 
 /**
- * 在图片上绘制水印（输出高清尺寸 1920 长边，方便印刷/机读）
+ * 绘制水印（默认图片长边 1920，输出高清可印刷尺寸
  */
 function drawWatermark(params) {
   const { ctx, canvas, imagePath, template, values, imgW, imgH } = params;
-  // 目标长边：1920（跨境电商产品图常用长边尺寸）
   const MAX_EDGE = 1920;
   let targetW = imgW;
   let targetH = imgH;
@@ -33,7 +36,6 @@ function drawWatermark(params) {
     targetW = Math.round(imgW * s);
     targetH = Math.round(imgH * s);
   }
-
   canvas.width = targetW;
   canvas.height = targetH;
   ctx.clearRect(0, 0, targetW, targetH);
@@ -51,94 +53,155 @@ function drawWatermark(params) {
 }
 
 /**
- * 在 canvas 上绘制模板水印
+ * 逐字段渲染水印
  */
 function renderTemplate(ctx, canvas, template, values, cw, ch) {
   const style = template.style || {};
   const position = template.position || 'bottom-left';
-  // 以图片宽为 750 为基准做字号/间距自适应，保证不同图片尺寸下字号稳定可读
+
   const ratio = cw / 750;
-  const fontSize = Math.max(18, Math.round((style.fontSize || 24) * ratio));
-  const lineHeight = Math.round(fontSize * (style.lineHeight || 1.65));
-  const padding = Math.round((style.padding || 18) * ratio);
-  const borderRadius = Math.round((style.borderRadius || 10) * ratio);
+  const fontSize = Math.max(16, Math.round((style.fontSize || 26) * ratio));
+  const lineHeight = Math.round(fontSize * (style.lineHeight || 1.8));
+  const padding = Math.round((style.padding || 22) * ratio);
+  const borderRadius = Math.round((style.borderRadius || 12) * ratio);
 
-  const lines = buildLines(template, values);
+  // 水印块宽度：图片宽度的 85%
+  const blockW = Math.round(cw * 0.85);
+  const indent = Math.round(fontSize * 1.8);
 
-  // 用英文排版：标签用 "Label : "
-  ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
-  let maxLineWidth = 0;
-  const computed = lines.map((line) => {
-    const labelText = line.label + ' : ';
-    const valueText = line.value || '—';
-    const full = labelText + valueText;
-    const m = ctx.measureText(full);
-    if (m.width > maxLineWidth) maxLineWidth = m.width;
-    return { labelText, valueText, type: line.type };
+  // 文本可写宽度
+  const textInnerW = blockW - padding * 2;
+
+  // 先计算每个字段要渲染的物理行（含标签单独一行，内容自动换行）
+  const fieldLineGroups = [];
+  (template.fields || []).forEach((f) => {
+    const raw = (values && values[f.key]);
+    if (raw == null) return;
+    let v = String(raw).trim();
+    if (!v) return; // 可留空
+
+    const lines = [];
+    // 标签单独一行（如 "Modelo:"）
+    lines.push({
+      text: f.label + ':',
+      isLabel: true,
+      type: f.type,
+      color: '#ffe58f'
+    });
+
+    // 内容按 \n 分段，每段再按单词/字符自动换行
+    const paragraphs = v.split(/\r?\n/);
+    paragraphs.forEach((p) => {
+      if (!p.trim() && paragraphs.length > 1) {
+        // 用户自己输入的空行保留
+        lines.push({ text: '', isLabel: false, type: f.type, color: style.color });
+        return;
+      }
+      wrapText(ctx, p, textInnerW - indent, fontSize).forEach((sub) => {
+        lines.push({ text: sub, isLabel: false, type: f.type, color: style.color });
+      });
+    });
+
+    fieldLineGroups.push({ lines });
   });
 
-  const finalBlockWidth = Math.min(cw * 0.78, maxLineWidth + padding * 2 + 20);
-  const blockHeight = padding * 2 + computed.length * lineHeight;
+  if (fieldLineGroups.length === 0) return;
 
-  const margin = Math.round(cw * 0.035);
+  // 总文本行
+  const allLines = [];
+  fieldLineGroups.forEach((g, idx) => {
+    g.lines.forEach((ln) => allLines.push(ln));
+    // 字段间插一行空白（最后不加）
+    if (idx < fieldLineGroups.length - 1) {
+      allLines.push({ text: '', isLabel: false, type: 'spacer', color: style.color, spacer: true });
+    }
+  });
+
+  const blockH = padding * 2 + allLines.length * lineHeight;
+
+  // 计算坐标（水印块定位
+  const margin = Math.round(cw * 0.04);
   let x = margin;
   let y = margin;
   if (position === 'top-left') {
     x = margin; y = margin;
   } else if (position === 'top-right') {
-    x = cw - finalBlockWidth - margin; y = margin;
+    x = cw - blockW - margin; y = margin;
   } else if (position === 'top-center') {
-    x = (cw - finalBlockWidth) / 2; y = margin;
+    x = (cw - blockW) / 2; y = margin;
   } else if (position === 'bottom-left') {
-    x = margin; y = ch - blockHeight - margin;
+    x = margin; y = ch - blockH - margin;
   } else if (position === 'bottom-right') {
-    x = cw - finalBlockWidth - margin; y = ch - blockHeight - margin;
+    x = cw - blockW - margin; y = ch - blockH - margin;
   } else if (position === 'bottom-center') {
-    x = (cw - finalBlockWidth) / 2; y = ch - blockHeight - margin;
+    x = (cw - blockW) / 2; y = ch - blockH - margin;
   }
 
-  // 先绘制深色背景（印刷级高对比）
-  const bgColor = parseColor(style.background, 0.7);
-  roundRect(ctx, x, y, finalBlockWidth, blockHeight, borderRadius, bgColor);
+  // 保证水印不会超出图片上边缘
+  y = Math.max(margin, y);
 
-  // 文字部分（加描边以保障机读性）
+  // 绘制深色背景（印刷级对比
+  const bgColor = parseColor(style.background, 0.72);
+  roundRect(ctx, x, y, blockW, blockH, borderRadius, bgColor);
+
+  // 绘制文字
   ctx.textBaseline = 'top';
   const textColor = parseColor(style.color || '#ffffff', 1);
-  const strokeWidth = Math.max(2, Math.round(fontSize / 8));
-  computed.forEach((line, i) => {
-    const tx = x + padding;
-    const ty = y + padding + i * lineHeight;
-    ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
-    ctx.lineWidth = strokeWidth;
-    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-    ctx.strokeText(line.labelText + line.valueText, tx, ty);
+  ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
+  ctx.lineWidth = Math.max(2, Math.round(fontSize / 8));
 
-    // 标签
-    ctx.fillStyle = textColor;
-    ctx.fillText(line.labelText, tx, ty);
-    const labelWidth = ctx.measureText(line.labelText).width;
-    // 关键字段（日期/SKU/定位用金色/蓝色，保证一眼抓到重点
-    if (line.type === 'datetime' || line.type === 'date' || line.type === 'time') {
-      ctx.fillStyle = '#ffe58f';
-    } else if (line.type === 'location') {
-      ctx.fillStyle = '#91d5ff';
-    } else {
-      ctx.fillStyle = textColor;
+  allLines.forEach((ln, i) => {
+    if (ln.spacer) return; // 空行
+    const tx = x + padding + (ln.isLabel ? 0 : indent);
+    const ty = y + padding + i * lineHeight;
+
+    if (ln.text) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.strokeText(ln.text, tx, ty);
+      ctx.fillStyle = ln.isLabel ? '#ffe58f' : textColor;
+      ctx.fillText(ln.text, tx, ty);
     }
-    ctx.fillText(line.valueText, tx + labelWidth, ty);
   });
 }
 
-function buildLines(template, values) {
+/**
+ * 按宽度把一段文字自动换行
+ * 英文按单词换行，中文/长英文按字符换行
+ */
+function wrapText(ctx, text, maxWidth, fontSize) {
+  if (!text) return [];
+  // 按空白符拆分（西语主要使用西语主要西语使用英文空格分词
+  // 简化处理：先按空格拆成 word token，然后逐个累加，超过宽度就换行
+  // 同时对超长的单个西语单词按字符继续折行
+  const tokens = text.split(/(\s+)/).filter((t) => t.length > 0);
   const lines = [];
-  (template.fields || []).forEach((f) => {
-    lines.push({
-      key: f.key,
-      label: f.label,
-      type: f.type,
-      value: (values && values[f.key] != null && values[f.key] !== '') ? String(values[f.key]) : ''
-    });
+  let current = '';
+  tokens.forEach((tk) => {
+    const candidate = current ? current + (current.endsWith(' ') ? '' : ' ') + tk : tk;
+    const w = ctx.measureText(candidate).width;
+    if (w <= maxWidth) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current.trim());
+      // 单个 token 本身太宽：按字符折行
+      if (ctx.measureText(tk).width > maxWidth) {
+        let sub = '';
+        for (let i = 0; i < tk.length; i++) {
+          const test = sub + tk[i];
+          if (ctx.measureText(test).width > maxWidth) {
+            if (sub) lines.push(sub);
+            sub = tk[i];
+          } else {
+            sub = test;
+          }
+        }
+        current = sub;
+      } else {
+        current = tk;
+      }
+    }
   });
+  if (current) lines.push(current.trim());
   return lines;
 }
 
@@ -159,9 +222,6 @@ function roundRect(ctx, x, y, w, h, r, fill) {
   ctx.fill();
 }
 
-/**
- * 将 Canvas 导出为临时文件
- */
 function canvasToTempFilePath(canvas) {
   return new Promise((resolve, reject) => {
     wx.canvasToTempFilePath({

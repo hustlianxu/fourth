@@ -5,7 +5,7 @@ const storage = require('../../utils/storage.js');
 Page({
   data: {
     templates: [],
-    selectedId: 'simple',
+    selectedId: 'handwrite',
     total: 0
   },
 

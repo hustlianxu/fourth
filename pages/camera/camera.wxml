@@ -1,5 +1,4 @@
 <view class="camera-wrap">
-  <!-- 阶段一：拍照 -->
   <block wx:if="{{stage === 'camera'}}">
     <camera
       class="camera"
@@ -10,8 +9,8 @@
 
     <view class="panel">
       <view class="row between">
-        <view class="title-sm" bindtap="onTplTap">模板：{{template.name}} ▾</view>
-        <view class="muted" bindtap="onRefreshTime">刷新时间</view>
+        <view class="title-sm" bindtap="onTplTap">模板 · Plantilla: {{template.name}} ▾</view>
+        <view class="muted" bindtap="onRefreshTime">刷新时间 · Fecha</view>
       </view>
 
       <view class="fields">
@@ -21,20 +20,23 @@
               <text>{{item.label}}</text>
               <text class="req" wx:if="{{item.required}}">*</text>
             </view>
-            <block wx:if="{{item.type === 'text' || item.type === 'number'}}">
-              <input
-                class="f-input"
-                type="{{item.type === 'number' ? 'digit' : 'text'}}"
-                placeholder="{{item.placeholder || '请输入' + item.label}}"
+            <block wx:if="{{item.type === 'textarea' || item.multiline}}">
+              <textarea
+                class="f-textarea"
+                placeholder="{{item.placeholder}}"
                 value="{{values[item.key]}}"
                 data-key="{{item.key}}"
                 bindinput="onFieldInput"
-              />
+                auto-height
+                maxlength="-1"
+                adjust-position
+              ></textarea>
             </block>
-            <block wx:elif="{{item.type === 'datetime' || item.type === 'date' || item.type === 'time'}}">
+            <block wx:elif="{{item.type === 'number'}}">
               <input
                 class="f-input"
-                placeholder="请输入"
+                type="digit"
+                placeholder="{{item.placeholder}}"
                 value="{{values[item.key]}}"
                 data-key="{{item.key}}"
                 bindinput="onFieldInput"
@@ -45,12 +47,12 @@
                 <input
                   class="f-input"
                   style="flex:1;"
-                  placeholder="点击右侧按钮获取定位"
+                  placeholder="输入或点击右侧按钮定位"
                   value="{{values[item.key]}}"
                   data-key="{{item.key}}"
                   bindinput="onFieldInput"
                 />
-                <view class="mini-btn" bindtap="onGetLocation">获取定位</view>
+                <view class="mini-btn" bindtap="onGetLocation">定位</view>
               </view>
             </block>
             <block wx:elif="{{item.type === 'select'}}">
@@ -64,6 +66,15 @@
                 <view class="f-input">{{values[item.key] || '请选择'}}</view>
               </picker>
             </block>
+            <block wx:else>
+              <input
+                class="f-input"
+                placeholder="{{item.placeholder}}"
+                value="{{values[item.key]}}"
+                data-key="{{item.key}}"
+                bindinput="onFieldInput"
+              />
+            </block>
           </view>
         </block>
       </view>
@@ -73,36 +84,34 @@
           从相册选
         </view>
         <view class="btn" bindtap="onTakePhoto" style="flex:1;">
-          拍照
+          拍照 · Tomar foto
         </view>
       </view>
     </view>
   </block>
 
-  <!-- 阶段二：预览 -->
   <block wx:else>
     <view class="preview">
       <image class="preview-img" src="{{photo}}" mode="aspectFit"></image>
     </view>
     <view class="panel">
-      <view class="title-sm">确认保存</view>
-      <view class="muted">点击下方按钮将把水印数据写入照片并入库保存。</view>
+      <view class="title-sm">确认保存 · Confirmar</view>
+      <view class="muted">下方预览未带水印；点击“保存水印照片”后生成带水印图片并入库。</view>
       <view class="row between" style="margin-top:24rpx;">
         <view class="btn secondary" bindtap="onRetake" style="flex:1;margin-right:16rpx;">
           重拍
         </view>
         <view class="btn" bindtap="onSave" style="flex:1;">
-          保存水印照片
+          保存水印照片 · Guardar
         </view>
       </view>
     </view>
   </block>
 </view>
 
-<!-- 模板选择弹层 -->
 <view class="mask" wx:if="{{showTplPicker}}" bindtap="closePicker"></view>
 <view class="picker" wx:if="{{showTplPicker}}">
-  <view class="picker-title">选择模板</view>
+  <view class="picker-title">选择模板 · Pick a template</view>
   <view class="picker-list">
     <view
       wx:for="{{templates}}"
@@ -115,12 +124,7 @@
       <view class="tpl-desc">{{item.description}}</view>
     </view>
   </view>
-  <view class="btn secondary" bindtap="closePicker" style="margin-top:16rpx;">关闭</view>
+  <view class="btn secondary" bindtap="closePicker" style="margin-top:16rpx;">关闭 · Cerrar</view>
 </view>
 
-<!-- 离屏 Canvas（不展示给用户，仅用于合成水印） -->
-<canvas
-  type="2d"
-  id="wmCanvas"
-  class="offscreen"
-></canvas>
+<canvas type="2d" id="wmCanvas" class="offscreen"></canvas>
