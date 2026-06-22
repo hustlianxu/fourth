@@ -1,5 +1,28 @@
 <view class="container" wx:if="{{record}}">
-  <image class="big-img" src="{{record.imagePath}}" mode="widthFix" bindtap="onPreview"></image>
+  <!-- 图片区域（编辑模式下可拖拽水印） -->
+  <view class="img-area"
+    style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;"
+    bindtouchstart="onTouchStart"
+    bindtouchmove="onTouchMove"
+    bindtouchend="onTouchEnd"
+  >
+    <image class="big-img" src="{{displayPhoto}}" mode="widthFix" style="width:100%;height:100%;" bindtap="onPreview"></image>
+
+    <!-- 编辑模式：可拖动水印层 -->
+    <view wx:if="{{showWmOverlay}}" class="detail-wm-layer"
+      style="left:{{editWmX}}px;top:{{editWmY}}px;opacity:{{editOpacity}};transform:scale({{editScale}});width:{{editWidthRatio * 100}}%;">
+      <view class="detail-wm-handle">
+        <view class="wm-drag-dots">
+          <view class="wm-dot"></view><view class="wm-dot"></view><view class="wm-dot"></view>
+        </view>
+        <text class="wm-drag-label">拖动水印</text>
+      </view>
+      <view wx:for="{{displayFields}}" wx:key="key" class="detail-wm-row {{editWidthRatio > 0.5 ? 'wide' : ''}}">
+        <text class="detail-wm-label">{{item.label}}:</text>
+        <text class="detail-wm-value">{{item.value}}</text>
+      </view>
+    </view>
+  </view>
 
   <view class="card">
     <view class="row between">
@@ -39,6 +62,26 @@
         · {{item.message}}
       </view>
     </block>
+  </view>
+
+  <!-- 编辑模式：水印参数调节 -->
+  <view class="card" wx:if="{{editing}}">
+    <view class="title">水印参数</view>
+    <view class="setting-row">
+      <text class="setting-label">缩放</text>
+      <slider min="0.5" max="1.5" step="0.1" value="{{editScale}}" bindchange="onScaleChange" activeColor="#07c160" />
+      <text class="setting-val">{{scaleLabel}}</text>
+    </view>
+    <view class="setting-row">
+      <text class="setting-label">透明度</text>
+      <slider min="0.3" max="1" step="0.05" value="{{editOpacity}}" bindchange="onOpacityChange" activeColor="#07c160" />
+      <text class="setting-val">{{opacityLabel}}</text>
+    </view>
+    <view class="setting-row">
+      <text class="setting-label">宽度</text>
+      <slider min="0.28" max="0.85" step="0.03" value="{{editWidthRatio}}" bindchange="onWidthChange" activeColor="#07c160" />
+      <text class="setting-val">{{widthLabel}}</text>
+    </view>
   </view>
 
   <view class="row between">

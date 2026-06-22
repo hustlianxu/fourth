@@ -15,7 +15,7 @@ const TEMPLATES = [
       background: 'rgba(0,0,0,0.70)',
       padding: 14,
       borderRadius: 10,
-      lineHeight: 1.7
+      lineHeight: 1.35
     },
     fields: [
       { key: 'modelo', label: '货号 · Modelo / Código', type: 'text', placeholder: '如：RL-034 · HB098', required: false },
@@ -43,7 +43,7 @@ const TEMPLATES = [
       background: 'rgba(0,0,0,0.70)',
       padding: 14,
       borderRadius: 10,
-      lineHeight: 1.7
+      lineHeight: 1.35
     },
     fields: [
       { key: 'modelo', label: '货号 · Modelo', type: 'text', placeholder: '如：RL-034', required: false },

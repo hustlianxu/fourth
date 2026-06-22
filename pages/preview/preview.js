@@ -25,8 +25,11 @@ Page({
     wmY: 100,
     wmScale: 1,
     wmOpacity: 0.85,
+    wmWidthRatio: 0.42,
+    imgScale: 1,
     scaleLabel: '100%',
     opacityLabel: '85%',
+    widthLabel: '42%',
     displayFields: [],
     QUICK_POS: QUICK_POS,
     currentPos: 'br',
@@ -42,8 +45,10 @@ Page({
   dragStartY: 0,
   wmStartX: 0,
   wmStartY: 0,
-  isPinching: false,
+  isPinching: false,       // 水印缩放
+  isImagePinching: false,  // 图片缩放
   lastPinchDist: 0,
+  lastImagePinchDist: 0,
   screenWidth: 0,
   screenHeight: 0,
   wmWidth: 0,
@@ -191,21 +196,21 @@ Page({
 
   // === 触摸拖拽（容器级别，覆盖整个图片区域） ===
 
-  // 触摸开始
+  // 触摸开始（容器级别 — 图片缩放、水印拖拽）
   onTouchStart(e) {
-    // 防止事件继续冒泡导致页面抖动
     if (e.touches.length === 1) {
       this.isDragging = true;
+      this.isImagePinching = false;
       this.dragStartX = e.touches[0].clientX;
       this.dragStartY = e.touches[0].clientY;
       this.wmStartX = this.data.wmX;
       this.wmStartY = this.data.wmY;
     } else if (e.touches.length === 2) {
       this.isDragging = false;
-      this.isPinching = true;
+      this.isImagePinching = true;
       const t1 = e.touches[0];
       const t2 = e.touches[1];
-      this.lastPinchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      this.lastImagePinchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
     }
   },
 
@@ -217,13 +222,13 @@ Page({
       let newX = this.wmStartX + dx;
       let newY = this.wmStartY + dy;
 
-      // 边界限制（允许水印部分超出容器，方便用户自由定位）
       const margin = -20;
       newX = Math.max(margin, Math.min(newX, this.data.imgDisplayWidth - this.wmWidth * 0.3));
       newY = Math.max(margin, Math.min(newY, this.data.imgDisplayHeight - this.wmHeight * 0.3));
 
       this.setData({ wmX: newX, wmY: newY });
     } else if (this.isPinching && e.touches.length === 2) {
+      // 水印缩放（优先于图片缩放）
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -234,6 +239,18 @@ Page({
         this.setData({ wmScale: newScale });
       }
       this.lastPinchDist = dist;
+    } else if (this.isImagePinching && e.touches.length === 2) {
+      // 图片缩放
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      if (this.lastImagePinchDist > 0) {
+        const scale = dist / this.lastImagePinchDist;
+        let newImgScale = this.data.imgScale * scale;
+        newImgScale = Math.max(0.5, Math.min(newImgScale, 3.0));
+        this.setData({ imgScale: newImgScale });
+      }
+      this.lastImagePinchDist = dist;
     }
   },
 
@@ -241,11 +258,24 @@ Page({
   onTouchEnd() {
     this.isDragging = false;
     this.isPinching = false;
+    this.isImagePinching = false;
     this.lastPinchDist = 0;
+    this.lastImagePinchDist = 0;
   },
 
-  // 水印层上的触摸（catch 已阻止冒泡，直接委托给统一处理）
+  // 水印层上的触摸（catch 已阻止冒泡）
   onWmTouchStart(e) {
+    if (e.touches.length === 2) {
+      // 双指 → 水印缩放（不委托给 onTouchStart，避免被误判为图片缩放）
+      this.isPinching = true;
+      this.isImagePinching = false;
+      this.isDragging = false;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      this.lastPinchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      return;
+    }
+    // 单指 → 水印拖拽，委托给容器级处理
     this.onTouchStart(e);
   },
 
@@ -257,7 +287,7 @@ Page({
     this.onTouchEnd();
   },
 
-  // 缩放滑块
+  // 水印缩放滑块
   onScaleChange(e) {
     const v = e.detail.value;
     this.setData({ wmScale: v, scaleLabel: Math.round(v * 100) + '%' });
@@ -267,6 +297,13 @@ Page({
   onOpacityChange(e) {
     const v = e.detail.value;
     this.setData({ wmOpacity: v, opacityLabel: Math.round(v * 100) + '%' });
+  },
+
+  // 水印宽度滑块
+  onWidthChange(e) {
+    const v = e.detail.value;
+    this.wmWidth = this.data.imgDisplayWidth * v;
+    this.setData({ wmWidthRatio: v, widthLabel: Math.round(v * 100) + '%' });
   },
 
   // 快速定位
@@ -361,6 +398,7 @@ Page({
         customY: actualY,
         customScale: this.data.wmScale,
         opacity: this.data.wmOpacity,
+        widthRatio: this.data.wmWidthRatio,
         maxEdge: 2048
       });
 
@@ -379,6 +417,7 @@ Page({
         watermarkY: actualY,
         watermarkScale: this.data.wmScale,
         watermarkOpacity: this.data.wmOpacity,
+        watermarkWidthRatio: this.data.wmWidthRatio,
         values: this.data.values,
         imagePath: outPath,
         originalPath: persistentPath,

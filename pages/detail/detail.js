@@ -10,19 +10,41 @@ Page({
     timeText: '',
     editing: false,
     editValues: {},
+    editScale: 1,
+    editOpacity: 0.85,
+    editWidthRatio: 0.42,
+    scaleLabel: '100%',
+    opacityLabel: '85%',
+    widthLabel: '42%',
+    // 水印拖拽
+    editWmX: 0,
+    editWmY: 0,
+    imgDisplayW: 0,
+    imgDisplayH: 0,
+    displayPhoto: '',
+    showWmOverlay: false,
+    displayFields: [],
     ocrResult: null,
     verifyIssues: []
   },
 
   recordId: '',
+  screenWidth: 0,
+  isDragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  wmStartX: 0,
+  wmStartY: 0,
+  wmWidth: 0,
+  wmHeight: 60,
 
   onLoad(options) {
     this.recordId = options.id;
+    const sysInfo = wx.getSystemInfoSync();
+    this.screenWidth = sysInfo.windowWidth;
   },
 
-  onReady() {
-    // 使用离屏 Canvas 渲染，无需初始化 DOM Canvas
-  },
+  onReady() {},
 
   onShow() {
     this.load();
@@ -41,14 +63,42 @@ Page({
       type: f.type,
       value: (record.values && record.values[f.key]) || ''
     }));
+    const displayFields = fields.filter(f => f.value).map(f => ({
+      key: f.key,
+      label: f.label,
+      value: f.value
+    }));
+
+    // 计算图片显示尺寸（image 用 widthFix 模式，宽度撑满）
+    const imgW = record.width || 1080;
+    const imgH = record.height || 1440;
+    const displayW = this.screenWidth - 48; // container padding
+    const displayH = displayW * (imgH / imgW);
+
     const date = new Date(record.createdAt);
     this.setData({
       record,
       fields,
+      displayFields,
+      displayPhoto: record.imagePath,
       timeText: templates.formatDateTime(date),
+      imgDisplayW: displayW,
+      imgDisplayH: displayH,
       ocrResult: record.ocr || null,
       verifyIssues: record.verifyIssues || []
     });
+  },
+
+  // 计算水印在图片显示尺寸下的位置
+  _calcWmDisplayPos(record) {
+    const imgW = record.width || 1080;
+    const imgH = record.height || 1440;
+    const wmX = record.watermarkX || 0;
+    const wmY = record.watermarkY || 0;
+    return {
+      x: wmX * (this.data.imgDisplayW / imgW),
+      y: wmY * (this.data.imgDisplayH / imgH)
+    };
   },
 
   onPreview() {
@@ -68,17 +118,60 @@ Page({
     });
   },
 
+  // === 触摸拖拽 ===
+  onTouchStart(e) {
+    if (!this.data.editing) return;
+    if (e.touches.length === 1) {
+      this.isDragging = true;
+      this.dragStartX = e.touches[0].clientX;
+      this.dragStartY = e.touches[0].clientY;
+      this.wmStartX = this.data.editWmX;
+      this.wmStartY = this.data.editWmY;
+    }
+  },
+
+  onTouchMove(e) {
+    if (!this.data.editing || !this.isDragging) return;
+    const dx = e.touches[0].clientX - this.dragStartX;
+    const dy = e.touches[0].clientY - this.dragStartY;
+    let newX = this.wmStartX + dx;
+    let newY = this.wmStartY + dy;
+    newX = Math.max(0, Math.min(newX, this.data.imgDisplayW - 80));
+    newY = Math.max(0, Math.min(newY, this.data.imgDisplayH - 30));
+    this.setData({ editWmX: newX, editWmY: newY });
+  },
+
+  onTouchEnd() {
+    this.isDragging = false;
+  },
+
+  // === 编辑切换 ===
   async onEditToggle() {
     if (this.data.editing) {
-      // 保存修改：用新字段值重新渲染水印
       wx.showLoading({ title: '保存中...', mask: true });
 
       try {
-        const newImagePath = await this._rerenderWatermark(this.data.editValues);
+        // 将显示坐标转回原图坐标
+        const record = this.data.record;
+        const imgW = record.width || 1080;
+        const imgH = record.height || 1440;
+        const actualX = Math.round(this.data.editWmX * (imgW / this.data.imgDisplayW));
+        const actualY = Math.round(this.data.editWmY * (imgH / this.data.imgDisplayH));
+
+        // 更新 record 中的水印位置（供 render 使用）
+        record.watermarkX = actualX;
+        record.watermarkY = actualY;
+
+        const newImagePath = await this._rerenderWatermark();
 
         const patch = {
           values: this.data.editValues,
-          imagePath: newImagePath
+          imagePath: newImagePath,
+          watermarkScale: this.data.editScale,
+          watermarkOpacity: this.data.editOpacity,
+          watermarkWidthRatio: this.data.editWidthRatio,
+          watermarkX: actualX,
+          watermarkY: actualY
         };
         storage.update(this.recordId, patch);
 
@@ -86,54 +179,60 @@ Page({
         wx.showToast({ title: '已更新', icon: 'success' });
 
         this.load();
-        this.setData({ editing: false, editValues: {} });
+        this.setData({ editing: false, editValues: {}, showWmOverlay: false, displayPhoto: newImagePath });
       } catch (e) {
         wx.hideLoading();
         console.error('[Detail] 重新渲染水印失败:', e);
-        // 显示具体错误信息方便排查
         const errMsg = e.message || String(e);
         wx.showToast({ title: '更新失败: ' + errMsg.slice(0, 20), icon: 'none', duration: 3000 });
       }
     } else {
+      const rec = this.data.record;
+      const wmPos = this._calcWmDisplayPos(rec);
+      this.wmWidth = this.data.imgDisplayW * (rec.watermarkWidthRatio || 0.42);
+
+      // 切换到原始照片（无水印），避免看到两个水印
+      const cleanPhoto = rec.originalPath || rec.imagePath;
       this.setData({
         editing: true,
-        editValues: Object.assign({}, this.data.record.values)
+        showWmOverlay: true,
+        displayPhoto: cleanPhoto,
+        editValues: Object.assign({}, rec.values),
+        editScale: rec.watermarkScale || 1,
+        editOpacity: rec.watermarkOpacity || 0.85,
+        editWidthRatio: rec.watermarkWidthRatio || 0.42,
+        editWmX: wmPos.x,
+        editWmY: wmPos.y,
+        scaleLabel: Math.round((rec.watermarkScale || 1) * 100) + '%',
+        opacityLabel: Math.round((rec.watermarkOpacity || 0.85) * 100) + '%',
+        widthLabel: Math.round((rec.watermarkWidthRatio || 0.42) * 100) + '%'
       });
     }
   },
 
-  // 重新渲染水印（使用离屏 Canvas）
-  async _rerenderWatermark(newValues) {
+  async _rerenderWatermark() {
     const record = this.data.record;
     const tpl = templates.getTemplateById(record.templateId);
-
-    if (!tpl) {
-      throw new Error('模板不存在');
-    }
-
-    // 必须使用原始照片（无水印），不能用已渲染过的 imagePath
+    if (!tpl) throw new Error('模板不存在');
     const originalPath = record.originalPath;
-    if (!originalPath) {
-      throw new Error('原始照片不存在，无法重新渲染');
-    }
+    if (!originalPath) throw new Error('原始照片不存在，无法重新渲染');
 
-    console.log('[Detail] 开始重新渲染水印, originalPath:', originalPath);
+    console.log('[Detail] 重新渲染, x:', record.watermarkX, 'y:', record.watermarkY, 'scale:', this.data.editScale);
 
-    // 详情页重新渲染使用较高分辨率，iOS 4096 / Android 2048（watermark.js 自动适配）
     const outPath = await watermark.renderWatermarkedImage({
       imagePath: originalPath,
       template: tpl,
-      values: newValues,
+      values: this.data.editValues,
       imgW: record.width || 1080,
       imgH: record.height || 1440,
       customX: record.watermarkX,
       customY: record.watermarkY,
-      customScale: record.watermarkScale || 1,
-      opacity: record.watermarkOpacity || 0.85,
+      customScale: this.data.editScale,
+      opacity: this.data.editOpacity,
+      widthRatio: this.data.editWidthRatio,
       maxEdge: 4096
     });
 
-    console.log('[Detail] 重新渲染完成:', outPath);
     return outPath;
   },
 
@@ -142,6 +241,22 @@ Page({
     const val = e.detail.value;
     const editValues = Object.assign({}, this.data.editValues, { [key]: val });
     this.setData({ editValues });
+  },
+
+  onScaleChange(e) {
+    const v = e.detail.value;
+    this.setData({ editScale: v, scaleLabel: Math.round(v * 100) + '%' });
+  },
+
+  onOpacityChange(e) {
+    const v = e.detail.value;
+    this.setData({ editOpacity: v, opacityLabel: Math.round(v * 100) + '%' });
+  },
+
+  onWidthChange(e) {
+    const v = e.detail.value;
+    this.wmWidth = this.data.imgDisplayW * v;
+    this.setData({ editWidthRatio: v, widthLabel: Math.round(v * 100) + '%' });
   },
 
   onDelete() {

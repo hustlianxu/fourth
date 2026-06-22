@@ -15,18 +15,20 @@
       bindtouchmove="onTouchMove"
       bindtouchend="onTouchEnd"
     >
+      <!-- 双指缩放图片 -->
       <image
         class="preview-img"
         src="{{photo}}"
         mode="aspectFit"
+        style="transform: scale({{imgScale}}); transform-origin: center center;"
         bindload="onImgLoad"
         binderror="onImgError"
       />
 
       <!-- 可拖动的水印层 -->
       <view
-        class="watermark-layer {{isDragging ? 'dragging' : ''}}"
-        style="left: {{wmX}}px; top: {{wmY}}px; transform: scale({{wmScale}}); opacity: {{wmOpacity}};"
+        class="watermark-layer {{isDragging ? 'dragging' : ''}} {{wmWidthRatio > 0.5 ? 'wide' : ''}}"
+        style="left: {{wmX}}px; top: {{wmY}}px; transform: scale({{wmScale}}); opacity: {{wmOpacity}}; width: {{wmWidthRatio * 100}}%;"
         catchtouchstart="onWmTouchStart"
         catchtouchmove="onWmTouchMove"
         catchtouchend="onWmTouchEnd"
@@ -47,7 +49,7 @@
             <text class="wm-value">{{item.value || '-'}}</text>
           </view>
         </view>
-        <view class="wm-resize-hint">双指缩放 · 滑杆调大小</view>
+        <view class="wm-resize-hint">双指缩放图片/水印 · 滑杆调参数</view>
       </view>
     </view>
   </view>
@@ -64,7 +66,20 @@
     <!-- 设置内容（可折叠） -->
     <view class="panel-content" wx:if="{{!panelCollapsed}}">
       <view class="setting-row">
-        <text class="setting-label">缩放比例</text>
+        <text class="setting-label">水印宽度</text>
+        <slider
+          class="scale-slider"
+          min="0.28"
+          max="0.85"
+          step="0.03"
+          value="{{wmWidthRatio}}"
+          bindchange="onWidthChange"
+          activeColor="#07c160"
+        />
+        <text class="scale-value">{{widthLabel}}</text>
+      </view>
+      <view class="setting-row">
+        <text class="setting-label">水印大小</text>
         <slider
           class="scale-slider"
           min="0.5"

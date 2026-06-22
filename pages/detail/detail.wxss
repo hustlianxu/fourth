@@ -1,8 +1,85 @@
+.img-area {
+  position: relative;
+  margin-bottom: 16rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #eee;
+}
+
 .big-img {
   width: 100%;
   border-radius: 16rpx;
   background: #eee;
-  margin-bottom: 16rpx;
+  display: block;
+}
+
+/* 编辑模式水印层 */
+.detail-wm-layer {
+  position: absolute;
+  background: rgba(0,0,0,0.75);
+  border-radius: 12rpx;
+  padding: 10rpx 14rpx;
+  z-index: 10;
+  min-width: 160rpx;
+  transform-origin: top left;
+  border: 2rpx solid rgba(7,193,96,0.5);
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.4);
+}
+
+.detail-wm-handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6rpx;
+  margin-bottom: 6rpx;
+  border-bottom: 1rpx solid rgba(255,255,255,0.15);
+}
+
+.wm-drag-dots {
+  display: flex;
+  gap: 3rpx;
+}
+
+.wm-dot {
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+}
+
+.wm-drag-label {
+  font-size: 18rpx;
+  color: rgba(255,255,255,0.5);
+}
+
+.detail-wm-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4rpx;
+}
+
+.detail-wm-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-wm-row.wide {
+  flex-direction: row;
+  align-items: baseline;
+}
+
+.detail-wm-row.wide .detail-wm-label {
+  flex-shrink: 0;
+  margin-right: 6rpx;
+}
+
+.detail-wm-label {
+  font-size: 18rpx;
+  color: rgba(255,230,140,0.85);
+}
+
+.detail-wm-value {
+  font-size: 20rpx;
+  color: #fff;
 }
 
 .field-row {
@@ -35,6 +112,35 @@
   padding: 12rpx;
   border-radius: 8rpx;
   font-size: 28rpx;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.setting-row:last-child {
+  margin-bottom: 0;
+}
+
+.setting-label {
+  font-size: 26rpx;
+  color: #666;
+  width: 100rpx;
+  flex-shrink: 0;
+}
+
+.setting-row slider {
+  flex: 1;
+  margin: 0 16rpx;
+}
+
+.setting-val {
+  font-size: 24rpx;
+  color: #07c160;
+  width: 80rpx;
+  text-align: right;
 }
 
 .issue {

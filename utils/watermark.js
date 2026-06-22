@@ -53,7 +53,7 @@ function parseColor(color, defaultAlpha) {
  * @returns {Promise<string>} 导出后的临时文件路径
  */
 async function renderWatermarkedImage(params) {
-  const { imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity, maxEdge: maxEdgeOverride } = params;
+  const { imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity, maxEdge: maxEdgeOverride, widthRatio } = params;
 
   console.log('[Watermark] renderWatermarkedImage 开始, imagePath:', imagePath, 'imgSize:', imgW + 'x' + imgH);
 
@@ -121,7 +121,7 @@ async function renderWatermarkedImage(params) {
   console.log('[Watermark] drawImage 完成');
 
   // 7. 渲染水印
-  renderTemplate(ctx, canvas, template, values, targetW, targetH, relX, relY, customScale, opacity);
+  renderTemplate(ctx, canvas, template, values, targetW, targetH, relX, relY, customScale, opacity, widthRatio);
   console.log('[Watermark] 模板渲染完成');
 
   // 8. 导出为临时文件
@@ -223,18 +223,19 @@ function exportCanvasToFile(canvas, targetW, targetH) {
 /**
  * 逐字段渲染水印
  */
-function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY, customScale, customOpacity) {
+function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY, customScale, customOpacity, customWidthRatio) {
   const style = template.style || {};
   const position = template.position || 'bottom-left';
 
   const ratio = cw / 750;
   const scale = customScale || 1;
+  const widthRatio = customWidthRatio || 0.42;
   const fontSize = Math.max(14, Math.round((style.fontSize || 22) * ratio * scale));
   const lineHeight = Math.round(fontSize * (style.lineHeight || 1.7));
   const padding = Math.round((style.padding || 14) * ratio * scale);
   const borderRadius = Math.round((style.borderRadius || 10) * ratio);
 
-  const blockW = Math.round(cw * 0.42 * scale);
+  const blockW = Math.round(cw * widthRatio * scale);
   const indent = Math.round(fontSize * 1.4);
   const textInnerW = blockW - padding * 2;
 
@@ -242,6 +243,7 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
   ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
 
   // 逐字段分行
+  const isWide = (widthRatio || 0.42) >= 0.5;
   const fieldLineGroups = [];
   (template.fields || []).forEach((f) => {
     const raw = (values && values[f.key]);
@@ -249,24 +251,40 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
     let v = String(raw).trim();
     if (!v) return;
 
+    const labelText = f.label + ':';
+    const isMultiline = f.multiline || f.type === 'textarea';
     const lines = [];
-    lines.push({
-      text: f.label + ':',
-      isLabel: true,
-      type: f.type,
-      color: '#ffe58f'
-    });
 
-    const paragraphs = v.split(/\r?\n/);
-    paragraphs.forEach((p) => {
-      if (!p.trim() && paragraphs.length > 1) {
-        lines.push({ text: '', isLabel: false, type: f.type, color: style.color });
-        return;
+    if (isWide && !isMultiline && !v.includes('\n')) {
+      // 宽模式 + 单行内容：尝试 label:value 同行
+      const combined = labelText + ' ' + v;
+      if (ctx.measureText(combined).width <= textInnerW) {
+        lines.push({
+          text: combined,
+          labelPart: labelText,
+          valuePart: v,
+          isInline: true,
+          type: f.type
+        });
+      } else {
+        // 放不下，降级为两行
+        lines.push({ text: labelText, isLabel: true, type: f.type, color: '#ffe58f' });
+        lines.push({ text: v, isLabel: false, type: f.type, color: style.color });
       }
-      wrapText(ctx, p, textInnerW - indent, fontSize).forEach((sub) => {
-        lines.push({ text: sub, isLabel: false, type: f.type, color: style.color });
+    } else {
+      // 窄模式或多行内容：label 单独一行，内容缩进另起行
+      lines.push({ text: labelText, isLabel: true, type: f.type, color: '#ffe58f' });
+      const paragraphs = v.split(/\r?\n/);
+      paragraphs.forEach((p) => {
+        if (!p.trim() && paragraphs.length > 1) {
+          lines.push({ text: '', isLabel: false, type: f.type, color: style.color });
+          return;
+        }
+        wrapText(ctx, p, textInnerW - indent, fontSize).forEach((sub) => {
+          lines.push({ text: sub, isLabel: false, type: f.type, color: style.color });
+        });
       });
-    });
+    }
 
     fieldLineGroups.push({ lines });
   });
@@ -336,14 +354,25 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
 
   allLines.forEach((ln, i) => {
     if (ln.spacer) return;
-    const tx = x + padding + (ln.isLabel ? 0 : indent);
+    const isContentLine = !ln.isLabel && !ln.isInline;
+    const tx = x + padding + (isContentLine ? indent : 0);
     const ty = y + padding + i * lineHeight;
 
     if (ln.text) {
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
       ctx.strokeText(ln.text, tx, ty);
-      ctx.fillStyle = ln.isLabel ? '#ffe58f' : textColor;
-      ctx.fillText(ln.text, tx, ty);
+
+      if (ln.isInline && ln.labelPart) {
+        // 同行模式：label 黄色 + value 白色
+        ctx.fillStyle = '#ffe58f';
+        ctx.fillText(ln.labelPart, tx, ty);
+        const labelW = ctx.measureText(ln.labelPart + ' ').width;
+        ctx.fillStyle = textColor;
+        ctx.fillText(ln.valuePart, tx + labelW, ty);
+      } else {
+        ctx.fillStyle = ln.isLabel ? '#ffe58f' : textColor;
+        ctx.fillText(ln.text, tx, ty);
+      }
     }
   });
 }
