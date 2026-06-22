@@ -25,6 +25,8 @@ Page({
     wmY: 100,
     wmScale: 1,
     wmOpacity: 0.85,
+    scaleLabel: '100%',
+    opacityLabel: '85%',
     displayFields: [],
     QUICK_POS: QUICK_POS
   },
@@ -158,12 +160,14 @@ Page({
 
   // 缩放滑块
   onScaleChange(e) {
-    this.setData({ wmScale: e.detail.value });
+    const v = e.detail.value;
+    this.setData({ wmScale: v, scaleLabel: Math.round(v * 100) + '%' });
   },
 
   // 透明度滑块
   onOpacityChange(e) {
-    this.setData({ wmOpacity: e.detail.value });
+    const v = e.detail.value;
+    this.setData({ wmOpacity: v, opacityLabel: Math.round(v * 100) + '%' });
   },
 
   // 快速定位

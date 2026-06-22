@@ -50,7 +50,7 @@
           bindchange="onScaleChange"
           activeColor="#07c160"
         />
-        <text class="scale-value">{{(wmScale * 100).toFixed(0)}}%</text>
+        <text class="scale-value">{{scaleLabel}}</text>
       </view>
       <view class="setting-row">
         <text class="setting-label">透明度</text>
@@ -63,7 +63,7 @@
           bindchange="onOpacityChange"
           activeColor="#07c160"
         />
-        <text class="opacity-value">{{(wmOpacity * 100).toFixed(0)}}%</text>
+        <text class="opacity-value">{{opacityLabel}}</text>
       </view>
       <view class="pos-quick">
         <text class="setting-label">快速定位</text>
