@@ -283,11 +283,20 @@ Page({
     wx.showLoading({ title: '生成水印...', mask: true });
 
     try {
+      const imgW = this.data.photoInfo.width || 1080;
+      const imgH = this.data.photoInfo.height || 1440;
+      
       // 计算实际位置和缩放（相对于原图）
-      const ratio = this.data.photoInfo.width / this.screenWidth;
+      const ratio = imgW / this.screenWidth;
       const actualX = this.data.wmX * ratio;
       const actualY = this.data.wmY * ratio;
       const actualScale = this.data.wmScale;
+
+      console.log('开始绘制水印:', {
+        imgW, imgH, actualX, actualY, actualScale,
+        canvasWidth: this.canvas.width,
+        canvasHeight: this.canvas.height
+      });
 
       await watermark.drawWatermark({
         ctx: this.ctx2d,
@@ -295,15 +304,19 @@ Page({
         imagePath: this.data.photo,
         template: this.data.template,
         values: this.data.values,
-        imgW: this.data.photoInfo.width,
-        imgH: this.data.photoInfo.height,
+        imgW: imgW,
+        imgH: imgH,
         customX: actualX,
         customY: actualY,
         customScale: actualScale,
         opacity: this.data.wmOpacity
       });
 
-      const outPath = await watermark.canvasToTempFilePath(this.canvas);
+      // 使用原始图片尺寸导出，确保高质量
+      const outPath = await watermark.canvasToTempFilePath(this.canvas, {
+        destWidth: this.canvas.width,
+        destHeight: this.canvas.height
+      });
 
       const record = {
         id: storage.genId(),

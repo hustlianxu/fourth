@@ -276,14 +276,49 @@ function roundRect(ctx, x, y, w, h, r, fill) {
   ctx.fill();
 }
 
-function canvasToTempFilePath(canvas) {
+function canvasToTempFilePath(canvas, options = {}) {
+  const { destWidth, destHeight } = options;
+  
   return new Promise((resolve, reject) => {
-    wx.canvasToTempFilePath({
+    // 显式设置导出尺寸，确保高质量输出
+    const exportOptions = {
       canvas: canvas,
       fileType: 'jpg',
-      quality: 0.98,
-      success: (res) => resolve(res.tempFilePath),
-      fail: reject
+      quality: 0.98
+    };
+    
+    // 如果提供了目标尺寸，使用目标尺寸
+    if (destWidth && destHeight) {
+      exportOptions.destWidth = destWidth;
+      exportOptions.destHeight = destHeight;
+    }
+    
+    console.log('canvasToTempFilePath:', {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      destWidth: exportOptions.destWidth,
+      destHeight: exportOptions.destHeight,
+      quality: exportOptions.quality
+    });
+    
+    wx.canvasToTempFilePath(exportOptions, {
+      success: (res) => {
+        // 获取导出后的文件信息
+        wx.getFileInfo({
+          filePath: res.tempFilePath,
+          success: (info) => {
+            console.log('导出后文件大小:', info.size, '字节');
+          },
+          fail: (err) => {
+            console.error('获取文件信息失败:', err);
+          }
+        });
+        resolve(res.tempFilePath);
+      },
+      fail: (err) => {
+        console.error('canvasToTempFilePath 失败:', err);
+        reject(err);
+      }
     });
   });
 }

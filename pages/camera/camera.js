@@ -176,9 +176,23 @@ Page({
     this.ctx.takePhoto({
       quality: 'high',
       success: (res) => {
+        console.log('拍照成功，临时文件路径:', res.tempImagePath);
+        
+        // 获取拍照后的文件信息
+        wx.getFileInfo({
+          filePath: res.tempImagePath,
+          success: (fileInfo) => {
+            console.log('拍照文件大小:', fileInfo.size, '字节', (fileInfo.size / 1024).toFixed(2) + 'KB');
+          },
+          fail: (err) => {
+            console.error('获取文件信息失败:', err);
+          }
+        });
+        
         wx.getImageInfo({
           src: res.tempImagePath,
           success: (info) => {
+            console.log('拍照图片尺寸:', info.width, 'x', info.height);
             this._goPreview(res.tempImagePath, { width: info.width, height: info.height });
           },
           fail: () => {
