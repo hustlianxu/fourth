@@ -4,6 +4,19 @@ const storage = require('../../utils/storage.js');
 const watermark = require('../../utils/watermark.js');
 const ocr = require('../../utils/ocr.js');
 
+// 水印位置选项（9个：左上/中上/右上 + 左中/正中/右中 + 左下/中下/右下）
+const POSITIONS = [
+  { id: 'top-left',     grid: '1 / 1', label: '左上' },
+  { id: 'top-center',   grid: '1 / 2', label: '上中' },
+  { id: 'top-right',    grid: '1 / 3', label: '右上' },
+  { id: 'center-left',  grid: '2 / 1', label: '左中' },
+  { id: 'center',       grid: '2 / 2', label: '正中' },
+  { id: 'center-right', grid: '2 / 3', label: '右中' },
+  { id: 'bottom-left',  grid: '3 / 1', label: '左下' },
+  { id: 'bottom-center',grid: '3 / 2', label: '下中' },
+  { id: 'bottom-right', grid: '3 / 3', label: '右下' }
+];
+
 Page({
   data: {
     template: null,
@@ -12,30 +25,32 @@ Page({
     photo: null,
     photoInfo: null,
     stage: 'camera',
-    ocrResult: null,
-    verifyIssues: [],
-    showTplPicker: false
+    showTplPicker: false,
+    formOpen: false,      // 表单是否展开
+    wPos: 'bottom-left',  // 当前选中的水印位置
+    POSITIONS: POSITIONS,
+    filledSummary: []
   },
 
   ctx: null,
   canvas: null,
 
   onLoad(options) {
-    const tplId = options.templateId || 'simple';
+    const tplId = options.templateId || 'handwrite';
     const tpl = templates.getTemplateById(tplId);
+    const defaultVals = templates.getDefaultValues(tpl);
     this.setData({
       template: tpl,
       templates: templates.TEMPLATES,
-      values: templates.getDefaultValues(tpl)
+      values: defaultVals,
+      wPos: (tpl && tpl.position) || 'bottom-left'
     });
-
-    // 获取相机 context（旧版兼容）
+    this._updateSummary();
     this.ctx = wx.createCameraContext();
   },
 
   onReady() {
-    const query = wx.createSelectorQuery();
-    query.select('#wmCanvas')
+    wx.createSelectorQuery().select('#wmCanvas')
       .fields({ node: true, size: true })
       .exec((res) => {
         if (res && res[0] && res[0].node) {
@@ -45,7 +60,82 @@ Page({
       });
   },
 
-  // 切换模板
+  // 切换表单展开/收起
+  toggleForm() {
+    this.setData({ formOpen: !this.data.formOpen });
+  },
+
+  // 设置水印位置
+  onSetPos(e) {
+    const pos = e.currentTarget.dataset.pos;
+    this.setData({ wPos: pos });
+  },
+
+  // 更新概要标签行（已填字段显示为标签）
+  _updateSummary() {
+    const fields = (this.data.template && this.data.template.fields) || [];
+    const vals = this.data.values || {};
+    const summary = [];
+    fields.forEach((f) => {
+      const v = vals[f.key];
+      if (v && String(v).trim()) {
+        // 截取前 12 个字符
+        const short = String(v).trim().slice(0, 12);
+        summary.push(short);
+      }
+    });
+    this.setData({ filledSummary: summary });
+  },
+
+  // 字段输入
+  onFieldInput(e) {
+    const key = e.currentTarget.dataset.key;
+    const val = e.detail.value;
+    const values = Object.assign({}, this.data.values, { [key]: val });
+    this.setData({ values });
+    this._updateSummary();
+  },
+
+  onSelectChange(e) {
+    const key = e.currentTarget.dataset.key;
+    const range = e.currentTarget.dataset.range;
+    const idx = e.detail.value;
+    const values = Object.assign({}, this.data.values, { [key]: range[idx] });
+    this.setData({ values });
+    this._updateSummary();
+  },
+
+  // 获取定位
+  onGetLocation() {
+    wx.getLocation({
+      type: 'gcj02',
+      success: (res) => {
+        const location = 'Loc ' + res.latitude.toFixed(4) + ',' + res.longitude.toFixed(4);
+        const values = Object.assign({}, this.data.values, { location });
+        this.setData({ values });
+        this._updateSummary();
+        wx.showToast({ title: '已定位', icon: 'success' });
+      },
+      fail: () => {
+        wx.showToast({ title: '定位失败', icon: 'none' });
+      }
+    });
+  },
+
+  // 刷新时间
+  onRefreshTime() {
+    const now = new Date();
+    const values = Object.assign({}, this.data.values);
+    (this.data.template.fields || []).forEach((f) => {
+      if (f.type === 'datetime') values[f.key] = templates.formatDateTime(now);
+      if (f.type === 'date') values[f.key] = templates.formatDate(now);
+      if (f.type === 'time') values[f.key] = templates.formatTime(now);
+    });
+    this.setData({ values });
+    this._updateSummary();
+  },
+
+  // 模板选择
   onTplTap() {
     this.setData({ showTplPicker: true });
   },
@@ -56,57 +146,28 @@ Page({
     this.setData({
       template: tpl,
       values: templates.getDefaultValues(tpl, { location: this.data.values.location }),
-      showTplPicker: false
+      wPos: (tpl && tpl.position) || 'bottom-left',
+      formOpen: false
     });
+    this._updateSummary();
   },
 
   closePicker() {
     this.setData({ showTplPicker: false });
   },
 
-  // 字段输入
-  onFieldInput(e) {
-    const key = e.currentTarget.dataset.key;
-    const val = e.detail.value;
-    const values = Object.assign({}, this.data.values, { [key]: val });
-    this.setData({ values });
-  },
-
-  onSelectChange(e) {
-    const key = e.currentTarget.dataset.key;
-    const range = e.currentTarget.dataset.range;
-    const idx = e.detail.value;
-    const values = Object.assign({}, this.data.values, { [key]: range[idx] });
-    this.setData({ values });
-  },
-
-  // 获取定位
-  onGetLocation() {
-    wx.getLocation({
-      type: 'gcj02',
-      success: (res) => {
-        const location = 'Loc ' + res.latitude.toFixed(4) + ', ' + res.longitude.toFixed(4);
-        const values = Object.assign({}, this.data.values, { location });
-        this.setData({ values });
-        wx.showToast({ title: '位置已获取', icon: 'success' });
-      },
-      fail: () => {
-        wx.showToast({ title: '获取位置失败', icon: 'none' });
-      }
-    });
-  },
-
-  // 使用当前时间刷新
-  onRefreshTime() {
-    const now = new Date();
-    const values = Object.assign({}, this.data.values);
+  // 校验
+  validate() {
     const fields = this.data.template.fields || [];
-    fields.forEach((f) => {
-      if (f.type === 'datetime') values[f.key] = templates.formatDateTime(now);
-      if (f.type === 'date') values[f.key] = templates.formatDate(now);
-      if (f.type === 'time') values[f.key] = templates.formatTime(now);
-    });
-    this.setData({ values });
+    const values = this.data.values || {};
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i];
+      if (f.required && (!values[f.key] || !String(values[f.key]).trim())) {
+        wx.showToast({ title: f.label + ' 不能为空', icon: 'none' });
+        return false;
+      }
+    }
+    return true;
   },
 
   // 拍照
@@ -125,67 +186,40 @@ Page({
             });
           },
           fail: () => {
-            this.setData({
-              photo: res.tempImagePath,
-              photoInfo: { width: 1080, height: 1440 },
-              stage: 'preview'
-            });
+            this.setData({ photo: res.tempImagePath, photoInfo: { width: 1080, height: 1440 }, stage: 'preview' });
           }
         });
       },
-      fail: () => {
-        wx.showToast({ title: '拍照失败', icon: 'none' });
-      }
+      fail: () => wx.showToast({ title: '拍照失败', icon: 'none' })
     });
   },
 
-  // 从相册选择
+  // 相册
   onPickImage() {
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
       sourceType: ['album'],
       success: (res) => {
-        const file = res.tempFiles[0];
         wx.getImageInfo({
-          src: file.tempFilePath,
+          src: res.tempFiles[0].tempFilePath,
           success: (info) => {
-            this.setData({
-              photo: file.tempFilePath,
-              photoInfo: { width: info.width, height: info.height },
-              stage: 'preview'
-            });
+            this.setData({ photo: info.path, photoInfo: { width: info.width, height: info.height }, stage: 'preview' });
+          },
+          fail: () => {
+            this.setData({ photo: res.tempFiles[0].tempFilePath, photoInfo: { width: 1080, height: 1440 }, stage: 'preview' });
           }
         });
       }
     });
   },
 
-  validate() {
-    const fields = this.data.template.fields || [];
-    const values = this.data.values || {};
-    for (let i = 0; i < fields.length; i++) {
-      const f = fields[i];
-      if (f.required && (!values[f.key] || !String(values[f.key]).trim())) {
-        wx.showToast({ title: f.label + ' 不能为空', icon: 'none' });
-        return false;
-      }
-    }
-    return true;
-  },
-
-  // 返回重拍
+  // 重拍
   onRetake() {
-    this.setData({
-      photo: null,
-      photoInfo: null,
-      stage: 'camera',
-      ocrResult: null,
-      verifyIssues: []
-    });
+    this.setData({ stage: 'camera', photo: null, photoInfo: null });
   },
 
-  // 合成水印并保存
+  // 合成并保存
   async onSave() {
     if (!this.ctx2d || !this.canvas) {
       wx.showToast({ title: 'Canvas 未就绪', icon: 'none' });
@@ -193,30 +227,31 @@ Page({
     }
     wx.showLoading({ title: '生成水印...', mask: true });
     try {
+      // 将用户选择的水印位置合并进模板对象
+      const renderTpl = Object.assign({}, this.data.template, { position: this.data.wPos });
+
       await watermark.drawWatermark({
         ctx: this.ctx2d,
         canvas: this.canvas,
         imagePath: this.data.photo,
-        template: this.data.template,
+        template: renderTpl,
         values: this.data.values,
         imgW: this.data.photoInfo.width,
         imgH: this.data.photoInfo.height
       });
+
       const outPath = await watermark.canvasToTempFilePath(this.canvas);
-      // 尝试识别 OCR（若云函数可用），失败则跳过
+
       let ocrResult = null;
-      try {
-        ocrResult = await ocr.recognize(outPath);
-      } catch (e) {
-        ocrResult = null;
-      }
+      try { ocrResult = await ocr.recognize(outPath); } catch (_) {}
+
       const issues = ocr.verify(this.data.values, ocrResult);
 
-      // 保存到本地存储
       const record = {
         id: storage.genId(),
         templateId: this.data.template.id,
         templateName: this.data.template.name,
+        watermarkPosition: this.data.wPos,
         values: this.data.values,
         imagePath: outPath,
         originalPath: this.data.photo,
@@ -228,26 +263,17 @@ Page({
       };
       storage.add(record);
 
-      // 保存到相册
       try {
         await new Promise((resolve, reject) => {
-          wx.saveImageToPhotosAlbum({
-            filePath: outPath,
-            success: resolve,
-            fail: reject
-          });
+          wx.saveImageToPhotosAlbum({ filePath: outPath, success: resolve, fail: reject });
         });
-      } catch (e) {
-        // 用户拒绝或无权限不阻塞
-      }
+      } catch (_) {}
 
       wx.hideLoading();
       const hasIssues = issues && issues.length > 0;
       wx.showModal({
-        title: hasIssues ? '已保存，请确认' : '保存成功',
-        content: hasIssues
-          ? '已入库。' + issues.map((i) => '· ' + i.message).join('\n')
-          : '照片已带水印并与数据关联入库。',
+        title: '已保存',
+        content: hasIssues ? '已入库。' + issues.map((i) => i.message).join('\n') : '带水印照片已保存并入库。',
         showCancel: false,
         success: () => {
           wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });

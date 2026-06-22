@@ -60,14 +60,14 @@ function renderTemplate(ctx, canvas, template, values, cw, ch) {
   const position = template.position || 'bottom-left';
 
   const ratio = cw / 750;
-  const fontSize = Math.max(16, Math.round((style.fontSize || 26) * ratio));
-  const lineHeight = Math.round(fontSize * (style.lineHeight || 1.8));
-  const padding = Math.round((style.padding || 22) * ratio);
-  const borderRadius = Math.round((style.borderRadius || 12) * ratio);
+  const fontSize = Math.max(14, Math.round((style.fontSize || 22) * ratio));
+  const lineHeight = Math.round(fontSize * (style.lineHeight || 1.7));
+  const padding = Math.round((style.padding || 14) * ratio);
+  const borderRadius = Math.round((style.borderRadius || 10) * ratio);
 
-  // 水印块宽度：图片宽度的 85%
-  const blockW = Math.round(cw * 0.85);
-  const indent = Math.round(fontSize * 1.8);
+  // 水印块宽度：图片宽度的 42%（紧凑，不遮挡主体画面）
+  const blockW = Math.round(cw * 0.42);
+  const indent = Math.round(fontSize * 1.4);
 
   // 文本可写宽度
   const textInnerW = blockW - padding * 2;
@@ -119,22 +119,29 @@ function renderTemplate(ctx, canvas, template, values, cw, ch) {
 
   const blockH = padding * 2 + allLines.length * lineHeight;
 
-  // 计算坐标（水印块定位
+  // 计算坐标（水印块定位，支持9个位置）
   const margin = Math.round(cw * 0.04);
+  const cx = (cw - blockW) / 2;
   let x = margin;
   let y = margin;
   if (position === 'top-left') {
     x = margin; y = margin;
+  } else if (position === 'top-center') {
+    x = cx; y = margin;
   } else if (position === 'top-right') {
     x = cw - blockW - margin; y = margin;
-  } else if (position === 'top-center') {
-    x = (cw - blockW) / 2; y = margin;
+  } else if (position === 'center-left') {
+    x = margin; y = (ch - blockH) / 2;
+  } else if (position === 'center') {
+    x = cx; y = (ch - blockH) / 2;
+  } else if (position === 'center-right') {
+    x = cw - blockW - margin; y = (ch - blockH) / 2;
   } else if (position === 'bottom-left') {
     x = margin; y = ch - blockH - margin;
+  } else if (position === 'bottom-center') {
+    x = cx; y = ch - blockH - margin;
   } else if (position === 'bottom-right') {
     x = cw - blockW - margin; y = ch - blockH - margin;
-  } else if (position === 'bottom-center') {
-    x = (cw - blockW) / 2; y = ch - blockH - margin;
   }
 
   // 保证水印不会超出图片上边缘

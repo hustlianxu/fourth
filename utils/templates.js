@@ -8,14 +8,14 @@ const TEMPLATES = [
     id: 'handwrite',
     name: '手写·双语',
     description: 'Formato anotación · 货号 + 西语描述 + 中文描述 + 单价 + 装箱数 + 件数 + 体积 + 日期',
-    position: 'bottom-left',
+    position: 'bottom-right',
     style: {
-      fontSize: 26,
+      fontSize: 22,
       color: '#ffffff',
-      background: 'rgba(0,0,0,0.72)',
-      padding: 22,
-      borderRadius: 12,
-      lineHeight: 1.75
+      background: 'rgba(0,0,0,0.70)',
+      padding: 14,
+      borderRadius: 10,
+      lineHeight: 1.7
     },
     fields: [
       { key: 'modelo', label: '货号 · Modelo / Código', type: 'text', placeholder: '如：RL-034 · HB098', required: false },
@@ -36,14 +36,14 @@ const TEMPLATES = [
     id: 'handwriteSimple',
     name: '手写·精简',
     description: 'Formato corto · 货号 + 西语描述 + 单价 + 装箱数 + 日期',
-    position: 'bottom-left',
+    position: 'bottom-right',
     style: {
-      fontSize: 28,
+      fontSize: 24,
       color: '#ffffff',
-      background: 'rgba(0,0,0,0.72)',
-      padding: 22,
-      borderRadius: 12,
-      lineHeight: 1.75
+      background: 'rgba(0,0,0,0.70)',
+      padding: 14,
+      borderRadius: 10,
+      lineHeight: 1.7
     },
     fields: [
       { key: 'modelo', label: '货号 · Modelo', type: 'text', placeholder: '如：RL-034', required: true },
