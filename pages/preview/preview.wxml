@@ -69,8 +69,8 @@
         <text class="setting-label">快速定位</text>
         <view class="pos-grid">
           <view wx:for="{{QUICK_POS}}" wx:key="id" 
-            class="pos-btn"
-            data-x="{{item.x}}" data-y="{{item.y}}"
+            class="pos-btn {{currentPos === item.id ? 'active' : ''}}"
+            data-x="{{item.x}}" data-y="{{item.y}}" data-id="{{item.id}}"
             bindtap="onQuickPos">
             {{item.label}}
           </view>

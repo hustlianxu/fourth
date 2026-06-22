@@ -28,7 +28,8 @@ Page({
     scaleLabel: '100%',
     opacityLabel: '85%',
     displayFields: [],
-    QUICK_POS: QUICK_POS
+    QUICK_POS: QUICK_POS,
+    currentPos: 'br'
   },
 
   ctx2d: null,
@@ -52,40 +53,44 @@ Page({
     this.screenWidth = sysInfo.windowWidth;
     this.screenHeight = sysInfo.windowHeight;
 
-    // 从 options 获取参数（处理 URL 解码）
-    let photo = options.photo;
-    try {
-      photo = decodeURIComponent(options.photo || '');
-    } catch (e) {
-      photo = options.photo || '';
-    }
-
+    // 从全局变量获取参数（避免 URL 长度限制问题）
+    const app = getApp();
+    const previewData = app.globalData && app.globalData.previewData;
+    
+    let photo = '';
     let photoInfo = { width: 1080, height: 1440 };
-    try {
-      photoInfo = JSON.parse(decodeURIComponent(options.photoInfo || '{"width":1080,"height":1440}'));
-    } catch (e) {
+    let template = {};
+    let values = {};
+
+    if (previewData) {
+      photo = previewData.photo || '';
+      try {
+        photoInfo = JSON.parse(previewData.photoInfo || '{"width":1080,"height":1440}');
+      } catch (e) {}
+      try {
+        template = JSON.parse(previewData.template || '{}');
+      } catch (e) {}
+      try {
+        values = JSON.parse(previewData.values || '{}');
+      } catch (e) {}
+      // 清空临时数据
+      app.globalData.previewData = null;
+    } else {
+      // 降级使用 URL 参数
+      photo = options.photo || '';
       try {
         photoInfo = JSON.parse(options.photoInfo || '{"width":1080,"height":1440}');
-      } catch (e2) {}
-    }
-
-    let template = {};
-    try {
-      template = JSON.parse(decodeURIComponent(options.template || '{}'));
-    } catch (e) {
+      } catch (e) {}
       try {
         template = JSON.parse(options.template || '{}');
-      } catch (e2) {}
-    }
-
-    let values = {};
-    try {
-      values = JSON.parse(decodeURIComponent(options.values || '{}'));
-    } catch (e) {
+      } catch (e) {}
       try {
         values = JSON.parse(options.values || '{}');
-      } catch (e2) {}
+      } catch (e) {}
     }
+
+    console.log('preview photo:', photo);
+    console.log('preview template:', template);
 
     this.setData({
       photo: photo,
@@ -208,6 +213,7 @@ Page({
   onQuickPos(e) {
     const x = e.currentTarget.dataset.x;
     const y = e.currentTarget.dataset.y;
+    const posId = e.currentTarget.dataset.id;
     let newX, newY;
 
     if (x === '10%') newX = 20;
@@ -218,7 +224,7 @@ Page({
     else if (y === '50%') newY = (this.screenHeight - 350 - this.wmHeight) / 2;
     else newY = this.screenHeight - 350 - this.wmHeight - 20;
 
-    this.setData({ wmX: newX, wmY: newY });
+    this.setData({ wmX: newX, wmY: newY, currentPos: posId });
   },
 
   // 返回

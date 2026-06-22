@@ -192,14 +192,28 @@ Page({
 
   // 跳转到预览页
   _goPreview(photo, photoInfo) {
-    const params = {
-      photo: encodeURIComponent(photo),
-      photoInfo: encodeURIComponent(JSON.stringify(photoInfo)),
-      template: encodeURIComponent(JSON.stringify(this.data.template)),
-      values: encodeURIComponent(JSON.stringify(this.data.values))
-    };
-    const url = `/pages/preview/preview?${Object.keys(params).map(k => `${k}=${params[k]}`).join('&')}`;
-    wx.navigateTo({ url });
+    try {
+      const params = {
+        photo: photo,
+        photoInfo: JSON.stringify(photoInfo),
+        template: JSON.stringify(this.data.template),
+        values: JSON.stringify(this.data.values)
+      };
+      wx.navigateTo({ 
+        url: `/pages/preview/preview`,
+        success: () => {
+          console.log('navigateTo success');
+        },
+        fail: (err) => {
+          console.error('navigateTo failed:', err);
+        }
+      });
+      // 使用全局变量临时存储数据
+      getApp().globalData.previewData = params;
+    } catch (e) {
+      console.error('_goPreview error:', e);
+      wx.showToast({ title: '跳转失败', icon: 'none' });
+    }
   },
 
   // 相册
