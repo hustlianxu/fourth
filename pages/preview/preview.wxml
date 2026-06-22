@@ -8,30 +8,35 @@
 
   <!-- 预览区域 -->
   <view class="preview-area">
-    <image 
-      class="preview-img" 
-      src="{{photo}}" 
-      mode="aspectFit"
-      bindtouchstart="onTouchStart"
-      bindtouchmove="onTouchMove"
-      bindtouchend="onTouchEnd"
-    />
+    <!-- 图片容器 -->
+    <view class="img-container" style="width:{{imgDisplayWidth}}px;height:{{imgDisplayHeight}}px;">
+      <image 
+        class="preview-img" 
+        src="{{photo}}" 
+        mode="aspectFit"
+        bindtouchstart="onTouchStart"
+        bindtouchmove="onTouchMove"
+        bindtouchend="onTouchEnd"
+        bindload="onImgLoad"
+        binderror="onImgError"
+      />
 
-    <!-- 可拖动的水印层 -->
-    <view 
-      class="watermark-layer"
-      style="left: {{wmX}}px; top: {{wmY}}px; transform: scale({{wmScale}});"
-      bindtouchstart="onWmTouchStart"
-      bindtouchmove="onWmTouchMove"
-      bindtouchend="onWmTouchEnd"
-    >
-      <view class="wm-content">
-        <view wx:for="{{displayFields}}" wx:key="key" class="wm-row">
-          <text class="wm-label">{{item.label}}:</text>
-          <text class="wm-value">{{item.value || '-'}}</text>
+      <!-- 可拖动的水印层 -->
+      <view 
+        class="watermark-layer"
+        style="left: {{wmX}}px; top: {{wmY}}px; transform: scale({{wmScale}});"
+        bindtouchstart="onWmTouchStart"
+        bindtouchmove="onWmTouchMove"
+        bindtouchend="onWmTouchEnd"
+      >
+        <view class="wm-content">
+          <view wx:for="{{displayFields}}" wx:key="key" class="wm-row">
+            <text class="wm-label">{{item.label}}:</text>
+            <text class="wm-value">{{item.value || '-'}}</text>
+          </view>
         </view>
+        <view class="wm-resize-hint">拖动调整位置，双指缩放大小</view>
       </view>
-      <view class="wm-resize-hint">拖动调整位置，双指缩放大小</view>
     </view>
   </view>
 

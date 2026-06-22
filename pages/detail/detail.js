@@ -1,7 +1,7 @@
 // pages/detail/detail.js
 const storage = require('../../utils/storage.js');
 const templates = require('../../utils/templates.js');
-const ocr = require('../../utils/ocr.js');
+const watermark = require('../../utils/watermark.js');
 
 Page({
   data: {
@@ -14,8 +14,23 @@ Page({
     verifyIssues: []
   },
 
+  recordId: '',
+  ctx2d: null,
+  canvas: null,
+
   onLoad(options) {
     this.recordId = options.id;
+  },
+
+  onReady() {
+    wx.createSelectorQuery().select('#wmCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        if (res && res[0] && res[0].node) {
+          this.canvas = res[0].node;
+          this.ctx2d = res[0].node.getContext('2d');
+        }
+      });
   },
 
   onShow() {
@@ -62,27 +77,73 @@ Page({
     });
   },
 
-  onEditToggle() {
+  async onEditToggle() {
     if (this.data.editing) {
-      // 保存
-      const patch = { values: this.data.editValues };
-      storage.update(this.recordId, patch);
-      // 重新跑一次 OCR 校验
-      ocr.recognize(this.data.record.imagePath)
-        .catch(() => null)
-        .then((res) => {
-          const issues = ocr.verify(this.data.editValues, res);
-          storage.update(this.recordId, { ocr: res, verifyIssues: issues });
-          this.load();
-          this.setData({ editing: false, editValues: {} });
-          wx.showToast({ title: '已更新', icon: 'success' });
-        });
+      // 保存修改
+      wx.showLoading({ title: '保存中...', mask: true });
+      
+      try {
+        // 重新渲染水印图片
+        const newImagePath = await this._rerenderWatermark(this.data.editValues);
+        
+        // 更新记录
+        const patch = { 
+          values: this.data.editValues,
+          imagePath: newImagePath
+        };
+        storage.update(this.recordId, patch);
+        
+        wx.hideLoading();
+        wx.showToast({ title: '已更新', icon: 'success' });
+        
+        // 重新加载
+        this.load();
+        this.setData({ editing: false, editValues: {} });
+      } catch (e) {
+        wx.hideLoading();
+        wx.showToast({ title: '更新失败', icon: 'none' });
+        console.error('重新渲染水印失败:', e);
+      }
     } else {
       this.setData({
         editing: true,
         editValues: Object.assign({}, this.data.record.values)
       });
     }
+  },
+
+  // 重新渲染水印
+  async _rerenderWatermark(newValues) {
+    if (!this.ctx2d || !this.canvas) {
+      throw new Error('Canvas 未就绪');
+    }
+
+    const record = this.data.record;
+    const tpl = templates.getTemplateById(record.templateId);
+    
+    if (!tpl) {
+      throw new Error('模板不存在');
+    }
+
+    // 使用原图重新渲染
+    const originalPath = record.originalPath || record.imagePath;
+    
+    await watermark.drawWatermark({
+      ctx: this.ctx2d,
+      canvas: this.canvas,
+      imagePath: originalPath,
+      template: tpl,
+      values: newValues,
+      imgW: record.width || 1080,
+      imgH: record.height || 1440,
+      customX: record.watermarkX,
+      customY: record.watermarkY,
+      customScale: record.watermarkScale || 1,
+      opacity: record.watermarkOpacity || 0.85
+    });
+
+    const outPath = await watermark.canvasToTempFilePath(this.canvas);
+    return outPath;
   },
 
   onFieldInput(e) {
@@ -95,7 +156,7 @@ Page({
   onDelete() {
     wx.showModal({
       title: '删除确认',
-      content: '将从本地删除本条记录（已保存到相册的照片不会被删除）。',
+      content: '确定要删除本条记录吗？',
       success: (res) => {
         if (res.confirm) {
           storage.remove(this.recordId);
@@ -109,6 +170,6 @@ Page({
     return {
       title: '水印相机 · ' + (this.data.record ? this.data.record.templateName : ''),
       path: '/pages/index/index'
-    };
+    }
   }
 });

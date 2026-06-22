@@ -49,13 +49,24 @@
   flex: 1;
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding-top: calc(100rpx + env(safe-area-inset-top));
+  padding-bottom: 400rpx;
+}
+
+.img-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-img {
   width: 100%;
-  height: calc(100% - 100rpx - env(safe-area-inset-top));
-  object-fit: contain;
+  height: 100%;
+  background: #1a1a1a;
 }
 
 /* 可拖动水印层 */

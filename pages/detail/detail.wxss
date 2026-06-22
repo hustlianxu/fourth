@@ -42,3 +42,10 @@
   font-size: 26rpx;
   margin-top: 8rpx;
 }
+
+/* 隐藏的 canvas */
+.offscreen {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+}

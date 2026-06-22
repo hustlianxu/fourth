@@ -29,7 +29,9 @@ Page({
     opacityLabel: '85%',
     displayFields: [],
     QUICK_POS: QUICK_POS,
-    currentPos: 'br'
+    currentPos: 'br',
+    imgDisplayWidth: 300,
+    imgDisplayHeight: 400
   },
 
   ctx2d: null,
@@ -90,7 +92,7 @@ Page({
     }
 
     console.log('preview photo:', photo);
-    console.log('preview template:', template);
+    console.log('preview photoInfo:', photoInfo);
 
     this.setData({
       photo: photo,
@@ -102,12 +104,40 @@ Page({
     // 计算显示字段
     this._calcDisplayFields();
 
+    // 计算图片显示尺寸
+    this._calcImgDisplaySize();
+
     // 初始化水印位置（右下角）
     this.wmWidth = this.screenWidth * 0.42;
     this.wmHeight = 200;
     this.setData({
       wmX: this.screenWidth - this.wmWidth - 20,
       wmY: this.screenHeight - 400 - this.wmHeight
+    });
+  },
+
+  // 计算图片显示尺寸
+  _calcImgDisplaySize() {
+    const imgW = this.data.photoInfo.width || 1080;
+    const imgH = this.data.photoInfo.height || 1440;
+    const ratio = imgW / imgH;
+    
+    // 可用区域（减去顶部工具栏和底部面板）
+    const availableHeight = this.screenHeight - 200 - 100;
+    const availableWidth = this.screenWidth - 40;
+    
+    let displayW, displayH;
+    if (ratio > availableWidth / availableHeight) {
+      displayW = availableWidth;
+      displayH = displayW / ratio;
+    } else {
+      displayH = availableHeight;
+      displayW = displayH * ratio;
+    }
+    
+    this.setData({
+      imgDisplayWidth: displayW,
+      imgDisplayHeight: displayH
     });
   },
 
@@ -132,6 +162,17 @@ Page({
       value: values[f.key] || ''
     })).filter(f => f.value);
     this.setData({ displayFields: display });
+  },
+
+  // 图片加载成功
+  onImgLoad(e) {
+    console.log('图片加载成功', e.detail);
+  },
+
+  // 图片加载失败
+  onImgError(e) {
+    console.error('图片加载失败', e.detail);
+    wx.showToast({ title: '图片加载失败', icon: 'none' });
   },
 
   // 触摸开始
@@ -232,7 +273,7 @@ Page({
     wx.navigateBack();
   },
 
-  // 保存
+  // 保存（不直接保存到相册，只保存记录）
   async onSave() {
     if (!this.ctx2d || !this.canvas) {
       wx.showToast({ title: 'Canvas 未就绪', icon: 'none' });
@@ -285,21 +326,13 @@ Page({
 
       storage.add(record);
 
-      try {
-        await new Promise((resolve, reject) => {
-          wx.saveImageToPhotosAlbum({ filePath: outPath, success: resolve, fail: reject });
-        });
-      } catch (_) {}
-
       wx.hideLoading();
-      wx.showModal({
-        title: '已保存',
-        content: '带水印照片已保存到相册并入库。',
-        showCancel: false,
-        success: () => {
-          wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });
-        }
-      });
+      wx.showToast({ title: '已保存到记录', icon: 'success' });
+      
+      // 跳转到详情页
+      setTimeout(() => {
+        wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });
+      }, 500);
 
     } catch (e) {
       wx.hideLoading();

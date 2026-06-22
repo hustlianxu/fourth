@@ -16,6 +16,7 @@ App({
   },
   globalData: {
     systemInfo: null,
-    userInfo: null
+    userInfo: null,
+    previewData: null
   }
 });
