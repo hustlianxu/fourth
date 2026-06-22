@@ -16,7 +16,7 @@
       <view wx:for="{{templates}}" wx:key="id" class="template-card" data-id="{{item.id}}" bindtap="onEdit">
         <view class="card-header">
           <text class="tpl-name">{{item.name}}</text>
-          <view class="tpl-actions" bindtap.stop="onCardActions" data-id="{{item.id}}">
+          <view class="tpl-actions" catchtap="onCardActions" data-id="{{item.id}}">
             <text>⋮</text>
           </view>
         </view>
