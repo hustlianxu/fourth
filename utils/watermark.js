@@ -23,7 +23,7 @@ function parseColor(color, defaultAlpha) {
 }
 
 /**
- * 绘制水印（默认图片长边 1920，输出高清可印刷尺寸
+ * 绘制水印（保留原始图片尺寸，不做强制缩放）
  * @param {Object} params
  * @param {CanvasRenderingContext2D} params.ctx
  * @param {HTMLCanvasElement} params.canvas
@@ -39,15 +39,20 @@ function parseColor(color, defaultAlpha) {
  */
 function drawWatermark(params) {
   const { ctx, canvas, imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity } = params;
-  const MAX_EDGE = 1920;
+  
+  // 保留原始图片尺寸，不做强制缩放以保证画质
   let targetW = imgW;
   let targetH = imgH;
+  
+  // 仅在图片过大时进行适度缩小（长边最大 4096，避免内存问题）
+  const MAX_EDGE = 4096;
   const maxEdge = Math.max(imgW, imgH);
-  if (maxEdge > MAX_EDGE || maxEdge < 800) {
+  if (maxEdge > MAX_EDGE) {
     const s = MAX_EDGE / maxEdge;
     targetW = Math.round(imgW * s);
     targetH = Math.round(imgH * s);
   }
+  
   canvas.width = targetW;
   canvas.height = targetH;
   ctx.clearRect(0, 0, targetW, targetH);
@@ -276,7 +281,7 @@ function canvasToTempFilePath(canvas) {
     wx.canvasToTempFilePath({
       canvas: canvas,
       fileType: 'jpg',
-      quality: 0.92,
+      quality: 0.98,
       success: (res) => resolve(res.tempFilePath),
       fail: reject
     });

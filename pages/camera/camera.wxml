@@ -4,7 +4,7 @@
     class="camera"
     device-position="back"
     flash="auto"
-    resolution="medium"
+    resolution="high"
   ></camera>
 
   <!-- 水印位置选择浮层 -->
