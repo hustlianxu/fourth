@@ -34,5 +34,11 @@
     </view>
   </view>
 
+  <view class="row between" style="margin-top:16rpx;">
+    <view class="btn outline" bindtap="goTemplate" style="flex:1;">
+      管理模板 · Templates
+    </view>
+  </view>
+
   <view class="footer" bindtap="goAbout">使用说明</view>
 </view>

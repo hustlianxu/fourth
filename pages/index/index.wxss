@@ -64,6 +64,12 @@
   border-radius: 999rpx;
 }
 
+.btn.outline {
+  background: #fff;
+  color: #07c160;
+  border: 2rpx solid #07c160;
+}
+
 .footer {
   text-align: center;
   color: #999;

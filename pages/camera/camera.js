@@ -179,19 +179,27 @@ Page({
         wx.getImageInfo({
           src: res.tempImagePath,
           success: (info) => {
-            this.setData({
-              photo: res.tempImagePath,
-              photoInfo: { width: info.width, height: info.height },
-              stage: 'preview'
-            });
+            this._goPreview(res.tempImagePath, { width: info.width, height: info.height });
           },
           fail: () => {
-            this.setData({ photo: res.tempImagePath, photoInfo: { width: 1080, height: 1440 }, stage: 'preview' });
+            this._goPreview(res.tempImagePath, { width: 1080, height: 1440 });
           }
         });
       },
       fail: () => wx.showToast({ title: '拍照失败', icon: 'none' })
     });
+  },
+
+  // 跳转到预览页
+  _goPreview(photo, photoInfo) {
+    const params = {
+      photo: encodeURIComponent(photo),
+      photoInfo: encodeURIComponent(JSON.stringify(photoInfo)),
+      template: encodeURIComponent(JSON.stringify(this.data.template)),
+      values: encodeURIComponent(JSON.stringify(this.data.values))
+    };
+    const url = `/pages/preview/preview?${Object.keys(params).map(k => `${k}=${params[k]}`).join('&')}`;
+    wx.navigateTo({ url });
   },
 
   // 相册
@@ -204,85 +212,14 @@ Page({
         wx.getImageInfo({
           src: res.tempFiles[0].tempFilePath,
           success: (info) => {
-            this.setData({ photo: info.path, photoInfo: { width: info.width, height: info.height }, stage: 'preview' });
+            this._goPreview(info.path, { width: info.width, height: info.height });
           },
           fail: () => {
-            this.setData({ photo: res.tempFiles[0].tempFilePath, photoInfo: { width: 1080, height: 1440 }, stage: 'preview' });
+            this._goPreview(res.tempFiles[0].tempFilePath, { width: 1080, height: 1440 });
           }
         });
       }
     });
   },
 
-  // 重拍
-  onRetake() {
-    this.setData({ stage: 'camera', photo: null, photoInfo: null });
-  },
-
-  // 合成并保存
-  async onSave() {
-    if (!this.ctx2d || !this.canvas) {
-      wx.showToast({ title: 'Canvas 未就绪', icon: 'none' });
-      return;
-    }
-    wx.showLoading({ title: '生成水印...', mask: true });
-    try {
-      // 将用户选择的水印位置合并进模板对象
-      const renderTpl = Object.assign({}, this.data.template, { position: this.data.wPos });
-
-      await watermark.drawWatermark({
-        ctx: this.ctx2d,
-        canvas: this.canvas,
-        imagePath: this.data.photo,
-        template: renderTpl,
-        values: this.data.values,
-        imgW: this.data.photoInfo.width,
-        imgH: this.data.photoInfo.height
-      });
-
-      const outPath = await watermark.canvasToTempFilePath(this.canvas);
-
-      let ocrResult = null;
-      try { ocrResult = await ocr.recognize(outPath); } catch (_) {}
-
-      const issues = ocr.verify(this.data.values, ocrResult);
-
-      const record = {
-        id: storage.genId(),
-        templateId: this.data.template.id,
-        templateName: this.data.template.name,
-        watermarkPosition: this.data.wPos,
-        values: this.data.values,
-        imagePath: outPath,
-        originalPath: this.data.photo,
-        width: this.canvas.width,
-        height: this.canvas.height,
-        createdAt: Date.now(),
-        ocr: ocrResult || null,
-        verifyIssues: issues || []
-      };
-      storage.add(record);
-
-      try {
-        await new Promise((resolve, reject) => {
-          wx.saveImageToPhotosAlbum({ filePath: outPath, success: resolve, fail: reject });
-        });
-      } catch (_) {}
-
-      wx.hideLoading();
-      const hasIssues = issues && issues.length > 0;
-      wx.showModal({
-        title: '已保存',
-        content: hasIssues ? '已入库。' + issues.map((i) => i.message).join('\n') : '带水印照片已保存并入库。',
-        showCancel: false,
-        success: () => {
-          wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });
-        }
-      });
-    } catch (e) {
-      wx.hideLoading();
-      wx.showToast({ title: '生成失败', icon: 'none' });
-      console.error(e);
-    }
-  }
 });

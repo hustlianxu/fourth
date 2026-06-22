@@ -1,0 +1,83 @@
+<view class="preview-page">
+  <!-- 顶部工具栏 -->
+  <view class="toolbar">
+    <view class="back-btn" bindtap="onBack">← 返回</view>
+    <view class="toolbar-title">调整水印</view>
+    <view class="save-btn" bindtap="onSave">保存</view>
+  </view>
+
+  <!-- 预览区域 -->
+  <view class="preview-area">
+    <image 
+      class="preview-img" 
+      src="{{photo}}" 
+      mode="aspectFit"
+      bindtouchstart="onTouchStart"
+      bindtouchmove="onTouchMove"
+      bindtouchend="onTouchEnd"
+    />
+
+    <!-- 可拖动的水印层 -->
+    <view 
+      class="watermark-layer"
+      style="left: {{wmX}}px; top: {{wmY}}px; transform: scale({{wmScale}});"
+      bindtouchstart="onWmTouchStart"
+      bindtouchmove="onWmTouchMove"
+      bindtouchend="onWmTouchEnd"
+    >
+      <view class="wm-content">
+        <view wx:for="{{displayFields}}" wx:key="key" class="wm-row">
+          <text class="wm-label">{{item.label}}:</text>
+          <text class="wm-value">{{item.value || '-'}}</text>
+        </view>
+      </view>
+      <view class="wm-resize-hint">拖动调整位置，双指缩放大小</view>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-panel">
+    <view class="panel-title">水印设置</view>
+    <view class="panel-content">
+      <view class="setting-row">
+        <text class="setting-label">缩放比例</text>
+        <slider 
+          class="scale-slider"
+          min="0.5" 
+          max="1.5" 
+          step="0.1" 
+          value="{{wmScale}}" 
+          bindchange="onScaleChange"
+          activeColor="#07c160"
+        />
+        <text class="scale-value">{{(wmScale * 100).toFixed(0)}}%</text>
+      </view>
+      <view class="setting-row">
+        <text class="setting-label">透明度</text>
+        <slider 
+          class="opacity-slider"
+          min="0.3" 
+          max="1" 
+          step="0.05" 
+          value="{{wmOpacity}}" 
+          bindchange="onOpacityChange"
+          activeColor="#07c160"
+        />
+        <text class="opacity-value">{{(wmOpacity * 100).toFixed(0)}}%</text>
+      </view>
+      <view class="pos-quick">
+        <text class="setting-label">快速定位</text>
+        <view class="pos-grid">
+          <view wx:for="{{QUICK_POS}}" wx:key="id" 
+            class="pos-btn"
+            data-x="{{item.x}}" data-y="{{item.y}}"
+            bindtap="onQuickPos">
+            {{item.label}}
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<canvas type="2d" id="wmCanvas" class="offscreen"></canvas>

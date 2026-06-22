@@ -10,8 +10,14 @@ Page({
   },
 
   onLoad() {
+    this.loadTemplates();
+  },
+
+  loadTemplates() {
+    const builtIn = templates.TEMPLATES;
+    const custom = storage.getCustomTemplates() || [];
     this.setData({
-      templates: templates.TEMPLATES
+      templates: [...custom, ...builtIn]
     });
   },
 
@@ -38,11 +44,23 @@ Page({
     });
   },
 
+  goTemplate() {
+    wx.navigateTo({
+      url: '/pages/template/template'
+    });
+  },
+
   goAbout() {
     wx.showModal({
       title: '关于水印相机',
       content: '基于微信小程序原生实现：可选水印模板，据实填写数据；生成带水印的照片并与字段关联保存。可扩展至微信云开发，支持云端 OCR 核验。',
       showCancel: false
     });
+  },
+
+  onShow() {
+    const list = storage.getAll();
+    this.setData({ total: list.length });
+    this.loadTemplates();
   }
 });

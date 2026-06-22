@@ -1,114 +1,97 @@
 <view class="camera-wrap">
-  <!-- ===== 阶段一：拍照 ===== -->
-  <block wx:if="{{stage === 'camera'}}">
-    <camera
-      class="camera"
-      device-position="back"
-      flash="auto"
-      resolution="medium"
-    ></camera>
+  <!-- 拍照阶段 -->
+  <camera
+    class="camera"
+    device-position="back"
+    flash="auto"
+    resolution="medium"
+  ></camera>
 
-    <!-- 水印位置选择浮层（叠加在相机画面右上角） -->
-    <view class="pos-panel">
-      <view class="pos-label">水印位置</view>
-      <view class="pos-grid">
-        <view
-          wx:for="{{POSITIONS}}"
-          wx:key="id"
-          class="pos-dot {{wPos === item.id ? 'active' : ''}}"
-          data-pos="{{item.id}}"
-          bindtap="onSetPos"
-          style="grid-area: {{item.grid}}"
-        ></view>
+  <!-- 水印位置选择浮层 -->
+  <view class="pos-panel">
+    <view class="pos-label">水印位置</view>
+    <view class="pos-grid">
+      <view
+        wx:for="{{POSITIONS}}"
+        wx:key="id"
+        class="pos-dot {{wPos === item.id ? 'active' : ''}}"
+        data-pos="{{item.id}}"
+        bindtap="onSetPos"
+        style="grid-area: {{item.grid}}"
+      ></view>
+    </view>
+  </view>
+
+  <!-- 底部操作栏 -->
+  <view class="bottom-bar {{formOpen ? 'open' : ''}}">
+    <!-- 收起时：概要行 -->
+    <view class="summary-row" bindtap="toggleForm">
+      <view class="summary-tags">
+        <text class="sum-tag" wx:for="{{filledSummary}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="expand-btn">
+        {{formOpen ? '收起 ∧' : '展开 ∨'}}
       </view>
     </view>
 
-    <!-- 底部操作栏（始终可见：收起/展开 + 拍照按钮） -->
-    <view class="bottom-bar {{formOpen ? 'open' : ''}}">
-      <!-- 收起时：概要行 -->
-      <view class="summary-row" bindtap="toggleForm">
-        <view class="summary-tags">
-          <text class="sum-tag" wx:for="{{filledSummary}}" wx:key="*this">{{item}}</text>
-        </view>
-        <view class="expand-btn">
-          {{formOpen ? '收起 ∧' : '展开 ∨'}}
-        </view>
-      </view>
-
-      <!-- 展开的表单 -->
-      <view class="form-body" wx:if="{{formOpen}}">
-        <view class="fields">
-          <block wx:for="{{template.fields}}" wx:key="key">
-            <view class="field">
-              <view class="f-label">
-                <text>{{item.label}}</text>
-                <text class="req" wx:if="{{item.required}}">*</text>
-              </view>
-              <block wx:if="{{item.type === 'textarea' || item.multiline}}">
-                <textarea
-                  class="f-textarea"
-                  placeholder="{{item.placeholder}}"
-                  value="{{values[item.key]}}"
-                  data-key="{{item.key}}"
-                  bindinput="onFieldInput"
-                  auto-height
-                  maxlength="-1"
-                  adjust-position
-                ></textarea>
-              </block>
-              <block wx:elif="{{item.type === 'number'}}">
-                <input class="f-input" type="digit" placeholder="{{item.placeholder}}"
-                  value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="onFieldInput" />
-              </block>
-              <block wx:elif="{{item.type === 'location'}}">
-                <view class="row">
-                  <input class="f-input" style="flex:1;" placeholder="输入或定位"
-                    value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="onFieldInput" />
-                  <view class="mini-btn" bindtap="onGetLocation">定位</view>
-                </view>
-              </block>
-              <block wx:elif="{{item.type === 'select'}}">
-                <picker mode="selector" range="{{item.options}}"
-                  data-key="{{item.key}}" data-range="{{item.options}}"
-                  bindchange="onSelectChange">
-                  <view class="f-input">{{values[item.key] || '请选择'}}</view>
-                </picker>
-              </block>
-              <block wx:else>
-                <input class="f-input" placeholder="{{item.placeholder}}"
-                  value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="onFieldInput" />
-              </block>
+    <!-- 展开的表单 -->
+    <view class="form-body" wx:if="{{formOpen}}">
+      <view class="fields">
+        <block wx:for="{{template.fields}}" wx:key="key">
+          <view class="field">
+            <view class="f-label">
+              <text>{{item.label}}</text>
+              <text class="req" wx:if="{{item.required}}">*</text>
             </view>
-          </block>
-        </view>
-        <view class="form-actions">
-          <view class="btn secondary" bindtap="onPickImage">相册</view>
-          <view class="btn" bindtap="onTakePhoto">拍照</view>
-        </view>
+            <block wx:if="{{item.type === 'textarea' || item.multiline}}">
+              <textarea
+                class="f-textarea"
+                placeholder="{{item.placeholder}}"
+                value="{{values[item.key]}}"
+                data-key="{{item.key}}"
+                bindinput="onFieldInput"
+                auto-height
+                maxlength="-1"
+                adjust-position
+              ></textarea>
+            </block>
+            <block wx:elif="{{item.type === 'number'}}">
+              <input class="f-input" type="digit" placeholder="{{item.placeholder}}"
+                value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="onFieldInput" />
+            </block>
+            <block wx:elif="{{item.type === 'location'}}">
+              <view class="row">
+                <input class="f-input" style="flex:1;" placeholder="输入或定位"
+                  value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="onFieldInput" />
+                <view class="mini-btn" bindtap="onGetLocation">定位</view>
+              </view>
+            </block>
+            <block wx:elif="{{item.type === 'select'}}">
+              <picker mode="selector" range="{{item.options}}"
+                data-key="{{item.key}}" data-range="{{item.options}}"
+                bindchange="onSelectChange">
+                <view class="f-input">{{values[item.key] || '请选择'}}</view>
+              </picker>
+            </block>
+            <block wx:else>
+              <input class="f-input" placeholder="{{item.placeholder}}"
+                value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="onFieldInput" />
+            </block>
+          </view>
+        </block>
       </view>
-
-      <!-- 收起时：底部按钮 -->
-      <view class="bottom-actions" wx:else>
+      <view class="form-actions">
         <view class="btn secondary" bindtap="onPickImage">相册</view>
         <view class="btn" bindtap="onTakePhoto">拍照</view>
       </view>
     </view>
-  </block>
 
-  <!-- ===== 阶段二：预览 ===== -->
-  <block wx:else>
-    <view class="preview">
-      <image class="preview-img" src="{{photo}}" mode="aspectFit"></image>
+    <!-- 收起时：底部按钮 -->
+    <view class="bottom-actions" wx:else>
+      <view class="btn secondary" bindtap="onPickImage">相册</view>
+      <view class="btn" bindtap="onTakePhoto">拍照</view>
     </view>
-    <view class="panel">
-      <view class="title-sm">确认保存 · Confirmar</view>
-      <view class="muted">点击下方按钮将把水印数据写入照片并入库。</view>
-      <view class="row between" style="margin-top:24rpx;">
-        <view class="btn secondary" bindtap="onRetake" style="flex:1;margin-right:16rpx;">重拍</view>
-        <view class="btn" bindtap="onSave" style="flex:1;">保存水印照片</view>
-      </view>
-    </view>
-  </block>
+  </view>
 </view>
 
 <!-- 模板选择弹层 -->
@@ -125,5 +108,3 @@
   </view>
   <view class="btn secondary" bindtap="closePicker" style="margin-top:16rpx;">关闭</view>
 </view>
-
-<canvas type="2d" id="wmCanvas" class="offscreen"></canvas>

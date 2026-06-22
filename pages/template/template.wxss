@@ -1,0 +1,362 @@
+/* 页面容器 */
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+/* 头部 */
+.header {
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+  padding: 48rpx 32rpx;
+  color: #fff;
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 600;
+  display: block;
+}
+
+.subtitle {
+  font-size: 26rpx;
+  opacity: 0.85;
+  margin-top: 8rpx;
+  display: block;
+}
+
+/* 列表区域 */
+.list {
+  padding: 24rpx;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.label {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.btn-add {
+  background: #07c160;
+  color: #fff;
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+}
+
+/* 模板卡片 */
+.template-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.tpl-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.tpl-actions {
+  font-size: 36rpx;
+  color: #999;
+  padding: 8rpx;
+}
+
+.tpl-desc {
+  font-size: 24rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+}
+
+.tpl-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.field-tag {
+  padding: 6rpx 14rpx;
+  background: #f0f5ff;
+  color: #1890ff;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+}
+
+.field-tag.more {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.tpl-meta {
+  display: flex;
+  gap: 20rpx;
+  font-size: 22rpx;
+  color: #999;
+}
+
+/* 弹窗遮罩 */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 100;
+}
+
+/* 弹窗 */
+.modal {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  top: 10%;
+  bottom: 24rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.modal-header text {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.close-btn {
+  font-size: 48rpx;
+  color: #999;
+  line-height: 1;
+}
+
+.modal-body {
+  flex: 1;
+  padding: 24rpx;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 16rpx;
+  padding: 20rpx 24rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.btn {
+  flex: 1;
+  background: #07c160;
+  color: #fff;
+  padding: 22rpx;
+  text-align: center;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+}
+
+.btn.secondary {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.btn.danger {
+  background: #ff4d4f;
+}
+
+/* 表单区块 */
+.form-section {
+  margin-bottom: 28rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+  display: block;
+}
+
+.section-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.mini-btn {
+  background: #e6f7ee;
+  color: #07c160;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+}
+
+/* 表单项 */
+.form-item {
+  margin-bottom: 16rpx;
+}
+
+.form-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.form-item.half {
+  flex: 1;
+}
+
+.form-label {
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 8rpx;
+  display: block;
+}
+
+.form-input {
+  width: 100%;
+  background: #f7f8fa;
+  padding: 18rpx;
+  border-radius: 10rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+/* 位置选择网格 */
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+}
+
+.pos-btn {
+  padding: 16rpx;
+  background: #f7f8fa;
+  border-radius: 10rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #666;
+  border: 2rpx solid transparent;
+}
+
+.pos-btn.active {
+  background: #e6f7ee;
+  border-color: #07c160;
+  color: #07c160;
+}
+
+/* 颜色选择器 */
+.color-picker {
+  display: flex;
+  gap: 12rpx;
+}
+
+.color-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  border: 3rpx solid #e8e8e8;
+}
+
+/* 字段列表 */
+.field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.field-input-wrap {
+  flex: 1;
+}
+
+.field-input {
+  width: 100%;
+  background: #f7f8fa;
+  padding: 14rpx;
+  border-radius: 8rpx;
+  font-size: 26rpx;
+}
+
+.field-type {
+  padding: 14rpx 20rpx;
+  background: #f7f8fa;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  color: #666;
+  min-width: 100rpx;
+  text-align: center;
+}
+
+.field-actions {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.field-remove {
+  font-size: 36rpx;
+  color: #ff4d4f;
+  line-height: 1;
+}
+
+/* 删除确认弹窗 */
+.delete-modal {
+  position: fixed;
+  left: 60rpx;
+  right: 60rpx;
+  top: 40%;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  z-index: 102;
+}
+
+.delete-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 12rpx;
+}
+
+.delete-desc {
+  font-size: 26rpx;
+  color: #666;
+  text-align: center;
+  margin-bottom: 28rpx;
+}
+
+.delete-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.delete-actions .btn {
+  flex: 1;
+}

@@ -1,12 +1,13 @@
 // utils/storage.js
-// 本地存储管理：照片记录（包含图片本地路径 + 模板信息 + 填写数据）
-// 未来可替换为云开发数据库（wx.cloud.database）
+// 本地存储管理：照片记录 + 自定义模板
 
-const KEY = 'watermark_photos';
+const KEY_PHOTOS = 'watermark_photos';
+const KEY_TEMPLATES = 'watermark_custom_tpls';
 
+// ===== 照片记录操作 =====
 function getAll() {
   try {
-    const list = wx.getStorageSync(KEY);
+    const list = wx.getStorageSync(KEY_PHOTOS);
     return Array.isArray(list) ? list : [];
   } catch (e) {
     return [];
@@ -21,7 +22,7 @@ function getById(id) {
 function add(record) {
   const list = getAll();
   list.unshift(record);
-  wx.setStorageSync(KEY, list);
+  wx.setStorageSync(KEY_PHOTOS, list);
   return record;
 }
 
@@ -30,19 +31,48 @@ function update(id, patch) {
   const idx = list.findIndex((item) => item.id === id);
   if (idx === -1) return null;
   list[idx] = Object.assign({}, list[idx], patch);
-  wx.setStorageSync(KEY, list);
+  wx.setStorageSync(KEY_PHOTOS, list);
   return list[idx];
 }
 
 function remove(id) {
   const list = getAll();
   const next = list.filter((item) => item.id !== id);
-  wx.setStorageSync(KEY, next);
+  wx.setStorageSync(KEY_PHOTOS, next);
   return true;
 }
 
 function clearAll() {
-  wx.setStorageSync(KEY, []);
+  wx.setStorageSync(KEY_PHOTOS, []);
+}
+
+// ===== 自定义模板操作 =====
+function getCustomTemplates() {
+  try {
+    const list = wx.getStorageSync(KEY_TEMPLATES);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCustomTemplate(tpl) {
+  const list = getCustomTemplates();
+  const idx = list.findIndex(item => item.id === tpl.id);
+  if (idx >= 0) {
+    list[idx] = tpl;
+  } else {
+    list.unshift(tpl);
+  }
+  wx.setStorageSync(KEY_TEMPLATES, list);
+  return tpl;
+}
+
+function deleteCustomTemplate(id) {
+  const list = getCustomTemplates();
+  const next = list.filter(item => item.id !== id);
+  wx.setStorageSync(KEY_TEMPLATES, next);
+  return true;
 }
 
 /**
@@ -59,5 +89,8 @@ module.exports = {
   update,
   remove,
   clearAll,
-  genId
+  genId,
+  getCustomTemplates,
+  saveCustomTemplate,
+  deleteCustomTemplate
 };

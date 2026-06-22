@@ -1,0 +1,143 @@
+<view class="page">
+  <!-- 头部 -->
+  <view class="header">
+    <view class="title">水印模板管理</view>
+    <view class="subtitle">自定义字段、样式、位置</view>
+  </view>
+
+  <!-- 模板列表 -->
+  <view class="list">
+    <view class="list-header">
+      <text class="label">可用模板</text>
+      <view class="btn-add" bindtap="onAdd">+ 新增模板</view>
+    </view>
+
+    <view class="template-list">
+      <view wx:for="{{templates}}" wx:key="id" class="template-card" data-id="{{item.id}}" bindtap="onEdit">
+        <view class="card-header">
+          <text class="tpl-name">{{item.name}}</text>
+          <view class="tpl-actions" bindtap.stop="onCardActions" data-id="{{item.id}}">
+            <text>⋮</text>
+          </view>
+        </view>
+        <view class="tpl-desc">{{item.description}}</view>
+        <view class="tpl-fields">
+          <text class="field-tag" wx:for="{{item.fields.slice(0, 4)}}" wx:key="key" wx:for-item="f">{{f.label}}</text>
+          <text class="field-tag more" wx:if="{{item.fields.length > 4}}">+{{item.fields.length - 4}}</text>
+        </view>
+        <view class="tpl-meta">
+          <text class="pos">位置: {{getPosLabel(item.position)}}</text>
+          <text class="size">字号: {{item.style.fontSize}}px</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 新增/编辑模板弹窗 -->
+  <view class="modal-mask" wx:if="{{showModal}}" bindtap="closeModal"></view>
+  <view class="modal" wx:if="{{showModal}}">
+    <view class="modal-header">
+      <text>{{editingId ? '编辑模板' : '新增模板'}}</text>
+      <view class="close-btn" bindtap="closeModal">×</view>
+    </view>
+    <scroll-view class="modal-body" scroll-y>
+      <!-- 基本信息 -->
+      <view class="form-section">
+        <view class="section-title">基本信息</view>
+        <view class="form-item">
+          <text class="form-label">模板名称 *</text>
+          <input class="form-input" placeholder="如：外贸手写" value="{{form.name}}" bindinput="onFormInput" data-key="name" />
+        </view>
+        <view class="form-item">
+          <text class="form-label">描述</text>
+          <input class="form-input" placeholder="简短描述" value="{{form.description}}" bindinput="onFormInput" data-key="description" />
+        </view>
+      </view>
+
+      <!-- 位置选择 -->
+      <view class="form-section">
+        <view class="section-title">水印位置</view>
+        <view class="pos-grid">
+          <view wx:for="{{POSITIONS}}" wx:key="id" 
+            class="pos-btn {{form.position === item.id ? 'active' : ''}}"
+            data-pos="{{item.id}}" bindtap="onSetPos">
+            {{item.label}}
+          </view>
+        </view>
+      </view>
+
+      <!-- 样式设置 -->
+      <view class="form-section">
+        <view class="section-title">样式设置</view>
+        <view class="form-row">
+          <view class="form-item half">
+            <text class="form-label">字号</text>
+            <input class="form-input" type="number" placeholder="22" value="{{form.style.fontSize}}" bindinput="onStyleInput" data-key="fontSize" />
+          </view>
+          <view class="form-item half">
+            <text class="form-label">内边距</text>
+            <input class="form-input" type="number" placeholder="14" value="{{form.style.padding}}" bindinput="onStyleInput" data-key="padding" />
+          </view>
+        </view>
+        <view class="form-item">
+          <text class="form-label">背景色</text>
+          <view class="color-picker">
+            <view class="color-btn" style="background:rgba(0,0,0,0.7)" data-color="rgba(0,0,0,0.7)" bindtap="onSetBgColor"></view>
+            <view class="color-btn" style="background:rgba(255,255,255,0.85)" data-color="rgba(255,255,255,0.85)" bindtap="onSetBgColor"></view>
+            <view class="color-btn" style="background:rgba(7,193,96,0.8)" data-color="rgba(7,193,96,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn" style="background:rgba(59,89,152,0.8)" data-color="rgba(59,89,152,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn" style="background:rgba(255,153,0,0.8)" data-color="rgba(255,153,0,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn" style="background:rgba(255,77,79,0.8)" data-color="rgba(255,77,79,0.8)" bindtap="onSetBgColor"></view>
+          </view>
+        </view>
+        <view class="form-item">
+          <text class="form-label">文字颜色</text>
+          <view class="color-picker">
+            <view class="color-btn" style="background:#ffffff" data-color="#ffffff" bindtap="onSetTextColor"></view>
+            <view class="color-btn" style="background:#000000" data-color="#000000" bindtap="onSetTextColor"></view>
+            <view class="color-btn" style="background:#07c160" data-color="#07c160" bindtap="onSetTextColor"></view>
+            <view class="color-btn" style="background:#ff9900" data-color="#ff9900" bindtap="onSetTextColor"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 字段列表 -->
+      <view class="form-section">
+        <view class="section-row">
+          <text class="section-title">字段列表</text>
+          <view class="mini-btn" bindtap="onAddField">+ 添加字段</view>
+        </view>
+        <view class="field-list">
+          <view wx:for="{{form.fields}}" wx:key="index" class="field-row" data-index="{{index}}">
+            <view class="field-input-wrap">
+              <input class="field-input" placeholder="字段标签（如：货号 · Modelo）" 
+                value="{{item.label}}" bindinput="onFieldLabelInput" data-index="{{index}}" />
+            </view>
+            <picker mode="selector" range="{{FIELD_TYPES}}" 
+              data-index="{{index}}" bindchange="onFieldTypeChange">
+              <view class="field-type">{{FIELD_TYPES.indexOf(item.type) >= 0 ? item.type : 'text'}}</view>
+            </picker>
+            <view class="field-actions">
+              <text class="field-remove" bindtap="onRemoveField" data-index="{{index}}">×</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="modal-footer">
+      <view class="btn secondary" bindtap="closeModal">取消</view>
+      <view class="btn" bindtap="onSave">保存</view>
+    </view>
+  </view>
+
+  <!-- 删除确认弹窗 -->
+  <view class="modal-mask" wx:if="{{showDeleteConfirm}}" bindtap="cancelDelete"></view>
+  <view class="delete-modal" wx:if="{{showDeleteConfirm}}">
+    <view class="delete-title">确认删除</view>
+    <view class="delete-desc">确定要删除模板「{{deleteName}}」吗？</view>
+    <view class="delete-actions">
+      <view class="btn secondary" bindtap="cancelDelete">取消</view>
+      <view class="btn danger" bindtap="onDelete">删除</view>
+    </view>
+  </view>
+</view>

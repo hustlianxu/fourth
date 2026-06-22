@@ -24,9 +24,21 @@ function parseColor(color, defaultAlpha) {
 
 /**
  * 绘制水印（默认图片长边 1920，输出高清可印刷尺寸
+ * @param {Object} params
+ * @param {CanvasRenderingContext2D} params.ctx
+ * @param {HTMLCanvasElement} params.canvas
+ * @param {string} params.imagePath
+ * @param {Object} params.template
+ * @param {Object} params.values
+ * @param {number} params.imgW
+ * @param {number} params.imgH
+ * @param {number} [params.customX] - 自定义X位置（相对于原图）
+ * @param {number} [params.customY] - 自定义Y位置（相对于原图）
+ * @param {number} [params.customScale] - 自定义缩放比例
+ * @param {number} [params.opacity] - 透明度
  */
 function drawWatermark(params) {
-  const { ctx, canvas, imagePath, template, values, imgW, imgH } = params;
+  const { ctx, canvas, imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity } = params;
   const MAX_EDGE = 1920;
   let targetW = imgW;
   let targetH = imgH;
@@ -40,11 +52,15 @@ function drawWatermark(params) {
   canvas.height = targetH;
   ctx.clearRect(0, 0, targetW, targetH);
 
+  // 计算相对坐标（如果提供了自定义位置）
+  let relX = customX != null ? (customX / imgW) * targetW : null;
+  let relY = customY != null ? (customY / imgH) * targetH : null;
+
   return new Promise((resolve, reject) => {
     const img = canvas.createImage ? canvas.createImage() : new Image();
     img.onload = () => {
       ctx.drawImage(img, 0, 0, targetW, targetH);
-      renderTemplate(ctx, canvas, template, values, targetW, targetH);
+      renderTemplate(ctx, canvas, template, values, targetW, targetH, relX, relY, customScale, opacity);
       resolve();
     };
     img.onerror = (err) => reject(err);
@@ -54,19 +70,30 @@ function drawWatermark(params) {
 
 /**
  * 逐字段渲染水印
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {HTMLCanvasElement} canvas
+ * @param {Object} template
+ * @param {Object} values
+ * @param {number} cw
+ * @param {number} ch
+ * @param {number} [customX] - 自定义X位置
+ * @param {number} [customY] - 自定义Y位置
+ * @param {number} [customScale] - 自定义缩放比例
+ * @param {number} [customOpacity] - 自定义透明度
  */
-function renderTemplate(ctx, canvas, template, values, cw, ch) {
+function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY, customScale, customOpacity) {
   const style = template.style || {};
   const position = template.position || 'bottom-left';
 
   const ratio = cw / 750;
-  const fontSize = Math.max(14, Math.round((style.fontSize || 22) * ratio));
+  const scale = customScale || 1;
+  const fontSize = Math.max(14, Math.round((style.fontSize || 22) * ratio * scale));
   const lineHeight = Math.round(fontSize * (style.lineHeight || 1.7));
-  const padding = Math.round((style.padding || 14) * ratio);
+  const padding = Math.round((style.padding || 14) * ratio * scale);
   const borderRadius = Math.round((style.borderRadius || 10) * ratio);
 
   // 水印块宽度：图片宽度的 42%（紧凑，不遮挡主体画面）
-  const blockW = Math.round(cw * 0.42);
+  const blockW = Math.round(cw * 0.42 * scale);
   const indent = Math.round(fontSize * 1.4);
 
   // 文本可写宽度
@@ -119,36 +146,51 @@ function renderTemplate(ctx, canvas, template, values, cw, ch) {
 
   const blockH = padding * 2 + allLines.length * lineHeight;
 
-  // 计算坐标（水印块定位，支持9个位置）
+  // 计算坐标（水印块定位，支持9个位置 + 自定义位置）
   const margin = Math.round(cw * 0.04);
   const cx = (cw - blockW) / 2;
   let x = margin;
   let y = margin;
-  if (position === 'top-left') {
-    x = margin; y = margin;
+
+  // 如果提供了自定义位置，优先使用
+  if (customX != null) {
+    x = customX;
+  } else if (position === 'top-left') {
+    x = margin;
   } else if (position === 'top-center') {
-    x = cx; y = margin;
+    x = cx;
   } else if (position === 'top-right') {
-    x = cw - blockW - margin; y = margin;
+    x = cw - blockW - margin;
   } else if (position === 'center-left') {
-    x = margin; y = (ch - blockH) / 2;
+    x = margin;
   } else if (position === 'center') {
-    x = cx; y = (ch - blockH) / 2;
+    x = cx;
   } else if (position === 'center-right') {
-    x = cw - blockW - margin; y = (ch - blockH) / 2;
+    x = cw - blockW - margin;
   } else if (position === 'bottom-left') {
-    x = margin; y = ch - blockH - margin;
+    x = margin;
   } else if (position === 'bottom-center') {
-    x = cx; y = ch - blockH - margin;
+    x = cx;
   } else if (position === 'bottom-right') {
-    x = cw - blockW - margin; y = ch - blockH - margin;
+    x = cw - blockW - margin;
   }
 
-  // 保证水印不会超出图片上边缘
-  y = Math.max(margin, y);
+  if (customY != null) {
+    y = customY;
+  } else if (position === 'top-left' || position === 'top-center' || position === 'top-right') {
+    y = margin;
+  } else if (position === 'center-left' || position === 'center' || position === 'center-right') {
+    y = (ch - blockH) / 2;
+  } else {
+    y = ch - blockH - margin;
+  }
 
-  // 绘制深色背景（印刷级对比
-  const bgColor = parseColor(style.background, 0.72);
+  // 保证水印不会超出边界
+  x = Math.max(margin, Math.min(x, cw - blockW - margin));
+  y = Math.max(margin, Math.min(y, ch - blockH - margin));
+
+  // 绘制深色背景（支持自定义透明度）
+  const bgColor = parseColor(style.background, customOpacity != null ? customOpacity : 0.72);
   roundRect(ctx, x, y, blockW, blockH, borderRadius, bgColor);
 
   // 绘制文字
