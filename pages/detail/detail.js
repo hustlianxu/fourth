@@ -31,6 +31,8 @@ Page({
   recordId: '',
   screenWidth: 0,
   isDragging: false,
+  isPinching: false,
+  lastPinchDist: 0,
   dragStartX: 0,
   dragStartY: 0,
   wmStartX: 0,
@@ -118,31 +120,53 @@ Page({
     });
   },
 
-  // === 触摸拖拽 ===
+  // === 触摸拖拽 + 双指缩放 ===
   onTouchStart(e) {
     if (!this.data.editing) return;
     if (e.touches.length === 1) {
       this.isDragging = true;
+      this.isPinching = false;
       this.dragStartX = e.touches[0].clientX;
       this.dragStartY = e.touches[0].clientY;
       this.wmStartX = this.data.editWmX;
       this.wmStartY = this.data.editWmY;
+    } else if (e.touches.length === 2) {
+      this.isDragging = false;
+      this.isPinching = true;
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      this.lastPinchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
     }
   },
 
   onTouchMove(e) {
-    if (!this.data.editing || !this.isDragging) return;
-    const dx = e.touches[0].clientX - this.dragStartX;
-    const dy = e.touches[0].clientY - this.dragStartY;
-    let newX = this.wmStartX + dx;
-    let newY = this.wmStartY + dy;
-    newX = Math.max(0, Math.min(newX, this.data.imgDisplayW - 80));
-    newY = Math.max(0, Math.min(newY, this.data.imgDisplayH - 30));
-    this.setData({ editWmX: newX, editWmY: newY });
+    if (!this.data.editing) return;
+    if (this.isDragging && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - this.dragStartX;
+      const dy = e.touches[0].clientY - this.dragStartY;
+      let newX = this.wmStartX + dx;
+      let newY = this.wmStartY + dy;
+      newX = Math.max(0, Math.min(newX, this.data.imgDisplayW - 80));
+      newY = Math.max(0, Math.min(newY, this.data.imgDisplayH - 30));
+      this.setData({ editWmX: newX, editWmY: newY });
+    } else if (this.isPinching && e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      if (this.lastPinchDist > 0) {
+        const scale = dist / this.lastPinchDist;
+        let newScale = this.data.editScale * scale;
+        newScale = Math.max(0.5, Math.min(newScale, 1.5));
+        this.setData({ editScale: newScale, scaleLabel: Math.round(newScale * 100) + '%' });
+      }
+      this.lastPinchDist = dist;
+    }
   },
 
   onTouchEnd() {
     this.isDragging = false;
+    this.isPinching = false;
+    this.lastPinchDist = 0;
   },
 
   // === 编辑切换 ===

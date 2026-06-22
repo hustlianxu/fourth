@@ -293,11 +293,8 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
 
   // 汇总所有行
   const allLines = [];
-  fieldLineGroups.forEach((g, idx) => {
+  fieldLineGroups.forEach((g) => {
     g.lines.forEach((ln) => allLines.push(ln));
-    if (idx < fieldLineGroups.length - 1) {
-      allLines.push({ text: '', isLabel: false, type: 'spacer', color: style.color, spacer: true });
-    }
   });
 
   const blockH = padding * 2 + allLines.length * lineHeight;
