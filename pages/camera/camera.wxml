@@ -25,7 +25,7 @@
   <!-- 底部操作栏 -->
   <view class="bottom-bar {{formOpen ? 'open' : ''}}">
     <!-- 收起时：概要行 + 按钮 -->
-    <view class="summary-row" wx:else>
+    <view class="summary-row" wx:if="{{!formOpen}}">
       <view class="summary-tags" bindtap="toggleForm">
         <text class="sum-tag" wx:for="{{filledSummary}}" wx:key="*this">{{item}}</text>
         <text class="expand-tag" wx:if="{{template.fields.length > 0}}">展开 ∨</text>
