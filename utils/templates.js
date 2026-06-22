@@ -46,7 +46,7 @@ const TEMPLATES = [
       lineHeight: 1.7
     },
     fields: [
-      { key: 'modelo', label: '货号 · Modelo', type: 'text', placeholder: '如：RL-034', required: true },
+      { key: 'modelo', label: '货号 · Modelo', type: 'text', placeholder: '如：RL-034', required: false },
       { key: 'desEs', label: 'Descripción ES', type: 'textarea',
         placeholder: '如：3ctn × 48 pcs × 29 rmb · con luz y música', required: false, multiline: true },
       { key: 'precio', label: '单价 · Precio', type: 'text', placeholder: '如：¥11', required: false },
