@@ -36,11 +36,11 @@
 .save-btn {
   background: #07c160;
   color: #fff;
-  padding: 12rpx 24rpx;
+  padding: 12rpx 32rpx;
   border-radius: 999rpx;
   font-size: 28rpx;
   position: fixed;
-  right: calc(24rpx + env(safe-area-inset-right));
+  right: calc(80rpx + env(safe-area-inset-right));
 }
 
 /* 预览区域 */

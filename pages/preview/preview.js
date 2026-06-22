@@ -52,12 +52,46 @@ Page({
     this.screenWidth = sysInfo.windowWidth;
     this.screenHeight = sysInfo.windowHeight;
 
-    // 从 options 获取参数
+    // 从 options 获取参数（处理 URL 解码）
+    let photo = options.photo;
+    try {
+      photo = decodeURIComponent(options.photo || '');
+    } catch (e) {
+      photo = options.photo || '';
+    }
+
+    let photoInfo = { width: 1080, height: 1440 };
+    try {
+      photoInfo = JSON.parse(decodeURIComponent(options.photoInfo || '{"width":1080,"height":1440}'));
+    } catch (e) {
+      try {
+        photoInfo = JSON.parse(options.photoInfo || '{"width":1080,"height":1440}');
+      } catch (e2) {}
+    }
+
+    let template = {};
+    try {
+      template = JSON.parse(decodeURIComponent(options.template || '{}'));
+    } catch (e) {
+      try {
+        template = JSON.parse(options.template || '{}');
+      } catch (e2) {}
+    }
+
+    let values = {};
+    try {
+      values = JSON.parse(decodeURIComponent(options.values || '{}'));
+    } catch (e) {
+      try {
+        values = JSON.parse(options.values || '{}');
+      } catch (e2) {}
+    }
+
     this.setData({
-      photo: options.photo,
-      photoInfo: JSON.parse(options.photoInfo || '{"width":1080,"height":1440}'),
-      template: JSON.parse(options.template || '{}'),
-      values: JSON.parse(options.values || '{}')
+      photo: photo,
+      photoInfo: photoInfo,
+      template: template,
+      values: values
     });
 
     // 计算显示字段

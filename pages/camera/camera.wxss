@@ -75,7 +75,6 @@
   display: flex;
   align-items: center;
   padding: 16rpx 24rpx;
-  justify-content: space-between;
 }
 
 .summary-tags {
@@ -94,7 +93,7 @@
   border-radius: 999rpx;
   font-size: 22rpx;
   white-space: nowrap;
-  max-width: 200rpx;
+  max-width: 180rpx;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -103,7 +102,7 @@
   font-size: 24rpx;
   color: #07c160;
   font-weight: 500;
-  padding-left: 12rpx;
+  padding-left: 8rpx;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -174,7 +173,8 @@
   display: flex;
   gap: 16rpx;
   flex-shrink: 0;
-  margin-left: 16rpx;
+  margin-left: 12rpx;
+  width: 280rpx;
 }
 
 /* ===== 底部按钮 ===== */
