@@ -39,6 +39,8 @@
   padding: 12rpx 24rpx;
   border-radius: 999rpx;
   font-size: 28rpx;
+  position: fixed;
+  right: calc(24rpx + env(safe-area-inset-right));
 }
 
 /* 预览区域 */

@@ -218,9 +218,10 @@
 .mini-btn {
   background: #e6f7ee;
   color: #07c160;
-  padding: 8rpx 16rpx;
+  padding: 12rpx 20rpx;
   border-radius: 8rpx;
-  font-size: 24rpx;
+  font-size: 26rpx;
+  white-space: nowrap;
 }
 
 /* 表单项 */
@@ -289,6 +290,12 @@
   height: 72rpx;
   border-radius: 50%;
   border: 3rpx solid #e8e8e8;
+  transition: all 0.2s;
+}
+
+.color-btn.active {
+  border-color: #07c160;
+  box-shadow: 0 0 0 6rpx rgba(7, 193, 96, 0.2);
 }
 
 /* 字段列表 */

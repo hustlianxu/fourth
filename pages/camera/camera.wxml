@@ -24,18 +24,23 @@
 
   <!-- 底部操作栏 -->
   <view class="bottom-bar {{formOpen ? 'open' : ''}}">
-    <!-- 收起时：概要行 -->
-    <view class="summary-row" bindtap="toggleForm">
-      <view class="summary-tags">
+    <!-- 收起时：概要行 + 按钮 -->
+    <view class="summary-row" wx:else>
+      <view class="summary-tags" bindtap="toggleForm">
         <text class="sum-tag" wx:for="{{filledSummary}}" wx:key="*this">{{item}}</text>
+        <text class="expand-tag" wx:if="{{template.fields.length > 0}}">展开 ∨</text>
       </view>
-      <view class="expand-btn">
-        {{formOpen ? '收起 ∧' : '展开 ∨'}}
+      <view class="bottom-actions">
+        <view class="btn secondary" bindtap="onPickImage">相册</view>
+        <view class="btn" bindtap="onTakePhoto">拍照</view>
       </view>
     </view>
 
     <!-- 展开的表单 -->
     <view class="form-body" wx:if="{{formOpen}}">
+      <view class="expand-header" bindtap="toggleForm">
+        <text class="expand-text">收起 ∧</text>
+      </view>
       <view class="fields">
         <block wx:for="{{template.fields}}" wx:key="key">
           <view class="field">
@@ -84,12 +89,6 @@
         <view class="btn secondary" bindtap="onPickImage">相册</view>
         <view class="btn" bindtap="onTakePhoto">拍照</view>
       </view>
-    </view>
-
-    <!-- 收起时：底部按钮 -->
-    <view class="bottom-actions" wx:else>
-      <view class="btn secondary" bindtap="onPickImage">相册</view>
-      <view class="btn" bindtap="onTakePhoto">拍照</view>
     </view>
   </view>
 </view>

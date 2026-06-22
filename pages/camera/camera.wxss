@@ -62,7 +62,7 @@
   box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.12);
   z-index: 60;
   transition: all 0.25s ease;
-  max-height: 88rpx; /* 收起时只露出标题栏 */
+  max-height: 100rpx;
   overflow: hidden;
 }
 
@@ -74,7 +74,7 @@
 .summary-row {
   display: flex;
   align-items: center;
-  padding: 20rpx 24rpx;
+  padding: 16rpx 24rpx;
   justify-content: space-between;
 }
 
@@ -88,23 +88,24 @@
 
 .sum-tag {
   display: inline-block;
-  padding: 6rpx 14rpx;
+  padding: 6rpx 12rpx;
   background: #e6f7ee;
   color: #07c160;
   border-radius: 999rpx;
-  font-size: 24rpx;
+  font-size: 22rpx;
   white-space: nowrap;
-  max-width: 260rpx;
+  max-width: 200rpx;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.expand-btn {
-  font-size: 26rpx;
+.expand-tag {
+  font-size: 24rpx;
   color: #07c160;
   font-weight: 500;
-  padding-left: 16rpx;
+  padding-left: 12rpx;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* 展开的表单区域 */
@@ -172,7 +173,8 @@
 .bottom-actions {
   display: flex;
   gap: 16rpx;
-  padding: 16rpx 24rpx;
+  flex-shrink: 0;
+  margin-left: 16rpx;
 }
 
 /* ===== 底部按钮 ===== */

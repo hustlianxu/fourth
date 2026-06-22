@@ -82,21 +82,21 @@
         <view class="form-item">
           <text class="form-label">背景色</text>
           <view class="color-picker">
-            <view class="color-btn" style="background:rgba(0,0,0,0.7)" data-color="rgba(0,0,0,0.7)" bindtap="onSetBgColor"></view>
-            <view class="color-btn" style="background:rgba(255,255,255,0.85)" data-color="rgba(255,255,255,0.85)" bindtap="onSetBgColor"></view>
-            <view class="color-btn" style="background:rgba(7,193,96,0.8)" data-color="rgba(7,193,96,0.8)" bindtap="onSetBgColor"></view>
-            <view class="color-btn" style="background:rgba(59,89,152,0.8)" data-color="rgba(59,89,152,0.8)" bindtap="onSetBgColor"></view>
-            <view class="color-btn" style="background:rgba(255,153,0,0.8)" data-color="rgba(255,153,0,0.8)" bindtap="onSetBgColor"></view>
-            <view class="color-btn" style="background:rgba(255,77,79,0.8)" data-color="rgba(255,77,79,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn {{form.style.background === 'rgba(0,0,0,0.7)' ? 'active' : ''}}" style="background:rgba(0,0,0,0.7)" data-color="rgba(0,0,0,0.7)" bindtap="onSetBgColor"></view>
+            <view class="color-btn {{form.style.background === 'rgba(255,255,255,0.85)' ? 'active' : ''}}" style="background:rgba(255,255,255,0.85)" data-color="rgba(255,255,255,0.85)" bindtap="onSetBgColor"></view>
+            <view class="color-btn {{form.style.background === 'rgba(7,193,96,0.8)' ? 'active' : ''}}" style="background:rgba(7,193,96,0.8)" data-color="rgba(7,193,96,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn {{form.style.background === 'rgba(59,89,152,0.8)' ? 'active' : ''}}" style="background:rgba(59,89,152,0.8)" data-color="rgba(59,89,152,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn {{form.style.background === 'rgba(255,153,0,0.8)' ? 'active' : ''}}" style="background:rgba(255,153,0,0.8)" data-color="rgba(255,153,0,0.8)" bindtap="onSetBgColor"></view>
+            <view class="color-btn {{form.style.background === 'rgba(255,77,79,0.8)' ? 'active' : ''}}" style="background:rgba(255,77,79,0.8)" data-color="rgba(255,77,79,0.8)" bindtap="onSetBgColor"></view>
           </view>
         </view>
         <view class="form-item">
           <text class="form-label">文字颜色</text>
           <view class="color-picker">
-            <view class="color-btn" style="background:#ffffff" data-color="#ffffff" bindtap="onSetTextColor"></view>
-            <view class="color-btn" style="background:#000000" data-color="#000000" bindtap="onSetTextColor"></view>
-            <view class="color-btn" style="background:#07c160" data-color="#07c160" bindtap="onSetTextColor"></view>
-            <view class="color-btn" style="background:#ff9900" data-color="#ff9900" bindtap="onSetTextColor"></view>
+            <view class="color-btn {{form.style.color === '#ffffff' ? 'active' : ''}}" style="background:#ffffff" data-color="#ffffff" bindtap="onSetTextColor"></view>
+            <view class="color-btn {{form.style.color === '#000000' ? 'active' : ''}}" style="background:#000000" data-color="#000000" bindtap="onSetTextColor"></view>
+            <view class="color-btn {{form.style.color === '#07c160' ? 'active' : ''}}" style="background:#07c160" data-color="#07c160" bindtap="onSetTextColor"></view>
+            <view class="color-btn {{form.style.color === '#ff9900' ? 'active' : ''}}" style="background:#ff9900" data-color="#ff9900" bindtap="onSetTextColor"></view>
           </view>
         </view>
       </view>
@@ -113,9 +113,9 @@
               <input class="field-input" placeholder="字段标签（如：货号 · Modelo）" 
                 value="{{item.label}}" bindinput="onFieldLabelInput" data-index="{{index}}" />
             </view>
-            <picker mode="selector" range="{{FIELD_TYPES}}" 
+            <picker mode="selector" range="{{FIELD_TYPES}}" range-key="label"
               data-index="{{index}}" bindchange="onFieldTypeChange">
-              <view class="field-type">{{FIELD_TYPES.indexOf(item.type) >= 0 ? item.type : 'text'}}</view>
+              <view class="field-type">{{getFieldTypeName(item.type)}}</view>
             </picker>
             <view class="field-actions">
               <text class="field-remove" bindtap="onRemoveField" data-index="{{index}}">×</text>

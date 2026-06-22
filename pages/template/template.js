@@ -14,7 +14,16 @@ const POSITIONS = [
   { id: 'bottom-right', label: '右下' }
 ];
 
-const FIELD_TYPES = ['text', 'number', 'textarea', 'select', 'datetime', 'date', 'time', 'location'];
+const FIELD_TYPES = [
+  { id: 'text', label: '文本' },
+  { id: 'number', label: '数字' },
+  { id: 'textarea', label: '多行文本' },
+  { id: 'select', label: '选择' },
+  { id: 'datetime', label: '日期时间' },
+  { id: 'date', label: '日期' },
+  { id: 'time', label: '时间' },
+  { id: 'location', label: '位置' }
+];
 
 Page({
   data: {
@@ -179,10 +188,10 @@ Page({
   // 字段类型选择
   onFieldTypeChange(e) {
     const idx = e.currentTarget.dataset.index;
-    const type = FIELD_TYPES[e.detail.value];
+    const typeInfo = FIELD_TYPES[e.detail.value];
     const fields = [...this.data.form.fields];
-    fields[idx].type = type;
-    if (type === 'select' && !fields[idx].options.length) {
+    fields[idx].type = typeInfo.id;
+    if (typeInfo.id === 'select' && !fields[idx].options.length) {
       fields[idx].options = ['选项1', '选项2', '选项3'];
     }
     this.setData({ 'form.fields': fields });
@@ -253,6 +262,12 @@ Page({
   // 取消删除
   cancelDelete() {
     this.setData({ showDeleteConfirm: false, hasModal: false, deleteName: '', deleteId: '' });
+  },
+
+  // 获取字段类型名称
+  getFieldTypeName(type) {
+    const found = FIELD_TYPES.find(t => t.id === type);
+    return found ? found.label : '文本';
   },
 
   // 关闭弹窗
