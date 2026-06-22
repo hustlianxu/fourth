@@ -15,22 +15,13 @@ Page({
   },
 
   recordId: '',
-  ctx2d: null,
-  canvas: null,
 
   onLoad(options) {
     this.recordId = options.id;
   },
 
   onReady() {
-    wx.createSelectorQuery().select('#wmCanvas')
-      .fields({ node: true, size: true })
-      .exec((res) => {
-        if (res && res[0] && res[0].node) {
-          this.canvas = res[0].node;
-          this.ctx2d = res[0].node.getContext('2d');
-        }
-      });
+    // 使用离屏 Canvas 渲染，无需初始化 DOM Canvas
   },
 
   onShow() {
@@ -79,30 +70,29 @@ Page({
 
   async onEditToggle() {
     if (this.data.editing) {
-      // 保存修改
+      // 保存修改：用新字段值重新渲染水印
       wx.showLoading({ title: '保存中...', mask: true });
-      
+
       try {
-        // 重新渲染水印图片
         const newImagePath = await this._rerenderWatermark(this.data.editValues);
-        
-        // 更新记录
-        const patch = { 
+
+        const patch = {
           values: this.data.editValues,
           imagePath: newImagePath
         };
         storage.update(this.recordId, patch);
-        
+
         wx.hideLoading();
         wx.showToast({ title: '已更新', icon: 'success' });
-        
-        // 重新加载
+
         this.load();
         this.setData({ editing: false, editValues: {} });
       } catch (e) {
         wx.hideLoading();
-        wx.showToast({ title: '更新失败', icon: 'none' });
-        console.error('重新渲染水印失败:', e);
+        console.error('[Detail] 重新渲染水印失败:', e);
+        // 显示具体错误信息方便排查
+        const errMsg = e.message || String(e);
+        wx.showToast({ title: '更新失败: ' + errMsg.slice(0, 20), icon: 'none', duration: 3000 });
       }
     } else {
       this.setData({
@@ -112,25 +102,25 @@ Page({
     }
   },
 
-  // 重新渲染水印
+  // 重新渲染水印（使用离屏 Canvas）
   async _rerenderWatermark(newValues) {
-    if (!this.ctx2d || !this.canvas) {
-      throw new Error('Canvas 未就绪');
-    }
-
     const record = this.data.record;
     const tpl = templates.getTemplateById(record.templateId);
-    
+
     if (!tpl) {
       throw new Error('模板不存在');
     }
 
-    // 使用原图重新渲染
-    const originalPath = record.originalPath || record.imagePath;
-    
-    await watermark.drawWatermark({
-      ctx: this.ctx2d,
-      canvas: this.canvas,
+    // 必须使用原始照片（无水印），不能用已渲染过的 imagePath
+    const originalPath = record.originalPath;
+    if (!originalPath) {
+      throw new Error('原始照片不存在，无法重新渲染');
+    }
+
+    console.log('[Detail] 开始重新渲染水印, originalPath:', originalPath);
+
+    // 详情页重新渲染使用较高分辨率，iOS 4096 / Android 2048（watermark.js 自动适配）
+    const outPath = await watermark.renderWatermarkedImage({
       imagePath: originalPath,
       template: tpl,
       values: newValues,
@@ -139,10 +129,11 @@ Page({
       customX: record.watermarkX,
       customY: record.watermarkY,
       customScale: record.watermarkScale || 1,
-      opacity: record.watermarkOpacity || 0.85
+      opacity: record.watermarkOpacity || 0.85,
+      maxEdge: 4096
     });
 
-    const outPath = await watermark.canvasToTempFilePath(this.canvas);
+    console.log('[Detail] 重新渲染完成:', outPath);
     return outPath;
   },
 

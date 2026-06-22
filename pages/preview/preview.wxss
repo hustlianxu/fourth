@@ -22,9 +22,13 @@
 }
 
 .back-btn {
+  position: fixed;
   font-size: 28rpx;
   color: #fff;
-  padding: 12rpx 20rpx;
+  padding: 0 20rpx;
+  z-index: 101;
+  display: flex;
+  align-items: center;
 }
 
 .toolbar-title {
@@ -34,14 +38,13 @@
 }
 
 .save-btn {
+  position: fixed;
   background: #07c160;
   color: #fff;
   padding: 12rpx 32rpx;
   border-radius: 999rpx;
   font-size: 28rpx;
-  position: fixed;
-  right: calc(90rpx + env(safe-area-inset-right));
-  top: calc(48rpx + env(safe-area-inset-top));
+  z-index: 101;
 }
 
 /* 预览区域 */
@@ -50,10 +53,10 @@
   position: relative;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding-top: calc(100rpx + env(safe-area-inset-top));
-  padding-bottom: 400rpx;
+  padding-top: calc(80rpx + env(safe-area-inset-top));
+  padding-bottom: 0;
 }
 
 .img-container {
@@ -72,13 +75,47 @@
 /* 可拖动水印层 */
 .watermark-layer {
   position: absolute;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.75);
   border-radius: 16rpx;
   padding: 16rpx;
-  cursor: move;
-  touch-action: none;
   z-index: 50;
   min-width: 200rpx;
+  transform-origin: top left;
+  border: 2rpx solid rgba(255,255,255,0.3);
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.4);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.watermark-layer.dragging {
+  border-color: rgba(7,193,96,0.7);
+  box-shadow: 0 6rpx 24rpx rgba(7,193,96,0.3);
+}
+
+/* 拖拽手柄 */
+.wm-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12rpx;
+  margin-bottom: 10rpx;
+  border-bottom: 1rpx solid rgba(255,255,255,0.15);
+}
+
+.wm-drag-dots {
+  display: flex;
+  gap: 4rpx;
+}
+
+.wm-dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+}
+
+.wm-drag-label {
+  font-size: 20rpx;
+  color: rgba(255,255,255,0.5);
 }
 
 .wm-content {
@@ -120,16 +157,51 @@
   right: 0;
   background: #fff;
   border-radius: 24rpx 24rpx 0 0;
-  padding: 24rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
   box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.15);
   z-index: 100;
+  transition: all 0.25s ease;
+}
+
+.bottom-panel.collapsed {
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+}
+
+/* 面板标题栏（可点击折叠） */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx 16rpx;
+}
+
+.bottom-panel.collapsed .panel-header {
+  padding-bottom: 16rpx;
 }
 
 .panel-title {
   font-size: 30rpx;
   font-weight: 600;
-  margin-bottom: 20rpx;
+}
+
+.panel-toggle {
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f7f8fa;
+  border-radius: 50%;
+}
+
+.toggle-icon {
+  font-size: 24rpx;
+  color: #999;
+}
+
+/* 面板内容区 */
+.panel-content {
+  padding: 0 24rpx 24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
 }
 
 .setting-row {
@@ -191,9 +263,3 @@
   color: #07c160;
 }
 
-/* 离屏画布 */
-.offscreen {
-  position: fixed;
-  left: -9999px;
-  top: -9999px;
-}

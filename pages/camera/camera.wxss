@@ -274,9 +274,3 @@
 .tpl-name { font-size: 28rpx; font-weight: 600; }
 .tpl-desc { font-size: 24rpx; color: #666; margin-top: 4rpx; }
 
-/* ===== 离屏画布 ===== */
-.offscreen {
-  position: fixed;
-  left: -9999px;
-  top: -9999px;
-}

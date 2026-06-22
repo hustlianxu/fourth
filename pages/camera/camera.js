@@ -32,9 +32,6 @@ Page({
     filledSummary: []
   },
 
-  ctx: null,
-  canvas: null,
-
   onLoad(options) {
     const tplId = options.templateId || 'handwrite';
     const tpl = templates.getTemplateById(tplId);
@@ -47,17 +44,6 @@ Page({
     });
     this._updateSummary();
     this.ctx = wx.createCameraContext();
-  },
-
-  onReady() {
-    wx.createSelectorQuery().select('#wmCanvas')
-      .fields({ node: true, size: true })
-      .exec((res) => {
-        if (res && res[0] && res[0].node) {
-          this.canvas = res[0].node;
-          this.ctx2d = res[0].node.getContext('2d');
-        }
-      });
   },
 
   // 切换表单展开/收起
@@ -213,17 +199,19 @@ Page({
         template: JSON.stringify(this.data.template),
         values: JSON.stringify(this.data.values)
       };
-      wx.navigateTo({ 
+      // 使用全局变量临时存储数据（必须在 navigateTo 之前设置，避免竞态）
+      getApp().globalData.previewData = params;
+      wx.navigateTo({
         url: `/pages/preview/preview`,
         success: () => {
           console.log('navigateTo success');
         },
         fail: (err) => {
           console.error('navigateTo failed:', err);
+          // 导航失败时清理全局数据
+          getApp().globalData.previewData = null;
         }
       });
-      // 使用全局变量临时存储数据
-      getApp().globalData.previewData = params;
     } catch (e) {
       console.error('_goPreview error:', e);
       wx.showToast({ title: '跳转失败', icon: 'none' });

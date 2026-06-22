@@ -1,10 +1,10 @@
 // utils/watermark.js
-// 外贸手写水印渲染器
+// 外贸手写水印渲染器（基于 wx.createOffscreenCanvas，无需 DOM Canvas）
 // 渲染规则：
 //   - 每一项独立成行；标签一行，内容另起一行并缩进
 //   - 西语描述 / 中文描述等长文本字段支持自动换行
 //   - 不同项之间留一行空行分隔（或由 lineHeight 的留白）
-//   - 水印块默认占图片宽的 85%，位于底部靠左
+//   - 水印块默认占图片宽的 42%，定位支持 9 个预设位置 + 自定义坐标
 
 function hexToRgba(hex, alpha) {
   let h = (hex || '#000000').replace('#', '');
@@ -17,74 +17,211 @@ function hexToRgba(hex, alpha) {
 
 function parseColor(color, defaultAlpha) {
   if (!color) return 'rgba(0,0,0,0.6)';
-  if (color.indexOf('rgba') === 0 || color.indexOf('rgb') === 0) return color;
+  // rgba 格式：如果提供了自定义透明度，替换原来的 alpha 值
+  if (color.indexOf('rgba') === 0) {
+    if (defaultAlpha != null) {
+      return color.replace(/[\d.]+\)$/, defaultAlpha + ')');
+    }
+    return color;
+  }
+  // rgb 格式：转换为 rgba 并应用透明度
+  if (color.indexOf('rgb(') === 0) {
+    if (defaultAlpha != null) {
+      return color.replace('rgb(', 'rgba(').replace(')', ', ' + defaultAlpha + ')');
+    }
+    return color.replace('rgb(', 'rgba(').replace(')', ', 1)');
+  }
+  // hex 格式：转换为 rgba
   if (color.indexOf('#') === 0) return hexToRgba(color, defaultAlpha != null ? defaultAlpha : 1);
   return color;
 }
 
 /**
- * 绘制水印（保留原始图片尺寸，不做强制缩放）
+ * 核心入口：使用离屏 Canvas 渲染带水印的图片并导出
+ *
  * @param {Object} params
- * @param {CanvasRenderingContext2D} params.ctx
- * @param {HTMLCanvasElement} params.canvas
- * @param {string} params.imagePath
- * @param {Object} params.template
- * @param {Object} params.values
- * @param {number} params.imgW
- * @param {number} params.imgH
- * @param {number} [params.customX] - 自定义X位置（相对于原图）
- * @param {number} [params.customY] - 自定义Y位置（相对于原图）
- * @param {number} [params.customScale] - 自定义缩放比例
- * @param {number} [params.opacity] - 透明度
+ * @param {string} params.imagePath    - 原始图片路径
+ * @param {Object} params.template     - 模板对象
+ * @param {Object} params.values       - 字段值键值对
+ * @param {number} params.imgW         - 原始图片宽度
+ * @param {number} params.imgH         - 原始图片高度
+ * @param {number} [params.customX]    - 水印 X 偏移（相对原图）
+ * @param {number} [params.customY]    - 水印 Y 偏移（相对原图）
+ * @param {number} [params.customScale] - 水印缩放倍数
+ * @param {number} [params.opacity]    - 水印背景透明度 0-1
+ * @param {number} [params.maxEdge]    - 渲染长边最大像素，默认 4096
+ * @returns {Promise<string>} 导出后的临时文件路径
  */
-function drawWatermark(params) {
-  const { ctx, canvas, imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity } = params;
-  
-  // 保留原始图片尺寸，不做强制缩放以保证画质
+async function renderWatermarkedImage(params) {
+  const { imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity, maxEdge: maxEdgeOverride } = params;
+
+  console.log('[Watermark] renderWatermarkedImage 开始, imagePath:', imagePath, 'imgSize:', imgW + 'x' + imgH);
+
+  // 1. 参数校验
+  if (!imagePath || typeof imagePath !== 'string' || !imagePath.trim()) {
+    throw new Error('无效的图片路径');
+  }
+  if (!template || !template.fields) {
+    throw new Error('无效的模板');
+  }
+
+  // 2. 创建离屏 Canvas（无需 DOM 元素，纯内存操作）
+  let canvas;
+  try {
+    canvas = wx.createOffscreenCanvas({ type: '2d' });
+  } catch (e) {
+    throw new Error('创建离屏 Canvas 失败: ' + (e.message || '设备可能不支持'));
+  }
+  const ctx = canvas.getContext('2d');
+
+  // 3. 计算渲染尺寸（Android 设备使用更保守的上限，避免内存不足）
+  const sysInfo = wx.getSystemInfoSync();
+  const isAndroid = sysInfo.platform === 'android';
+  const defaultMaxEdge = isAndroid ? 2048 : 4096;
+  const MAX_EDGE = maxEdgeOverride || defaultMaxEdge;
+
+  console.log('[Watermark] 平台:', sysInfo.platform, '默认maxEdge:', defaultMaxEdge, '实际maxEdge:', MAX_EDGE);
+
   let targetW = imgW;
   let targetH = imgH;
-  
-  // 仅在图片过大时进行适度缩小（长边最大 4096，避免内存问题）
-  const MAX_EDGE = 4096;
-  const maxEdge = Math.max(imgW, imgH);
-  if (maxEdge > MAX_EDGE) {
-    const s = MAX_EDGE / maxEdge;
+  const rawMaxEdge = Math.max(imgW, imgH);
+
+  if (rawMaxEdge > MAX_EDGE) {
+    const s = MAX_EDGE / rawMaxEdge;
     targetW = Math.round(imgW * s);
     targetH = Math.round(imgH * s);
+    console.log('[Watermark] 图片缩放至:', targetW + 'x' + targetH, '(maxEdge:', MAX_EDGE + ')');
   }
-  
-  canvas.width = targetW;
-  canvas.height = targetH;
+
+  // 4. 设置 Canvas 缓冲区尺寸
+  try {
+    canvas.width = targetW;
+    canvas.height = targetH;
+    console.log('[Watermark] Canvas 缓冲区:', targetW + 'x' + targetH);
+  } catch (e) {
+    // Android 设备内存不足时降级
+    const fallbackEdge = isAndroid ? 1536 : 2048;
+    console.warn('[Watermark] Canvas 尺寸设置失败，降级到', fallbackEdge, ':', e);
+    const s = rawMaxEdge > fallbackEdge ? fallbackEdge / rawMaxEdge : 1;
+    targetW = Math.round(imgW * s);
+    targetH = Math.round(imgH * s);
+    canvas.width = targetW;
+    canvas.height = targetH;
+  }
   ctx.clearRect(0, 0, targetW, targetH);
 
-  // 计算相对坐标（如果提供了自定义位置）
+  // 5. 计算水印坐标
   let relX = customX != null ? (customX / imgW) * targetW : null;
   let relY = customY != null ? (customY / imgH) * targetH : null;
 
+  // 6. 加载并绘制原图
+  const img = await loadImageOnCanvas(canvas, imagePath);
+  console.log('[Watermark] 图片加载完成, 尺寸:', img.width + 'x' + img.height);
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+  console.log('[Watermark] drawImage 完成');
+
+  // 7. 渲染水印
+  renderTemplate(ctx, canvas, template, values, targetW, targetH, relX, relY, customScale, opacity);
+  console.log('[Watermark] 模板渲染完成');
+
+  // 8. 导出为临时文件
+  const outPath = await exportCanvasToFile(canvas, targetW, targetH);
+  console.log('[Watermark] 导出完成:', outPath);
+
+  return outPath;
+}
+
+/**
+ * 在 Canvas 上加载一张图片
+ */
+function loadImageOnCanvas(canvas, src) {
   return new Promise((resolve, reject) => {
-    const img = canvas.createImage ? canvas.createImage() : new Image();
+    const img = canvas.createImage();
+    if (!img) return reject(new Error('Canvas createImage 不可用'));
+
+    const TIMEOUT = 10000;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error('图片加载超时（10秒）: ' + src));
+    }, TIMEOUT);
+
     img.onload = () => {
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      renderTemplate(ctx, canvas, template, values, targetW, targetH, relX, relY, customScale, opacity);
-      resolve();
+      if (timedOut) return;
+      clearTimeout(timer);
+      resolve(img);
     };
-    img.onerror = (err) => reject(err);
-    img.src = imagePath;
+    img.onerror = (err) => {
+      if (timedOut) return;
+      clearTimeout(timer);
+      reject(err || new Error('图片加载失败: ' + src));
+    };
+    img.src = src;
+  });
+}
+
+/**
+ * 导出 Canvas 为临时文件
+ */
+function exportCanvasToFile(canvas, targetW, targetH) {
+  return new Promise((resolve, reject) => {
+    console.log('[Watermark] 开始导出, 尺寸:', targetW + 'x' + targetH);
+
+    const EXPORT_TIMEOUT = 15000;
+    let exportTimedOut = false;
+    const exportTimer = setTimeout(() => {
+      exportTimedOut = true;
+      reject(new Error('Canvas 导出超时（15秒）'));
+    }, EXPORT_TIMEOUT);
+
+    const onSuccess = (res) => {
+      if (exportTimedOut) return;
+      clearTimeout(exportTimer);
+      console.log('[Watermark] 导出成功:', res.tempFilePath);
+      wx.getFileInfo({
+        filePath: res.tempFilePath,
+        success: (info) => {
+          console.log('[Watermark] 文件大小:', (info.size / 1024).toFixed(1) + 'KB');
+        },
+        fail: () => {}
+      });
+      resolve(res.tempFilePath);
+    };
+
+    const onFail = (err) => {
+      if (exportTimedOut) return;
+      clearTimeout(exportTimer);
+      console.error('[Watermark] 导出失败:', JSON.stringify(err));
+      reject(err || new Error('Canvas 导出失败'));
+    };
+
+    // 离屏 Canvas：尝试 toTempFilePath 方法（较新基础库支持）
+    if (typeof canvas.toTempFilePath === 'function') {
+      canvas.toTempFilePath({
+        x: 0, y: 0,
+        width: targetW, height: targetH,
+        destWidth: targetW, destHeight: targetH,
+        fileType: 'jpg', quality: 0.92,
+        success: onSuccess,
+        fail: onFail
+      });
+    } else {
+      // 降级：使用 wx.canvasToTempFilePath，回调放在 options 对象内
+      wx.canvasToTempFilePath({
+        canvas: canvas,
+        x: 0, y: 0,
+        width: targetW, height: targetH,
+        destWidth: targetW, destHeight: targetH,
+        fileType: 'jpg', quality: 0.92,
+        success: onSuccess,
+        fail: onFail
+      });
+    }
   });
 }
 
 /**
  * 逐字段渲染水印
- * @param {CanvasRenderingContext2D} ctx
- * @param {HTMLCanvasElement} canvas
- * @param {Object} template
- * @param {Object} values
- * @param {number} cw
- * @param {number} ch
- * @param {number} [customX] - 自定义X位置
- * @param {number} [customY] - 自定义Y位置
- * @param {number} [customScale] - 自定义缩放比例
- * @param {number} [customOpacity] - 自定义透明度
  */
 function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY, customScale, customOpacity) {
   const style = template.style || {};
@@ -97,23 +234,22 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
   const padding = Math.round((style.padding || 14) * ratio * scale);
   const borderRadius = Math.round((style.borderRadius || 10) * ratio);
 
-  // 水印块宽度：图片宽度的 42%（紧凑，不遮挡主体画面）
   const blockW = Math.round(cw * 0.42 * scale);
   const indent = Math.round(fontSize * 1.4);
-
-  // 文本可写宽度
   const textInnerW = blockW - padding * 2;
 
-  // 先计算每个字段要渲染的物理行（含标签单独一行，内容自动换行）
+  // 必须在 wrapText 之前设置字体，否则 measureText 使用默认字体导致换行计算错误
+  ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
+
+  // 逐字段分行
   const fieldLineGroups = [];
   (template.fields || []).forEach((f) => {
     const raw = (values && values[f.key]);
     if (raw == null) return;
     let v = String(raw).trim();
-    if (!v) return; // 可留空
+    if (!v) return;
 
     const lines = [];
-    // 标签单独一行（如 "Modelo:"）
     lines.push({
       text: f.label + ':',
       isLabel: true,
@@ -121,11 +257,9 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
       color: '#ffe58f'
     });
 
-    // 内容按 \n 分段，每段再按单词/字符自动换行
     const paragraphs = v.split(/\r?\n/);
     paragraphs.forEach((p) => {
       if (!p.trim() && paragraphs.length > 1) {
-        // 用户自己输入的空行保留
         lines.push({ text: '', isLabel: false, type: f.type, color: style.color });
         return;
       }
@@ -139,11 +273,10 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
 
   if (fieldLineGroups.length === 0) return;
 
-  // 总文本行
+  // 汇总所有行
   const allLines = [];
   fieldLineGroups.forEach((g, idx) => {
     g.lines.forEach((ln) => allLines.push(ln));
-    // 字段间插一行空白（最后不加）
     if (idx < fieldLineGroups.length - 1) {
       allLines.push({ text: '', isLabel: false, type: 'spacer', color: style.color, spacer: true });
     }
@@ -151,13 +284,12 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
 
   const blockH = padding * 2 + allLines.length * lineHeight;
 
-  // 计算坐标（水印块定位，支持9个位置 + 自定义位置）
+  // 水印块定位
   const margin = Math.round(cw * 0.04);
   const cx = (cw - blockW) / 2;
   let x = margin;
   let y = margin;
 
-  // 如果提供了自定义位置，优先使用
   if (customX != null) {
     x = customX;
   } else if (position === 'top-left') {
@@ -190,22 +322,20 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
     y = ch - blockH - margin;
   }
 
-  // 保证水印不会超出边界
   x = Math.max(margin, Math.min(x, cw - blockW - margin));
   y = Math.max(margin, Math.min(y, ch - blockH - margin));
 
-  // 绘制深色背景（支持自定义透明度）
+  // 绘制背景
   const bgColor = parseColor(style.background, customOpacity != null ? customOpacity : 0.72);
   roundRect(ctx, x, y, blockW, blockH, borderRadius, bgColor);
 
   // 绘制文字
   ctx.textBaseline = 'top';
   const textColor = parseColor(style.color || '#ffffff', 1);
-  ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
   ctx.lineWidth = Math.max(2, Math.round(fontSize / 8));
 
   allLines.forEach((ln, i) => {
-    if (ln.spacer) return; // 空行
+    if (ln.spacer) return;
     const tx = x + padding + (ln.isLabel ? 0 : indent);
     const ty = y + padding + i * lineHeight;
 
@@ -218,15 +348,8 @@ function renderTemplate(ctx, canvas, template, values, cw, ch, customX, customY,
   });
 }
 
-/**
- * 按宽度把一段文字自动换行
- * 英文按单词换行，中文/长英文按字符换行
- */
 function wrapText(ctx, text, maxWidth, fontSize) {
   if (!text) return [];
-  // 按空白符拆分（西语主要使用西语主要西语使用英文空格分词
-  // 简化处理：先按空格拆成 word token，然后逐个累加，超过宽度就换行
-  // 同时对超长的单个西语单词按字符继续折行
   const tokens = text.split(/(\s+)/).filter((t) => t.length > 0);
   const lines = [];
   let current = '';
@@ -237,7 +360,6 @@ function wrapText(ctx, text, maxWidth, fontSize) {
       current = candidate;
     } else {
       if (current) lines.push(current.trim());
-      // 单个 token 本身太宽：按字符折行
       if (ctx.measureText(tk).width > maxWidth) {
         let sub = '';
         for (let i = 0; i < tk.length; i++) {
@@ -276,55 +398,6 @@ function roundRect(ctx, x, y, w, h, r, fill) {
   ctx.fill();
 }
 
-function canvasToTempFilePath(canvas, options = {}) {
-  const { destWidth, destHeight } = options;
-  
-  return new Promise((resolve, reject) => {
-    // 显式设置导出尺寸，确保高质量输出
-    const exportOptions = {
-      canvas: canvas,
-      fileType: 'jpg',
-      quality: 0.98
-    };
-    
-    // 如果提供了目标尺寸，使用目标尺寸
-    if (destWidth && destHeight) {
-      exportOptions.destWidth = destWidth;
-      exportOptions.destHeight = destHeight;
-    }
-    
-    console.log('canvasToTempFilePath:', {
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-      destWidth: exportOptions.destWidth,
-      destHeight: exportOptions.destHeight,
-      quality: exportOptions.quality
-    });
-    
-    wx.canvasToTempFilePath(exportOptions, {
-      success: (res) => {
-        // 获取导出后的文件信息
-        wx.getFileInfo({
-          filePath: res.tempFilePath,
-          success: (info) => {
-            console.log('导出后文件大小:', info.size, '字节');
-          },
-          fail: (err) => {
-            console.error('获取文件信息失败:', err);
-          }
-        });
-        resolve(res.tempFilePath);
-      },
-      fail: (err) => {
-        console.error('canvasToTempFilePath 失败:', err);
-        reject(err);
-      }
-    });
-  });
-}
-
 module.exports = {
-  drawWatermark,
-  renderTemplate,
-  canvasToTempFilePath
+  renderWatermarkedImage
 };

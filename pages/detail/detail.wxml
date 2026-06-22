@@ -48,6 +48,3 @@
 
   <view class="btn danger" bindtap="onDelete" style="margin-top:16rpx;">删除本条记录</view>
 </view>
-
-<!-- 隐藏的 canvas 用于重新渲染水印 -->
-<canvas type="2d" id="wmCanvas" class="offscreen"></canvas>
