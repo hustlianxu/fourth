@@ -20,6 +20,8 @@ Page({
   data: {
     templates: [],
     showModal: false,
+    showDeleteConfirm: false,
+    hasModal: false,
     editingId: null,
     form: {
       name: '',
@@ -63,8 +65,9 @@ Page({
   // 新增模板
   onAdd() {
     this.setData({
-      showModal: true,
-      editingId: null,
+        showModal: true,
+        hasModal: true,
+        editingId: null,
       form: {
         name: '',
         description: '',
@@ -90,6 +93,7 @@ Page({
     if (tpl) {
       this.setData({
         showModal: true,
+        hasModal: true,
         editingId: id,
         form: JSON.parse(JSON.stringify(tpl))
       });
@@ -106,6 +110,7 @@ Page({
     if (tpl) {
       this.setData({
         showDeleteConfirm: true,
+        hasModal: true,
         deleteName: tpl.name,
         deleteId: id
       });
@@ -247,11 +252,11 @@ Page({
 
   // 取消删除
   cancelDelete() {
-    this.setData({ showDeleteConfirm: false, deleteName: '', deleteId: '' });
+    this.setData({ showDeleteConfirm: false, hasModal: false, deleteName: '', deleteId: '' });
   },
 
   // 关闭弹窗
   closeModal() {
-    this.setData({ showModal: false, editingId: null });
+    this.setData({ showModal: false, hasModal: false, editingId: null });
   }
 });

@@ -4,10 +4,16 @@
   background: #f5f5f5;
 }
 
+.page.no-scroll {
+  overflow: hidden;
+  height: 100vh;
+}
+
 /* 头部 */
 .header {
   background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
   padding: 48rpx 32rpx;
+  padding-top: calc(48rpx + env(safe-area-inset-top));
   color: #fff;
 }
 
@@ -124,7 +130,7 @@
   position: fixed;
   left: 24rpx;
   right: 24rpx;
-  top: 10%;
+  top: 60rpx;
   bottom: 24rpx;
   background: #fff;
   border-radius: 20rpx;
@@ -132,6 +138,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  max-height: calc(100vh - 120rpx);
 }
 
 .modal-header {
@@ -140,6 +147,7 @@
   align-items: center;
   padding: 24rpx;
   border-bottom: 1rpx solid #f0f0f0;
+  flex-shrink: 0;
 }
 
 .modal-header text {
@@ -156,13 +164,17 @@
 .modal-body {
   flex: 1;
   padding: 24rpx;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-footer {
   display: flex;
   gap: 16rpx;
   padding: 20rpx 24rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid #f0f0f0;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -213,7 +225,7 @@
 
 /* 表单项 */
 .form-item {
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
 }
 
 .form-row {
@@ -228,17 +240,19 @@
 .form-label {
   font-size: 26rpx;
   color: #666;
-  margin-bottom: 8rpx;
+  margin-bottom: 10rpx;
   display: block;
 }
 
 .form-input {
   width: 100%;
   background: #f7f8fa;
-  padding: 18rpx;
-  border-radius: 10rpx;
+  padding: 24rpx 20rpx;
+  border-radius: 12rpx;
   font-size: 28rpx;
   box-sizing: border-box;
+  min-height: 88rpx;
+  line-height: 1.5;
 }
 
 /* 位置选择网格 */
@@ -249,11 +263,11 @@
 }
 
 .pos-btn {
-  padding: 16rpx;
+  padding: 20rpx 16rpx;
   background: #f7f8fa;
   border-radius: 10rpx;
   text-align: center;
-  font-size: 24rpx;
+  font-size: 26rpx;
   color: #666;
   border: 2rpx solid transparent;
 }
@@ -267,12 +281,12 @@
 /* 颜色选择器 */
 .color-picker {
   display: flex;
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
 .color-btn {
-  width: 64rpx;
-  height: 64rpx;
+  width: 72rpx;
+  height: 72rpx;
   border-radius: 50%;
   border: 3rpx solid #e8e8e8;
 }
@@ -281,7 +295,7 @@
 .field-list {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 16rpx;
 }
 
 .field-row {
@@ -297,31 +311,32 @@
 .field-input {
   width: 100%;
   background: #f7f8fa;
-  padding: 14rpx;
-  border-radius: 8rpx;
-  font-size: 26rpx;
+  padding: 20rpx;
+  border-radius: 10rpx;
+  font-size: 28rpx;
+  min-height: 80rpx;
 }
 
 .field-type {
-  padding: 14rpx 20rpx;
+  padding: 18rpx 20rpx;
   background: #f7f8fa;
-  border-radius: 8rpx;
-  font-size: 24rpx;
+  border-radius: 10rpx;
+  font-size: 26rpx;
   color: #666;
-  min-width: 100rpx;
+  min-width: 120rpx;
   text-align: center;
 }
 
 .field-actions {
-  width: 48rpx;
-  height: 48rpx;
+  width: 56rpx;
+  height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .field-remove {
-  font-size: 36rpx;
+  font-size: 40rpx;
   color: #ff4d4f;
   line-height: 1;
 }
