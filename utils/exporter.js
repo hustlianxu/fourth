@@ -1,5 +1,5 @@
 // utils/exporter.js
-// 导出记录为 Excel（HTML 格式，VML 嵌入未压缩原图）
+// 导出记录为 Excel（HTML 格式，VML 嵌入原图，行高按图片比例自适应，列宽自适应内容）
 
 var COLUMNS = [
   { key: 'imagePath', header: 'FOTO', isImage: true },
@@ -13,9 +13,11 @@ var COLUMNS = [
   { key: 'peso',      header: 'PESO' }
 ];
 
-var IMG_W = 200;
-var IMG_H = 160;
-var ROW_H = 180;
+var IMG_CELL_W = 220;       // FOTO 列单元格宽度（px）
+var MIN_ROW_H = 60;         // 最小行高
+var ROW_PAD = 16;           // 行高额外留白
+var CHAR_W = 9;             // 中文字符大约宽度（px）
+var MIN_COL_W = 60;         // 列最小宽度
 
 /**
  * 读取图片文件为 base64（不压缩）
@@ -25,9 +27,7 @@ function readFileAsBase64(filePath) {
     wx.getFileSystemManager().readFile({
       filePath: filePath,
       encoding: 'base64',
-      success: function (res) {
-        resolve(res.data);
-      },
+      success: function (res) { resolve(res.data); },
       fail: function (err) {
         console.warn('[Exporter] 读取图片失败:', filePath, err);
         resolve(null);
@@ -42,7 +42,59 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * 根据图片宽高比计算显示高度（保持比例，填充单元格宽度）
+ */
+function calcImgDisplayH(rec) {
+  var imgW = rec.width || 1080;
+  var imgH = rec.height || 1440;
+  return Math.round(IMG_CELL_W * (imgH / imgW));
+}
+
+/**
+ * 根据图片比例计算行高
+ */
+function calcRowHeight(rec) {
+  return Math.max(calcImgDisplayH(rec), MIN_ROW_H) + ROW_PAD;
+}
+
+/**
+ * 计算各列最宽内容所需的像素宽度
+ */
+function calcColumnWidths(records) {
+  var widths = {};
+  COLUMNS.forEach(function (col) {
+    if (col.isImage) {
+      widths[col.key] = IMG_CELL_W;
+      return;
+    }
+    // 从表头开始
+    var maxLen = col.header.length;
+    records.forEach(function (rec) {
+      var v = (rec.values && rec.values[col.key]) || '';
+      var len = String(v).length;
+      if (len > maxLen) maxLen = len;
+    });
+    widths[col.key] = Math.max(Math.round(maxLen * CHAR_W) + 24, MIN_COL_W);
+  });
+  return widths;
+}
+
+/**
+ * 生成 <col> 标签设置各列宽度
+ */
+function buildColGroup(colWidths) {
+  var html = '<colgroup>';
+  COLUMNS.forEach(function (col) {
+    html += '<col width="' + colWidths[col.key] + '">';
+  });
+  html += '</colgroup>';
+  return html;
+}
+
 async function buildHtmlTable(records) {
+  var colWidths = calcColumnWidths(records);
+
   var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
     + 'xmlns:x="urn:schemas-microsoft-com:office:excel" '
     + 'xmlns:v="urn:schemas-microsoft-com:vml" '
@@ -61,16 +113,20 @@ async function buildHtmlTable(records) {
     + 'vertical-align:middle;white-space:normal;vnd.ms-excel.numberformat:@;}'
     + 'v\\:*{behavior:url(#default#VML);}'
     + '</style></head><body><table>';
+  html += buildColGroup(colWidths);
 
   // 表头
-  html += '<tr height="24">';
+  html += '<tr height="28">';
   COLUMNS.forEach(function (c) { html += '<th>' + c.header + '</th>'; });
   html += '</tr>';
 
   // 数据行
   for (var ri = 0; ri < records.length; ri++) {
     var rec = records[ri];
-    html += '<tr height="' + ROW_H + '">';
+    var imgH = calcImgDisplayH(rec);
+    var rowH = calcRowHeight(rec);
+
+    html += '<tr height="' + rowH + '">';
     for (var ci = 0; ci < COLUMNS.length; ci++) {
       var col = COLUMNS[ci];
       if (col.isImage) {
@@ -78,21 +134,21 @@ async function buildHtmlTable(records) {
         if (rec.imagePath) {
           var b64 = await readFileAsBase64(rec.imagePath);
           if (b64) {
-            // VML 嵌入（Office/WPS）+ img 降级（其他）
             imgHtml = '<!--[if gte vml 1]>'
-              + '<v:shape style="width:' + IMG_W + 'px;height:' + IMG_H + 'px;'
+              + '<v:shape style="width:' + IMG_CELL_W + 'px;height:' + imgH + 'px;'
               + 'position:absolute;mso-position-horizontal:center;mso-position-vertical:middle;"'
-              + ' filled="t" stroked="f" coordsize="' + IMG_W + ',' + IMG_H + '">'
+              + ' filled="t" stroked="f" coordsize="' + IMG_CELL_W + ',' + imgH + '">'
               + '<v:imagedata src="data:image/jpeg;base64,' + b64 + '" o:title="FOTO"/>'
               + '</v:shape>'
               + '<![endif]-->'
               + '<img src="data:image/jpeg;base64,' + b64 + '" '
-              + 'width="' + IMG_W + '" height="' + IMG_H + '" />';
+              + 'width="' + IMG_CELL_W + '" height="' + imgH + '" />';
           } else {
             imgHtml = '图片读取失败';
           }
         }
-        html += '<td style="width:' + IMG_W + 'px;text-align:center;">' + imgHtml + '</td>';
+        html += '<td style="width:' + colWidths[col.key]
+          + 'px;text-align:center;">' + imgHtml + '</td>';
       } else {
         var v = (rec.values && rec.values[col.key]) || '';
         html += '<td style="text-align:left;padding-left:8px;">' + escapeHtml(String(v)) + '</td>';
