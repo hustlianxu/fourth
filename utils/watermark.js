@@ -74,10 +74,10 @@ async function renderWatermarkedImage(params) {
   }
   const ctx = canvas.getContext('2d');
 
-  // 3. 计算渲染尺寸（Android 设备使用更保守的上限，避免内存不足）
+  // 3. 计算渲染尺寸（长边最大 4096，避免内存不足；Android 分配失败时自动降级）
   const sysInfo = wx.getSystemInfoSync();
   const isAndroid = sysInfo.platform === 'android';
-  const defaultMaxEdge = isAndroid ? 2048 : 4096;
+  const defaultMaxEdge = 4096;
   const MAX_EDGE = maxEdgeOverride || defaultMaxEdge;
 
   console.log('[Watermark] 平台:', sysInfo.platform, '默认maxEdge:', defaultMaxEdge, '实际maxEdge:', MAX_EDGE);
@@ -100,7 +100,7 @@ async function renderWatermarkedImage(params) {
     console.log('[Watermark] Canvas 缓冲区:', targetW + 'x' + targetH);
   } catch (e) {
     // Android 设备内存不足时降级
-    const fallbackEdge = isAndroid ? 1536 : 2048;
+    const fallbackEdge = isAndroid ? 2048 : 3072;
     console.warn('[Watermark] Canvas 尺寸设置失败，降级到', fallbackEdge, ':', e);
     const s = rawMaxEdge > fallbackEdge ? fallbackEdge / rawMaxEdge : 1;
     targetW = Math.round(imgW * s);
@@ -201,7 +201,7 @@ function exportCanvasToFile(canvas, targetW, targetH) {
         x: 0, y: 0,
         width: targetW, height: targetH,
         destWidth: targetW, destHeight: targetH,
-        fileType: 'jpg', quality: 0.92,
+        fileType: 'jpg', quality: 0.98,
         success: onSuccess,
         fail: onFail
       });
@@ -212,7 +212,7 @@ function exportCanvasToFile(canvas, targetW, targetH) {
         x: 0, y: 0,
         width: targetW, height: targetH,
         destWidth: targetW, destHeight: targetH,
-        fileType: 'jpg', quality: 0.92,
+        fileType: 'jpg', quality: 0.98,
         success: onSuccess,
         fail: onFail
       });

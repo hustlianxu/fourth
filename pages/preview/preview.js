@@ -398,8 +398,7 @@ Page({
         customY: actualY,
         customScale: this.data.wmScale,
         opacity: this.data.wmOpacity,
-        widthRatio: this.data.wmWidthRatio,
-        maxEdge: 2048
+        widthRatio: this.data.wmWidthRatio
       });
 
       console.log('[Preview] 渲染完成:', outPath);

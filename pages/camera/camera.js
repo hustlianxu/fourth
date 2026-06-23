@@ -162,31 +162,66 @@ Page({
     this.ctx.takePhoto({
       quality: 'high',
       success: (res) => {
-        console.log('拍照成功，临时文件路径:', res.tempImagePath);
-        
-        // 获取拍照后的文件信息
+        const tempPath = res.tempImagePath;
+        console.log('[Camera] 拍照成功, tempPath:', tempPath);
+
+        // 获取文件信息用于诊断
         wx.getFileInfo({
-          filePath: res.tempImagePath,
+          filePath: tempPath,
           success: (fileInfo) => {
-            console.log('拍照文件大小:', fileInfo.size, '字节', (fileInfo.size / 1024).toFixed(2) + 'KB');
+            console.log('[Camera] 拍照文件大小:', fileInfo.size, '字节 (', (fileInfo.size / 1024).toFixed(1), 'KB)');
           },
           fail: (err) => {
-            console.error('获取文件信息失败:', err);
+            console.error('[Camera] getFileInfo 失败:', JSON.stringify(err));
           }
         });
-        
-        wx.getImageInfo({
-          src: res.tempImagePath,
-          success: (info) => {
-            console.log('拍照图片尺寸:', info.width, 'x', info.height);
-            this._goPreview(res.tempImagePath, { width: info.width, height: info.height });
-          },
-          fail: () => {
-            this._goPreview(res.tempImagePath, { width: 1080, height: 1440 });
-          }
-        });
+
+        // 获取图片尺寸（带重试机制，iOS 上可能因文件系统延迟而首次失败）
+        this._getPhotoInfo(tempPath, 0);
       },
-      fail: () => wx.showToast({ title: '拍照失败', icon: 'none' })
+      fail: (err) => {
+        console.error('[Camera] takePhoto 失败:', JSON.stringify(err));
+        wx.showToast({ title: '拍照失败', icon: 'none' });
+      }
+    });
+  },
+
+  /**
+   * 获取照片尺寸，带一次重试（解决 iOS 文件系统延迟问题）
+   */
+  _getPhotoInfo(tempPath, retryCount) {
+    const MAX_RETRY = 1;
+    const that = this;
+    wx.getImageInfo({
+      src: tempPath,
+      success: (info) => {
+        console.log('[Camera] 拍照分辨率:', info.width, 'x', info.height,
+          '(type:', info.type, 'orientation:', info.orientation, ')');
+        that._goPreview(tempPath, { width: info.width, height: info.height });
+      },
+      fail: (err) => {
+        console.error('[Camera] getImageInfo 失败 (retry=' + retryCount + '):', JSON.stringify(err));
+        if (retryCount < MAX_RETRY) {
+          // iOS 上可能是文件系统未就绪，延迟重试
+          setTimeout(() => {
+            that._getPhotoInfo(tempPath, retryCount + 1);
+          }, 300);
+        } else {
+          // 最终降级：使用文件大小估算分辨率
+          wx.getFileInfo({
+            filePath: tempPath,
+            success: (fileInfo) => {
+              console.warn('[Camera] getImageInfo 最终失败，文件大小:', fileInfo.size,
+                '使用估算分辨率 3024x4032');
+              that._goPreview(tempPath, { width: 3024, height: 4032 });
+            },
+            fail: () => {
+              console.warn('[Camera] getImageInfo 和 getFileInfo 均失败，使用兜底分辨率');
+              that._goPreview(tempPath, { width: 3024, height: 4032 });
+            }
+          });
+        }
+      }
     });
   },
 
