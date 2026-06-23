@@ -1,14 +1,82 @@
 // utils/storage.js
-// 本地存储管理：照片记录 + 自定义模板
+// 本地存储管理：照片记录 + 自定义模板 + 文件夹
 
 const KEY_PHOTOS = 'watermark_photos';
 const KEY_TEMPLATES = 'watermark_custom_tpls';
+const KEY_FOLDERS = 'watermark_folders';
+
+// ===== 内部辅助 =====
+
+/**
+ * 规范化记录对象，为旧数据补默认字段
+ */
+function _normalizeRecord(item) {
+  return Object.assign({}, item, {
+    folderId: item.folderId !== undefined ? item.folderId : null,
+    customName: item.customName || null
+  });
+}
+
+// ===== 文件夹操作 =====
+
+function getAllFolders() {
+  try {
+    const list = wx.getStorageSync(KEY_FOLDERS);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getFolderById(id) {
+  const list = getAllFolders();
+  return list.find(item => item.id === id);
+}
+
+function addFolder(name) {
+  const list = getAllFolders();
+  const folder = {
+    id: genFolderId(),
+    name: String(name).trim(),
+    createdAt: Date.now()
+  };
+  list.unshift(folder);
+  wx.setStorageSync(KEY_FOLDERS, list);
+  return folder;
+}
+
+function updateFolder(id, patch) {
+  const list = getAllFolders();
+  const idx = list.findIndex(item => item.id === id);
+  if (idx === -1) return null;
+  list[idx] = Object.assign({}, list[idx], patch, { updatedAt: Date.now() });
+  wx.setStorageSync(KEY_FOLDERS, list);
+  return list[idx];
+}
+
+function removeFolder(id) {
+  const list = getAllFolders();
+  const next = list.filter(item => item.id !== id);
+  wx.setStorageSync(KEY_FOLDERS, next);
+  return true;
+}
+
+function genFolderId() {
+  return 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function countByFolder(folderId) {
+  const all = getAll();
+  return all.filter(item => item.folderId === folderId).length;
+}
 
 // ===== 照片记录操作 =====
+
 function getAll() {
   try {
     const list = wx.getStorageSync(KEY_PHOTOS);
-    return Array.isArray(list) ? list : [];
+    if (!Array.isArray(list)) return [];
+    return list.map(_normalizeRecord);
   } catch (e) {
     return [];
   }
@@ -17,6 +85,15 @@ function getAll() {
 function getById(id) {
   const list = getAll();
   return list.find((item) => item.id === id);
+}
+
+/**
+ * 获取指定文件夹下的记录
+ * @param {string|null} folderId - null 匹配未分类记录
+ */
+function getByFolderId(folderId) {
+  const all = getAll();
+  return all.filter(item => item.folderId === folderId);
 }
 
 function add(record) {
@@ -44,6 +121,7 @@ function remove(id) {
 
 function clearAll() {
   wx.setStorageSync(KEY_PHOTOS, []);
+  wx.setStorageSync(KEY_FOLDERS, []);
 }
 
 // ===== 自定义模板操作 =====
@@ -85,11 +163,21 @@ function genId() {
 module.exports = {
   getAll,
   getById,
+  getByFolderId,
   add,
   update,
   remove,
   clearAll,
   genId,
+  // 文件夹
+  getAllFolders,
+  getFolderById,
+  addFolder,
+  updateFolder,
+  removeFolder,
+  genFolderId,
+  countByFolder,
+  // 自定义模板
   getCustomTemplates,
   saveCustomTemplate,
   deleteCustomTemplate

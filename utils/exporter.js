@@ -18,6 +18,19 @@ var MIN_ROW_H = 60;         // 最小行高
 var ROW_PAD = 16;           // 行高额外留白
 var CHAR_W = 9;             // 中文字符大约宽度（px）
 var MIN_COL_W = 60;         // 列最小宽度
+var MAX_NAME_LEN = 50;      // 自定义文件名最大长度
+
+/**
+ * 清理文件名，移除文件系统不安全字符
+ */
+function sanitizeFileName(name) {
+  if (!name) return 'export_' + Date.now();
+  return String(name)
+    .replace(/[\/\\:*?"<>|]/g, '_')   // 移除文件系统不安全字符
+    .replace(/\s+/g, '_')              // 空白字符替换为下划线
+    .slice(0, MAX_NAME_LEN)            // 截断至最大长度
+    || 'export_' + Date.now();         // 清理后为空则回退
+}
 
 /**
  * 读取图片文件为 base64（不压缩）
@@ -161,13 +174,14 @@ async function buildHtmlTable(records) {
   return html;
 }
 
-function exportToExcel(records) {
+function exportToExcel(records, customFileName) {
   if (!records || records.length === 0) throw new Error('没有选中任何记录');
 
-  console.log('[Exporter] 导出记录数:', records.length);
+  console.log('[Exporter] 导出记录数:', records.length, '自定义文件名:', customFileName || '(无)');
 
   return buildHtmlTable(records).then(function (html) {
-    var fileName = 'export_' + Date.now() + '.xls';
+    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
+    var fileName = baseName + '.xls';
     var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
 
     return new Promise(function (resolve, reject) {
@@ -193,4 +207,4 @@ function exportToExcel(records) {
   });
 }
 
-module.exports = { exportToExcel: exportToExcel, COLUMNS: COLUMNS };
+module.exports = { exportToExcel: exportToExcel, sanitizeFileName: sanitizeFileName, COLUMNS: COLUMNS };

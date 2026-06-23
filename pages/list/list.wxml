@@ -1,5 +1,6 @@
 <view class="container">
-  <view wx:if="{{list.length === 0}}" class="empty">
+  <!-- 空状态 -->
+  <view wx:if="{{list.length === 0 && folders.length === 0 && activeFolderId === null}}" class="empty">
     <view class="empty-icon">📷</view>
     <view class="empty-title">还没有记录</view>
     <view class="empty-sub">去拍一张带水印的照片吧</view>
@@ -7,7 +8,38 @@
   </view>
 
   <view wx:else>
-    <!-- 顶部操作栏 -->
+    <!-- ===== 文件夹Tab栏 ===== -->
+    <scroll-view class="folder-tabs" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="folder-tabs-inner">
+        <!-- 普通模式：全部Tab；导出模式：全选/取消全选 -->
+        <view
+          class="folder-tab {{!exportMode && activeFolderId === null ? 'active' : ''}} {{exportMode && allFoldersSelected ? 'export-selected' : ''}}"
+          data-folder-id=""
+          bindtap="onSelectFolder"
+        >全部({{totalCount}})</view>
+        <!-- 未分类Tab -->
+        <view
+          wx:if="{{uncategorizedCount > 0}}"
+          class="folder-tab {{!exportMode && activeFolderId === '__uncategorized__' ? 'active' : ''}} {{exportMode && uncategorizedExportSelected ? 'export-selected' : ''}}"
+          data-folder-id="__uncategorized__"
+          bindtap="onSelectFolder"
+          bindlongpress="{{exportMode ? '' : 'onUncategorizedLongPress'}}"
+        >未分类({{uncategorizedCount}})</view>
+        <!-- 自定义文件夹Tab -->
+        <view
+          wx:for="{{folders}}"
+          wx:key="id"
+          class="folder-tab {{!exportMode && activeFolderId === item.id ? 'active' : ''}} {{exportMode && item._exportSelected ? 'export-selected' : ''}}"
+          data-folder-id="{{item.id}}"
+          bindtap="onSelectFolder"
+          bindlongpress="{{exportMode ? '' : 'onFolderLongPress'}}"
+        >{{item.name}}({{item.count}})</view>
+        <!-- + 按钮（仅普通模式显示） -->
+        <view wx:if="{{!exportMode}}" class="folder-tab folder-tab-add" bindtap="onAddFolder">+</view>
+      </view>
+    </scroll-view>
+
+    <!-- ===== 顶部操作栏（普通模式） ===== -->
     <block wx:if="{{!exportMode}}">
       <view class="row between" style="margin-bottom:24rpx;">
         <view class="title" style="margin:0;">共 {{list.length}} 条</view>
@@ -18,8 +50,9 @@
       </view>
     </block>
 
-    <!-- 导出模式操作栏 -->
+    <!-- ===== 导出模式操作栏 ===== -->
     <block wx:else>
+      <view wx:if="{{selectedFolderIds.length === 0}}" class="export-hint">点击上方文件夹选择要导出的内容</view>
       <view class="export-bar">
         <view class="export-actions">
           <text class="export-link" bindtap="selectAll">全选</text>
@@ -31,13 +64,19 @@
       </view>
     </block>
 
-    <!-- 记录列表 -->
+    <!-- 当前文件夹空提示 -->
+    <view wx:if="{{list.length === 0}}" class="folder-empty">
+      <text>当前文件夹为空</text>
+    </view>
+
+    <!-- ===== 记录列表 ===== -->
     <view
       wx:for="{{list}}"
       wx:key="id"
       class="record {{exportMode ? 'export-selectable' : ''}} {{exportMode && item._checked ? 'selected' : ''}}"
       data-id="{{item.id}}"
       bindtap="{{exportMode ? 'toggleSelect' : 'goDetail'}}"
+      bindlongpress="{{!exportMode ? 'onRecordLongPress' : ''}}"
     >
       <!-- 导出模式勾选框 -->
       <view wx:if="{{exportMode}}" class="checkbox {{item._checked ? 'checked' : ''}}">
@@ -46,12 +85,110 @@
 
       <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
       <view class="record-body">
-        <view class="record-title">{{item.templateName}}</view>
+        <view class="record-title">{{item.customName || item.templateName}}</view>
         <view class="record-time">{{item.timeText}}</view>
         <view class="record-summary">{{item.summary}}</view>
       </view>
     </view>
 
     <view class="btn danger" bindtap="onClear" style="margin-top:24rpx;">清空本地记录</view>
+  </view>
+
+  <!-- ===== 文件夹创建/重命名弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showFolderModal}}" bindtap="closeFolderModal"></view>
+  <view class="folder-modal" wx:if="{{showFolderModal}}">
+    <view class="folder-modal-title">{{editingFolderId ? '重命名文件夹' : '新建文件夹'}}</view>
+    <input
+      class="folder-modal-input"
+      placeholder="输入文件夹名称"
+      maxlength="20"
+      value="{{folderNameInput}}"
+      bindinput="onFolderNameInput"
+      focus="{{showFolderModal}}"
+    />
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeFolderModal">取消</view>
+      <view class="btn" bindtap="onConfirmFolder">确定</view>
+    </view>
+  </view>
+
+  <!-- ===== 记录重命名弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showRenameModal}}" bindtap="closeRenameModal"></view>
+  <view class="folder-modal" wx:if="{{showRenameModal}}">
+    <view class="folder-modal-title">重命名照片</view>
+    <input
+      class="folder-modal-input"
+      placeholder="输入照片名称（留空则使用模板名称）"
+      maxlength="30"
+      value="{{renameInput}}"
+      bindinput="onRenameInput"
+      focus="{{showRenameModal}}"
+    />
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeRenameModal">取消</view>
+      <view class="btn" bindtap="onConfirmRename">确定</view>
+    </view>
+  </view>
+
+  <!-- ===== 导出文件名弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showExportNameModal}}" bindtap="closeExportNameModal"></view>
+  <view class="folder-modal" wx:if="{{showExportNameModal}}">
+    <view class="folder-modal-title">导出到 Excel</view>
+    <view class="folder-modal-desc">将导出已选中的 {{selectedCount}} 条记录</view>
+    <input
+      class="folder-modal-input"
+      placeholder="输入文件名（不含扩展名）"
+      maxlength="50"
+      value="{{exportFileName}}"
+      bindinput="onExportNameInput"
+      focus="{{showExportNameModal}}"
+    />
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeExportNameModal">取消</view>
+      <view class="btn" bindtap="onConfirmExport">导出</view>
+    </view>
+  </view>
+
+  <!-- ===== 文件夹选择器底部弹层（移动/复制） ===== -->
+  <view class="mask" wx:if="{{showFolderPicker}}" bindtap="closeFolderPicker"></view>
+  <view class="picker" wx:if="{{showFolderPicker}}">
+    <view class="picker-title">
+      {{pickerMode === 'move' ? '移动到文件夹' : '复制到文件夹'}}
+    </view>
+    <view class="picker-list">
+      <!-- 未分类选项 -->
+      <view
+        class="picker-item"
+        data-folder-id="__uncategorized__"
+        bindtap="onPickTargetFolder"
+      >未分类</view>
+      <view
+        wx:for="{{folders}}"
+        wx:key="id"
+        class="picker-item {{pickerRecordId && item.id === activeFolderId && pickerMode === 'move' ? 'picker-item-disabled' : ''}}"
+        data-folder-id="{{item.id}}"
+        bindtap="onPickTargetFolder"
+      >
+        <view class="picker-item-name">{{item.name}}</view>
+        <view class="picker-item-count">{{item.count}} 条记录</view>
+      </view>
+      <view wx:if="{{folders.length === 0}}" class="picker-empty">暂无文件夹，请先创建</view>
+    </view>
+    <view class="btn secondary" bindtap="closeFolderPicker" style="margin-top:16rpx;">取消</view>
+  </view>
+
+  <!-- ===== 删除文件夹确认弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showDeleteFolderModal}}" bindtap="closeDeleteFolderModal"></view>
+  <view class="folder-modal" wx:if="{{showDeleteFolderModal}}">
+    <view class="folder-modal-title">删除文件夹</view>
+    <view class="folder-modal-desc">
+      文件夹「{{deleteFolderName}}」中有 {{deleteFolderCount}} 条记录。
+      请选择如何处理这些记录：
+    </view>
+    <view class="folder-modal-actions" style="flex-direction:column;gap:12rpx;">
+      <view class="btn danger" bindtap="onDeleteFolderWithRecords">一起删除记录</view>
+      <view class="btn secondary" bindtap="onDeleteFolderKeepRecords">移入未分类</view>
+      <view class="btn secondary" bindtap="closeDeleteFolderModal" style="background:#f5f5f5;color:#999;">取消</view>
+    </view>
   </view>
 </view>

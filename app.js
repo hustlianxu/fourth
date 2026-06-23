@@ -13,6 +13,14 @@ App({
     } catch (e) {
       wx.setStorageSync('watermark_photos', []);
     }
+    try {
+      const folders = wx.getStorageSync('watermark_folders');
+      if (!Array.isArray(folders)) {
+        wx.setStorageSync('watermark_folders', []);
+      }
+    } catch (e) {
+      wx.setStorageSync('watermark_folders', []);
+    }
   },
   globalData: {
     systemInfo: null,
