@@ -75,12 +75,12 @@ async function renderWatermarkedImage(params) {
   const ctx = canvas.getContext('2d');
 
   // 3. 计算渲染尺寸（长边最大 4096，避免内存不足；Android 分配失败时自动降级）
-  const sysInfo = wx.getSystemInfoSync();
-  const isAndroid = sysInfo.platform === 'android';
+  const deviceInfo = wx.getDeviceInfo();
+  const isAndroid = deviceInfo.platform === 'android';
   const defaultMaxEdge = 4096;
   const MAX_EDGE = maxEdgeOverride || defaultMaxEdge;
 
-  console.log('[Watermark] 平台:', sysInfo.platform, '默认maxEdge:', defaultMaxEdge, '实际maxEdge:', MAX_EDGE);
+  console.log('[Watermark] 平台:', deviceInfo.platform, '默认maxEdge:', defaultMaxEdge, '实际maxEdge:', MAX_EDGE);
 
   let targetW = imgW;
   let targetH = imgH;
@@ -178,7 +178,7 @@ function exportCanvasToFile(canvas, targetW, targetH) {
       if (exportTimedOut) return;
       clearTimeout(exportTimer);
       console.log('[Watermark] 导出成功:', res.tempFilePath);
-      wx.getFileInfo({
+      wx.getFileSystemManager().getFileInfo({
         filePath: res.tempFilePath,
         success: (info) => {
           console.log('[Watermark] 文件大小:', (info.size / 1024).toFixed(1) + 'KB');

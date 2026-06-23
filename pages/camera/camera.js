@@ -166,7 +166,7 @@ Page({
         console.log('[Camera] 拍照成功, tempPath:', tempPath);
 
         // 获取文件信息用于诊断
-        wx.getFileInfo({
+        wx.getFileSystemManager().getFileInfo({
           filePath: tempPath,
           success: (fileInfo) => {
             console.log('[Camera] 拍照文件大小:', fileInfo.size, '字节 (', (fileInfo.size / 1024).toFixed(1), 'KB)');
@@ -208,7 +208,7 @@ Page({
           }, 300);
         } else {
           // 最终降级：使用文件大小估算分辨率
-          wx.getFileInfo({
+          wx.getFileSystemManager().getFileInfo({
             filePath: tempPath,
             success: (fileInfo) => {
               console.warn('[Camera] getImageInfo 最终失败，文件大小:', fileInfo.size,

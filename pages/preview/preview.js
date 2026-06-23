@@ -55,15 +55,15 @@ Page({
   wmHeight: 0,
 
   onLoad(options) {
-    const sysInfo = wx.getSystemInfoSync();
-    this.screenWidth = sysInfo.windowWidth;
-    this.screenHeight = sysInfo.windowHeight;
+    const windowInfo = wx.getWindowInfo();
+    this.screenWidth = windowInfo.windowWidth;
+    this.screenHeight = windowInfo.windowHeight;
 
     // 获取微信原生胶囊按钮位置，避免保存按钮被遮挡
     try {
       const capsule = wx.getMenuButtonBoundingClientRect();
       // 保存按钮放在胶囊左侧，间距 12px
-      const saveRight = sysInfo.windowWidth - capsule.left + 12;
+      const saveRight = windowInfo.windowWidth - capsule.left + 12;
       const saveTop = capsule.top;
       const btnLineHeight = capsule.height; // 与胶囊同高，保证对齐
       this.setData({

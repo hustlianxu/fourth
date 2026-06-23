@@ -42,8 +42,8 @@ Page({
 
   onLoad(options) {
     this.recordId = options.id;
-    const sysInfo = wx.getSystemInfoSync();
-    this.screenWidth = sysInfo.windowWidth;
+    const windowInfo = wx.getWindowInfo();
+    this.screenWidth = windowInfo.windowWidth;
   },
 
   onReady() {},
