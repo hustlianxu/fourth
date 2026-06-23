@@ -129,16 +129,15 @@ Page({
     // 计算图片显示尺寸（必须先计算，后续初始化依赖此值）
     this._calcImgDisplaySize();
 
-    // 初始化水印位置（右中，确保在各种屏幕上都可见）
+    // 初始化水印位置：根据用户在相机页选择的位置计算
     const containerW = this.data.imgDisplayWidth;
     const containerH = this.data.imgDisplayHeight;
     this.wmWidth = containerW * 0.42;
     this.wmHeight = 60; // 初始高度较小，水印层实际高度由内容决定
-    this.setData({
-      wmX: containerW - this.wmWidth - 10,
-      wmY: (containerH - this.wmHeight) / 2,
-      currentPos: 'cr'
-    });
+
+    // 将 camera 页的 position ID 映射为 preview 页的坐标
+    const posId = this.data.template.position || 'bottom-left';
+    this._applyPosition(posId);
   },
 
   // 计算图片显示尺寸
@@ -169,6 +168,41 @@ Page({
 
   onReady() {
     // 使用离屏 Canvas 渲染，无需初始化 DOM Canvas
+  },
+
+  /**
+   * 将 camera 页面的位置 ID 映射为水印显示坐标
+   * 位置 ID: top-left, top-center, top-right, center-left, center,
+   *          center-right, bottom-left, bottom-center, bottom-right
+   */
+  _applyPosition(posId) {
+    // camera 位置 ID → preview QUICK_POS ID 映射
+    const POS_MAP = {
+      'top-left':     { qid: 'tl', x: '10%', y: '10%' },
+      'top-center':   { qid: 'tc', x: '50%', y: '10%' },
+      'top-right':    { qid: 'tr', x: '90%', y: '10%' },
+      'center-left':  { qid: 'cl', x: '10%', y: '50%' },
+      'center':       { qid: 'cc', x: '50%', y: '50%' },
+      'center-right': { qid: 'cr', x: '90%', y: '50%' },
+      'bottom-left':  { qid: 'bl', x: '10%', y: '90%' },
+      'bottom-center':{ qid: 'bc', x: '50%', y: '90%' },
+      'bottom-right': { qid: 'br', x: '90%', y: '90%' }
+    };
+    const pos = POS_MAP[posId] || POS_MAP['bottom-left'];
+
+    const cw = this.data.imgDisplayWidth;
+    const ch = this.data.imgDisplayHeight;
+    let newX, newY;
+
+    if (pos.x === '10%') newX = 10;
+    else if (pos.x === '50%') newX = (cw - this.wmWidth) / 2;
+    else newX = cw - this.wmWidth - 10;
+
+    if (pos.y === '10%') newY = 10;
+    else if (pos.y === '50%') newY = (ch - this.wmHeight) / 2;
+    else newY = ch - this.wmHeight - 10;
+
+    this.setData({ wmX: newX, wmY: newY, currentPos: pos.qid });
   },
 
   // 计算显示字段

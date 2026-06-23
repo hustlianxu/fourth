@@ -29,7 +29,8 @@ Page({
     formOpen: false,      // 表单是否展开
     wPos: 'bottom-left',  // 当前选中的水印位置
     POSITIONS: POSITIONS,
-    filledSummary: []
+    filledSummary: [],
+    wmPreviewLines: []    // 水印预览文本行
   },
 
   onLoad(options) {
@@ -43,7 +44,12 @@ Page({
       wPos: (tpl && tpl.position) || 'bottom-left'
     });
     this._updateSummary();
+    this._calcWmPreview();
     this.ctx = wx.createCameraContext();
+  },
+
+  onShow() {
+    this._refreshTimeFields();
   },
 
   // 切换表单展开/收起
@@ -55,6 +61,7 @@ Page({
   onSetPos(e) {
     const pos = e.currentTarget.dataset.pos;
     this.setData({ wPos: pos });
+    // wPos 变更触发预览浮层重新定位（通过 class 绑定自动响应）
   },
 
   // 更新概要标签行（已填字段显示为标签）
@@ -73,6 +80,47 @@ Page({
     this.setData({ filledSummary: summary });
   },
 
+  // 计算水印预览浮层的文本行
+  _calcWmPreview() {
+    const fields = (this.data.template && this.data.template.fields) || [];
+    const vals = this.data.values || {};
+    const lines = [];
+    fields.forEach((f) => {
+      const v = vals[f.key];
+      if (v && String(v).trim()) {
+        lines.push(f.label + ': ' + String(v).trim());
+      }
+    });
+    this.setData({ wmPreviewLines: lines });
+  },
+
+  // 每次进入页面时刷新时间字段
+  _refreshTimeFields() {
+    if (!this.data.template || !this.data.template.fields) return;
+    const now = new Date();
+    const values = Object.assign({}, this.data.values);
+    let changed = false;
+    this.data.template.fields.forEach((f) => {
+      if (f.type === 'datetime') {
+        values[f.key] = templates.formatDateTime(now);
+        changed = true;
+      }
+      if (f.type === 'date') {
+        values[f.key] = templates.formatDate(now);
+        changed = true;
+      }
+      if (f.type === 'time') {
+        values[f.key] = templates.formatTime(now);
+        changed = true;
+      }
+    });
+    if (changed) {
+      this.setData({ values });
+      this._updateSummary();
+      this._calcWmPreview();
+    }
+  },
+
   // 字段输入
   onFieldInput(e) {
     const key = e.currentTarget.dataset.key;
@@ -80,6 +128,7 @@ Page({
     const values = Object.assign({}, this.data.values, { [key]: val });
     this.setData({ values });
     this._updateSummary();
+    this._calcWmPreview();
   },
 
   onSelectChange(e) {
@@ -89,6 +138,7 @@ Page({
     const values = Object.assign({}, this.data.values, { [key]: range[idx] });
     this.setData({ values });
     this._updateSummary();
+    this._calcWmPreview();
   },
 
   // 获取定位
@@ -100,6 +150,7 @@ Page({
         const values = Object.assign({}, this.data.values, { location });
         this.setData({ values });
         this._updateSummary();
+        this._calcWmPreview();
         wx.showToast({ title: '已定位', icon: 'success' });
       },
       fail: () => {
@@ -110,15 +161,7 @@ Page({
 
   // 刷新时间
   onRefreshTime() {
-    const now = new Date();
-    const values = Object.assign({}, this.data.values);
-    (this.data.template.fields || []).forEach((f) => {
-      if (f.type === 'datetime') values[f.key] = templates.formatDateTime(now);
-      if (f.type === 'date') values[f.key] = templates.formatDate(now);
-      if (f.type === 'time') values[f.key] = templates.formatTime(now);
-    });
-    this.setData({ values });
-    this._updateSummary();
+    this._refreshTimeFields();
   },
 
   // 模板选择
@@ -136,6 +179,7 @@ Page({
       formOpen: false
     });
     this._updateSummary();
+    this._calcWmPreview();
   },
 
   closePicker() {
@@ -258,10 +302,14 @@ Page({
   // 跳转到预览页
   _goPreview(photo, photoInfo) {
     try {
+      // 将用户选择的水印位置同步到 template，确保预览页使用正确位置
+      const template = Object.assign({}, this.data.template, {
+        position: this.data.wPos
+      });
       const params = {
         photo: photo,
         photoInfo: JSON.stringify(photoInfo),
-        template: JSON.stringify(this.data.template),
+        template: JSON.stringify(template),
         values: JSON.stringify(this.data.values)
       };
       // 使用全局变量临时存储数据（必须在 navigateTo 之前设置，避免竞态）
