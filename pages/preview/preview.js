@@ -130,12 +130,6 @@ Page({
     this._calcImgDisplaySize();
 
     // 初始化水印位置：根据用户在相机页选择的位置计算
-    const containerW = this.data.imgDisplayWidth;
-    const containerH = this.data.imgDisplayHeight;
-    this.wmWidth = containerW * 0.42;
-    this.wmHeight = 60; // 初始高度较小，水印层实际高度由内容决定
-
-    // 将 camera 页的 position ID 映射为 preview 页的坐标
     const posId = this.data.template.position || 'bottom-left';
     this._applyPosition(posId);
   },
@@ -171,36 +165,55 @@ Page({
   },
 
   /**
+   * 计算水印显示尺寸（宽度、高度、边距），与 watermark.js 的缩放公式保持一致
+   */
+  _calcWmMetrics() {
+    const cw = this.data.imgDisplayWidth || 300;
+    const ch = this.data.imgDisplayHeight || 400;
+    const margin = Math.round(cw * 0.04);
+    const ratio = cw / 750;
+    const scale = this.data.wmScale || 1;
+    const fontSize = Math.round(22 * ratio * scale);
+    const lineHeight = Math.round(fontSize * 1.7);
+    const padding = Math.round(14 * ratio * scale);
+    const fieldCount = (this.data.displayFields && this.data.displayFields.length) || 0;
+    const estimatedLines = Math.max(fieldCount * 2, 1);
+    const wmHeight = padding * 2 + estimatedLines * lineHeight;
+    this.wmWidth = Math.round(cw * (this.data.wmWidthRatio || 0.42) * scale);
+    this.wmHeight = wmHeight;
+    return { cw, ch, margin };
+  },
+
+  /**
    * 将 camera 页面的位置 ID 映射为水印显示坐标
    * 位置 ID: top-left, top-center, top-right, center-left, center,
    *          center-right, bottom-left, bottom-center, bottom-right
    */
   _applyPosition(posId) {
+    const { cw, ch, margin } = this._calcWmMetrics();
+
     // camera 位置 ID → preview QUICK_POS ID 映射
     const POS_MAP = {
-      'top-left':     { qid: 'tl', x: '10%', y: '10%' },
-      'top-center':   { qid: 'tc', x: '50%', y: '10%' },
-      'top-right':    { qid: 'tr', x: '90%', y: '10%' },
-      'center-left':  { qid: 'cl', x: '10%', y: '50%' },
-      'center':       { qid: 'cc', x: '50%', y: '50%' },
-      'center-right': { qid: 'cr', x: '90%', y: '50%' },
-      'bottom-left':  { qid: 'bl', x: '10%', y: '90%' },
-      'bottom-center':{ qid: 'bc', x: '50%', y: '90%' },
-      'bottom-right': { qid: 'br', x: '90%', y: '90%' }
+      'top-left':     { qid: 'tl', x: 'left',  y: 'top' },
+      'top-center':   { qid: 'tc', x: 'center',y: 'top' },
+      'top-right':    { qid: 'tr', x: 'right', y: 'top' },
+      'center-left':  { qid: 'cl', x: 'left',  y: 'center' },
+      'center':       { qid: 'cc', x: 'center',y: 'center' },
+      'center-right': { qid: 'cr', x: 'right', y: 'center' },
+      'bottom-left':  { qid: 'bl', x: 'left',  y: 'bottom' },
+      'bottom-center':{ qid: 'bc', x: 'center',y: 'bottom' },
+      'bottom-right': { qid: 'br', x: 'right', y: 'bottom' }
     };
     const pos = POS_MAP[posId] || POS_MAP['bottom-left'];
 
-    const cw = this.data.imgDisplayWidth;
-    const ch = this.data.imgDisplayHeight;
     let newX, newY;
+    if (pos.x === 'left') newX = margin;
+    else if (pos.x === 'center') newX = (cw - this.wmWidth) / 2;
+    else newX = cw - this.wmWidth - margin;
 
-    if (pos.x === '10%') newX = 10;
-    else if (pos.x === '50%') newX = (cw - this.wmWidth) / 2;
-    else newX = cw - this.wmWidth - 10;
-
-    if (pos.y === '10%') newY = 10;
-    else if (pos.y === '50%') newY = (ch - this.wmHeight) / 2;
-    else newY = ch - this.wmHeight - 10;
+    if (pos.y === 'top') newY = margin;
+    else if (pos.y === 'center') newY = (ch - this.wmHeight) / 2;
+    else newY = ch - this.wmHeight - margin;
 
     this.setData({ wmX: newX, wmY: newY, currentPos: pos.qid });
   },
@@ -325,6 +338,11 @@ Page({
   onScaleChange(e) {
     const v = e.detail.value;
     this.setData({ wmScale: v, scaleLabel: Math.round(v * 100) + '%' });
+    // 缩放改变水印高度，需重新计算位置
+    const QID_TO_POS = { tl:'top-left', tc:'top-center', tr:'top-right',
+      cl:'center-left', cc:'center', cr:'center-right',
+      bl:'bottom-left', bc:'bottom-center', br:'bottom-right' };
+    this._applyPosition(QID_TO_POS[this.data.currentPos] || 'bottom-left');
   },
 
   // 透明度滑块
@@ -336,8 +354,8 @@ Page({
   // 水印宽度滑块
   onWidthChange(e) {
     const v = e.detail.value;
-    this.wmWidth = this.data.imgDisplayWidth * v;
     this.setData({ wmWidthRatio: v, widthLabel: Math.round(v * 100) + '%' });
+    this._calcWmMetrics();
   },
 
   // 快速定位
@@ -345,17 +363,16 @@ Page({
     const x = e.currentTarget.dataset.x;
     const y = e.currentTarget.dataset.y;
     const posId = e.currentTarget.dataset.id;
-    const cw = this.data.imgDisplayWidth;
-    const ch = this.data.imgDisplayHeight;
+    const { cw, ch, margin } = this._calcWmMetrics();
+
     let newX, newY;
-
-    if (x === '10%') newX = 10;
+    if (x === '10%') newX = margin;
     else if (x === '50%') newX = (cw - this.wmWidth) / 2;
-    else newX = cw - this.wmWidth - 10;
+    else newX = cw - this.wmWidth - margin;
 
-    if (y === '10%') newY = 10;
+    if (y === '10%') newY = margin;
     else if (y === '50%') newY = (ch - this.wmHeight) / 2;
-    else newY = ch - this.wmHeight - 10;
+    else newY = ch - this.wmHeight - margin;
 
     this.setData({ wmX: newX, wmY: newY, currentPos: posId });
   },

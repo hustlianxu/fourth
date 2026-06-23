@@ -30,7 +30,8 @@ Page({
     wPos: 'bottom-left',  // 当前选中的水印位置
     POSITIONS: POSITIONS,
     filledSummary: [],
-    wmPreviewLines: []    // 水印预览文本行
+    wmPreviewLines: [],   // 水印预览文本行
+    wmPreviewFontSize: 20 // 预览字号（px）
   },
 
   onLoad(options) {
@@ -80,7 +81,7 @@ Page({
     this.setData({ filledSummary: summary });
   },
 
-  // 计算水印预览浮层的文本行
+  // 计算水印预览浮层的文本行和字号
   _calcWmPreview() {
     const fields = (this.data.template && this.data.template.fields) || [];
     const vals = this.data.values || {};
@@ -91,7 +92,14 @@ Page({
         lines.push(f.label + ': ' + String(v).trim());
       }
     });
-    this.setData({ wmPreviewLines: lines });
+    // 按 watermark.js 公式计算预览字号：fontSize = 22 * (viewportW / 750)
+    const viewportW = wx.getWindowInfo().windowWidth;
+    const ratio = viewportW / 750;
+    const previewFontSize = Math.round(22 * ratio);
+    this.setData({
+      wmPreviewLines: lines,
+      wmPreviewFontSize: previewFontSize
+    });
   },
 
   // 每次进入页面时刷新时间字段

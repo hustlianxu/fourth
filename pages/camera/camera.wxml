@@ -14,7 +14,7 @@
       wx:if="{{wmPreviewLines.length > 0}}"
       class="wm-preview wm-preview--{{wPos}}"
     >
-      <view class="wm-preview-bg">
+      <view class="wm-preview-bg" style="font-size: {{wmPreviewFontSize}}px">
         <text
           class="wm-preview-line"
           wx:for="{{wmPreviewLines}}"
