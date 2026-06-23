@@ -190,6 +190,36 @@ Page({
     });
   },
 
+  // 高清拍摄：调用系统相机，保留原始分辨率
+  onTakeHighQualityPhoto() {
+    if (!this.validate()) return;
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['camera'],
+      sizeType: ['original'],
+      success: (res) => {
+        const file = res.tempFiles[0];
+        console.log('高清拍摄成功, 大小:', (file.size / 1024).toFixed(1) + 'KB');
+        wx.getImageInfo({
+          src: file.tempFilePath,
+          success: (info) => {
+            console.log('高清拍摄分辨率:', info.width + 'x' + info.height);
+            this._goPreview(file.tempFilePath, { width: info.width, height: info.height });
+          },
+          fail: () => {
+            this._goPreview(file.tempFilePath, { width: 2736, height: 3648 });
+          }
+        });
+      },
+      fail: (err) => {
+        if (err.errMsg && err.errMsg.indexOf('cancel') === -1) {
+          wx.showToast({ title: '拍摄失败', icon: 'none' });
+        }
+      }
+    });
+  },
+
   // 跳转到预览页
   _goPreview(photo, photoInfo) {
     try {

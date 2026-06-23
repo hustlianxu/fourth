@@ -27,6 +27,7 @@ const TEMPLATES = [
       { key: 'pzs', label: '每箱件数 · Pzs / caja', type: 'text', placeholder: '如：48 pzs / caja', required: false },
       { key: 'cajas', label: '件数 · Total cajas / pzs', type: 'text', placeholder: '如：50 cajas · 1200 pzs', required: false },
       { key: 'volumen', label: '体积 · Volumen', type: 'text', placeholder: '如：0.125 m³ / 2 cajas', required: false },
+      { key: 'peso', label: '重量 · Peso', type: 'text', placeholder: '如：2.5 kg', required: false },
       { key: 'nota', label: '备注 · Nota', type: 'textarea', placeholder: '如：con luz y música · movimiento · poner más opp en la caja', required: false, multiline: true },
       { key: 'fecha', label: '日期 · Fecha', type: 'datetime', required: false }
     ]
@@ -52,6 +53,7 @@ const TEMPLATES = [
       { key: 'precio', label: '单价 · Precio', type: 'text', placeholder: '如：¥11', required: false },
       { key: 'pzs', label: '每箱 · Pzs / caja', type: 'text', placeholder: '如：48 pzs / caja', required: false },
       { key: 'cajas', label: '件数 · Total', type: 'text', placeholder: '如：10 cajas', required: false },
+      { key: 'peso', label: '重量 · Peso', type: 'text', placeholder: '如：2.5 kg', required: false },
       { key: 'fecha', label: '日期 · Fecha', type: 'datetime', required: false }
     ]
   }

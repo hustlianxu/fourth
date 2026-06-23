@@ -66,3 +66,69 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
+
+/* 导出模式 */
+.export-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 16rpx 0;
+  margin-bottom: 16rpx;
+}
+
+.export-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.export-link {
+  color: #07c160;
+  font-size: 26rpx;
+  padding: 8rpx 0;
+}
+
+.export-info {
+  font-size: 26rpx;
+  color: #666;
+  flex: 1;
+  text-align: center;
+}
+
+.btn.export-confirm {
+  background: #07c160;
+  color: #fff;
+  padding: 12rpx 24rpx;
+  border-radius: 10rpx;
+  font-size: 26rpx;
+}
+
+.record.export-selectable {
+  padding-left: 12rpx;
+}
+
+.record.selected {
+  background: #e6f7ee;
+  border: 2rpx solid #07c160;
+  box-shadow: 0 2rpx 12rpx rgba(7,193,96,0.15);
+}
+
+.checkbox {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 2rpx solid #ccc;
+  flex-shrink: 0;
+  margin-right: 12rpx;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: #fff;
+}
+
+.checkbox.checked {
+  background: #07c160;
+  border-color: #07c160;
+}

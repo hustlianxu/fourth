@@ -7,18 +7,43 @@
   </view>
 
   <view wx:else>
-    <view class="row between" style="margin-bottom:24rpx;">
-      <view class="title" style="margin:0;">共 {{list.length}} 条</view>
-      <view class="btn secondary" bindtap="goCamera" style="padding:12rpx 24rpx;">+ 新增</view>
-    </view>
+    <!-- 顶部操作栏 -->
+    <block wx:if="{{!exportMode}}">
+      <view class="row between" style="margin-bottom:24rpx;">
+        <view class="title" style="margin:0;">共 {{list.length}} 条</view>
+        <view class="row">
+          <view class="btn secondary" bindtap="toggleExportMode" style="padding:12rpx 24rpx;margin-right:12rpx;">导出</view>
+          <view class="btn secondary" bindtap="goCamera" style="padding:12rpx 24rpx;">+ 新增</view>
+        </view>
+      </view>
+    </block>
 
+    <!-- 导出模式操作栏 -->
+    <block wx:else>
+      <view class="export-bar">
+        <view class="export-actions">
+          <text class="export-link" bindtap="selectAll">全选</text>
+          <text class="export-link" bindtap="deselectAll">取消</text>
+        </view>
+        <view class="export-info">已选 {{selectedCount}} 条</view>
+        <view class="btn export-confirm" bindtap="doExport">确认导出</view>
+        <view class="btn secondary" bindtap="toggleExportMode" style="padding:12rpx 20rpx;">取消</view>
+      </view>
+    </block>
+
+    <!-- 记录列表 -->
     <view
       wx:for="{{list}}"
       wx:key="id"
-      class="record"
+      class="record {{exportMode ? 'export-selectable' : ''}} {{exportMode && item._checked ? 'selected' : ''}}"
       data-id="{{item.id}}"
-      bindtap="goDetail"
+      bindtap="{{exportMode ? 'toggleSelect' : 'goDetail'}}"
     >
+      <!-- 导出模式勾选框 -->
+      <view wx:if="{{exportMode}}" class="checkbox {{item._checked ? 'checked' : ''}}">
+        <text wx:if="{{item._checked}}">✓</text>
+      </view>
+
       <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
       <view class="record-body">
         <view class="record-title">{{item.templateName}}</view>

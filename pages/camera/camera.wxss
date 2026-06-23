@@ -171,10 +171,10 @@
 
 .bottom-actions {
   display: flex;
-  gap: 16rpx;
+  gap: 10rpx;
   flex-shrink: 0;
-  margin-left: 12rpx;
-  width: 280rpx;
+  margin-left: 8rpx;
+  width: 380rpx;
 }
 
 /* ===== 底部按钮 ===== */
@@ -193,6 +193,13 @@
   background: #fff;
   color: #07c160;
   border: 2rpx solid #07c160;
+}
+
+.btn.primary-outline {
+  background: #07c160;
+  color: #fff;
+  border: 2rpx solid #07c160;
+  font-size: 24rpx;
 }
 
 /* ===== 预览页 ===== */

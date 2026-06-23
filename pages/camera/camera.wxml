@@ -4,7 +4,7 @@
     class="camera"
     device-position="back"
     flash="auto"
-    resolution="high"
+    resolution="maximum"
   ></camera>
 
   <!-- 水印位置选择浮层 -->
@@ -33,6 +33,7 @@
       <view class="bottom-actions">
         <view class="btn secondary" bindtap="onPickImage">相册</view>
         <view class="btn" bindtap="onTakePhoto">拍照</view>
+        <view class="btn primary-outline" bindtap="onTakeHighQualityPhoto">高清</view>
       </view>
     </view>
 
@@ -88,6 +89,7 @@
       <view class="form-actions">
         <view class="btn secondary" bindtap="onPickImage">相册</view>
         <view class="btn" bindtap="onTakePhoto">拍照</view>
+        <view class="btn primary-outline" bindtap="onTakeHighQualityPhoto">高清</view>
       </view>
     </view>
   </view>
