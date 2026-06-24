@@ -19,7 +19,7 @@
     <image class="big-img" src="{{displayPhoto}}" mode="aspectFit" style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;" bindtap="onPreview"></image>
 
     <!-- 右上角操作浮层按钮（绝对定位于图片右上角） -->
-    <view class="action-fab" catchtap="onToggleActionMenu" catchtouchstart="onFabTouchStart" catchtouchmove="onFabTouchMove">⋮</view>
+    <view class="action-fab" catchtap="onToggleActionMenu" id="actionFab">⋮</view>
 
     <!-- 编辑模式：可拖动水印层 -->
     <view wx:if="{{showWmOverlay}}" class="detail-wm-layer"

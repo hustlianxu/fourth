@@ -135,6 +135,8 @@ Page({
   // === 触摸拖拽 + 双指缩放 ===
   onTouchStart(e) {
     if (!this.data.editing) return;
+    // 点击浮层按钮时不启动水印拖拽
+    if (e.target && e.target.id === 'actionFab') return;
     if (e.touches.length === 1) {
       this.isDragging = true;
       this.isPinching = false;
@@ -180,10 +182,6 @@ Page({
     this.isPinching = false;
     this.lastPinchDist = 0;
   },
-
-  // 浮层按钮触摸事件 - 阻止冒泡，避免触发水印拖拽
-  onFabTouchStart() {},
-  onFabTouchMove() {},
 
   // === 编辑切换 ===
   async onEditToggle() {
