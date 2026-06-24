@@ -98,4 +98,47 @@
   margin-top: 48rpx;
 }
 
-@import './index-wxa-auto-dark.wxss'
+/* ===== 暗黑模式 ===== */
+@media (prefers-color-scheme: dark) {
+  .hero {
+    background: linear-gradient(135deg, rgb(0, 105, 12) 0%, rgb(5, 80, 40) 100%);
+    color: rgb(255, 255, 255);
+  }
+
+  .tpl-item {
+    background: rgb(22, 22, 24);
+  }
+
+  .tpl-item.selected {
+    border-color: rgb(0, 105, 12);
+    background: rgb(5, 25, 15);
+  }
+
+  .tpl-check {
+    background: rgb(0, 105, 12);
+    color: rgb(255, 255, 255);
+  }
+
+  .tpl-name {
+    color: rgb(231, 231, 231);
+  }
+
+  .tpl-desc {
+    color: rgb(149, 149, 149);
+  }
+
+  .tag {
+    background: rgb(16, 29, 23);
+    color: rgb(0, 105, 12);
+  }
+
+  .btn.outline {
+    background: rgb(17, 17, 17);
+    color: rgb(0, 105, 12);
+    border: 2rpx solid rgb(0, 105, 12);
+  }
+
+  .footer {
+    color: rgb(99, 99, 99);
+  }
+}

@@ -383,3 +383,132 @@
   font-size: 26rpx;
   padding: 32rpx 0;
 }
+
+/* ===== 暗黑模式 ===== */
+@media (prefers-color-scheme: dark) {
+  .skeleton-card {
+    background: rgb(17, 17, 17);
+  }
+
+  .skeleton-thumb,
+  .skeleton-line {
+    background: rgb(42, 42, 42);
+  }
+
+  .folder-tabs {
+    background: rgb(17, 17, 17);
+    border-bottom-color: rgb(40, 40, 40);
+  }
+
+  .folder-tab {
+    background: rgb(40, 40, 40);
+    color: rgb(149, 149, 149);
+  }
+
+  .folder-tab.active,
+  .folder-tab.export-selected {
+    background: rgb(0, 105, 12);
+    color: rgb(255, 255, 255);
+  }
+
+  .folder-tab-add {
+    background: rgb(40, 40, 40);
+    border-color: rgb(55, 55, 55);
+    color: rgb(149, 149, 149);
+  }
+
+  .folder-empty {
+    color: rgb(115, 115, 115);
+  }
+
+  .record {
+    background: rgb(17, 17, 17);
+  }
+
+  .record-thumb {
+    background: rgb(42, 42, 42);
+  }
+
+  .record-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .record-time {
+    color: rgb(115, 115, 115);
+  }
+
+  .record-summary {
+    color: rgb(149, 149, 149);
+  }
+
+  .record.selected {
+    background: rgb(5, 25, 15);
+    border-color: rgb(0, 105, 12);
+  }
+
+  .checkbox {
+    border-color: rgb(115, 115, 115);
+  }
+
+  .checkbox.checked {
+    background: rgb(0, 105, 12);
+    border-color: rgb(0, 105, 12);
+  }
+
+  .export-hint {
+    color: rgb(0, 105, 12);
+  }
+
+  .export-info {
+    color: rgb(149, 149, 149);
+  }
+
+  .export-link {
+    color: rgb(0, 105, 12);
+  }
+
+  .folder-modal {
+    background: rgb(17, 17, 17);
+  }
+
+  .folder-modal-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .folder-modal-desc {
+    color: rgb(149, 149, 149);
+  }
+
+  .folder-modal-input {
+    background: rgb(40, 40, 40);
+    color: rgb(231, 231, 231);
+  }
+
+  .picker {
+    background: rgb(17, 17, 17);
+  }
+
+  .picker-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .picker-item {
+    background: rgb(40, 40, 40);
+  }
+
+  .picker-item:active {
+    background: rgb(5, 25, 15);
+  }
+
+  .picker-item-name {
+    color: rgb(231, 231, 231);
+  }
+
+  .picker-item-count {
+    color: rgb(115, 115, 115);
+  }
+
+  .picker-empty {
+    color: rgb(115, 115, 115);
+  }
+}

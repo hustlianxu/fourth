@@ -25,7 +25,9 @@ Page({
     showWmOverlay: false,
     displayFields: [],
     ocrResult: null,
-    verifyIssues: []
+    verifyIssues: [],
+    // 浮层菜单
+    showActionMenu: false
   },
 
   recordId: '',
@@ -48,23 +50,14 @@ Page({
 
   onReady() {},
 
-  // 返回上一页
-  onBack() {
-    wx.navigateBack();
+  // 浮层菜单
+  onToggleActionMenu() {
+    this.setData({ showActionMenu: !this.data.showActionMenu });
   },
 
-  // 显示操作菜单
-  onShowMenu() {
-    const that = this;
-    wx.showActionSheet({
-      itemList: ['删除记录'],
-      itemColor: '#ff4d4f',
-      success(res) {
-        if (res.tapIndex === 0) {
-          that.onDelete();
-        }
-      }
-    });
+  onDeleteFromMenu() {
+    this.setData({ showActionMenu: false });
+    this.onDelete();
   },
 
   onShow() {

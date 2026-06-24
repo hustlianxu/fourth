@@ -396,3 +396,130 @@
 .delete-actions .btn {
   flex: 1;
 }
+
+/* ===== 暗黑模式 ===== */
+@media (prefers-color-scheme: dark) {
+  .page {
+    background: rgb(23, 24, 26);
+  }
+
+  .header {
+    background: linear-gradient(135deg, rgb(0, 105, 12) 0%, rgb(5, 80, 40) 100%);
+    color: rgb(255, 255, 255);
+  }
+
+  .label {
+    color: rgb(231, 231, 231);
+  }
+
+  .btn-add {
+    background: rgb(0, 105, 12);
+    color: rgb(255, 255, 255);
+  }
+
+  .template-card {
+    background: rgb(17, 17, 17);
+    box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.2);
+  }
+
+  .tpl-name {
+    color: rgb(231, 231, 231);
+  }
+
+  .tpl-actions {
+    color: rgb(149, 149, 149);
+  }
+
+  .tpl-desc {
+    color: rgb(149, 149, 149);
+  }
+
+  .field-tag {
+    background: rgb(20, 40, 60);
+    color: rgb(100, 150, 255);
+  }
+
+  .field-tag.more {
+    background: rgb(40, 40, 40);
+    color: rgb(149, 149, 149);
+  }
+
+  .tpl-meta {
+    color: rgb(115, 115, 115);
+  }
+
+  .modal {
+    background: rgb(17, 17, 17);
+  }
+
+  .modal-header {
+    border-bottom-color: rgb(40, 40, 40);
+  }
+
+  .modal-header text {
+    color: rgb(231, 231, 231);
+  }
+
+  .close-btn {
+    color: rgb(149, 149, 149);
+  }
+
+  .modal-footer {
+    border-top-color: rgb(40, 40, 40);
+  }
+
+  .section-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .form-label {
+    color: rgb(149, 149, 149);
+  }
+
+  .form-input,
+  .field-input {
+    background: rgb(40, 40, 40);
+    color: rgb(231, 231, 231);
+  }
+
+  .field-type {
+    background: rgb(40, 40, 40);
+    color: rgb(149, 149, 149);
+  }
+
+  .mini-btn {
+    background: rgb(5, 25, 15);
+    color: rgb(0, 105, 12);
+  }
+
+  .pos-btn {
+    background: rgb(40, 40, 40);
+    color: rgb(149, 149, 149);
+  }
+
+  .pos-btn.active {
+    background: rgb(5, 25, 15);
+    border-color: rgb(0, 105, 12);
+    color: rgb(0, 105, 12);
+  }
+
+  .color-btn {
+    border-color: rgb(55, 55, 55);
+  }
+
+  .delete-modal {
+    background: rgb(17, 17, 17);
+  }
+
+  .delete-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .delete-desc {
+    color: rgb(149, 149, 149);
+  }
+
+  .field-remove {
+    color: rgb(255, 77, 79);
+  }
+}

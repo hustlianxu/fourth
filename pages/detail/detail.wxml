@@ -1,9 +1,12 @@
 <view class="container" wx:if="{{record}}">
-  <!-- 顶部导航栏 -->
-  <view class="detail-nav">
-    <view class="nav-back" bindtap="onBack">←</view>
-    <view class="nav-title">{{record.customName || record.templateName}}</view>
-    <view class="nav-more" bindtap="onShowMenu">⋮</view>
+  <!-- 右上角操作浮层 -->
+  <view class="action-fab" bindtap="onToggleActionMenu">⋮</view>
+  <view class="action-menu-mask" wx:if="{{showActionMenu}}" bindtap="onToggleActionMenu"></view>
+  <view class="action-menu" wx:if="{{showActionMenu}}">
+    <view class="action-menu-item danger" bindtap="onDeleteFromMenu">
+      <text class="action-menu-icon">🗑</text>
+      <text>删除记录</text>
+    </view>
   </view>
 
   <!-- 图片区域（编辑模式下可拖拽水印） -->
