@@ -16,7 +16,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 24rpx;
-  padding-top: calc(48rpx + env(safe-area-inset-top));
+  /* padding-top 需大于胶囊按钮底部（约 safe-area + 88rpx），留出间距到 96rpx */
+  padding-top: calc(96rpx + env(safe-area-inset-top));
   padding-bottom: 16rpx;
   background: rgba(0,0,0,0.7);
   z-index: 100;
@@ -63,7 +64,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: calc(140rpx + env(safe-area-inset-top));
+  /* 与 toolbar 高度匹配：96rpx(padding-top) + 工具栏内容 + 16rpx(padding-bottom) */
+  padding-top: calc(188rpx + env(safe-area-inset-top));
   padding-bottom: 0;
 }
 
