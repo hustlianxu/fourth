@@ -41,6 +41,8 @@ Page({
     // 行内编辑
     editingFieldKey: '',
     editValue: '',
+    // 拍照闪光动画
+    flashAnim: false,
   },
 
   // 拖拽状态（实例变量，不在 data 中避免频繁 setData）
@@ -332,6 +334,10 @@ Page({
 
   onTakePhoto() {
     if (!this.validate()) return;
+    // 闪光动画
+    this.setData({ flashAnim: true });
+    setTimeout(() => this.setData({ flashAnim: false }), 300);
+
     this.ctx.takePhoto({
       quality: 'high',
       success: (res) => {

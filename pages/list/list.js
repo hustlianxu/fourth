@@ -9,6 +9,7 @@ Page({
   data: {
     list: [],
     folders: [],
+    loading: true,
     activeFolderId: null,        // null=全部, '__uncategorized__'=未分类, 其他=folder.id（普通模式使用）
     totalCount: 0,
     uncategorizedCount: 0,
@@ -43,6 +44,8 @@ Page({
   onShow() {
     this._loadFolders();
     this._loadList();
+    // 模拟短暂加载状态（让骨架屏可见）
+    setTimeout(() => this.setData({ loading: false }), 300);
   },
 
   // ===== 数据加载 =====

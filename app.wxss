@@ -7,6 +7,30 @@ page {
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
 }
 
+/* 字体层级体系
+   .title    32rpx / 600  - 卡片标题
+   .subtitle 28rpx / 500  - 副标题
+   .body     28rpx / 400  - 正文（默认）
+   .caption  24rpx / 400  - 辅助说明
+   .mini     22rpx / 400  - 极小文字（标签等）
+*/
+
+.title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.subtitle {
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.muted {
+  color: #888;
+  font-size: 24rpx;
+}
+
 .container {
   padding: 24rpx;
   box-sizing: border-box;
@@ -28,6 +52,12 @@ page {
   text-align: center;
   font-size: 30rpx;
   font-weight: 500;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
 }
 
 .btn.secondary {
@@ -36,9 +66,17 @@ page {
   border: 2rpx solid #07c160;
 }
 
+.btn.secondary:active {
+  opacity: 0.7;
+}
+
 .btn.danger {
   background: #ff4d4f;
   color: #fff;
+}
+
+.btn.danger:active {
+  opacity: 0.85;
 }
 
 .btn[disabled] {
@@ -53,17 +91,6 @@ page {
 
 .row.between {
   justify-content: space-between;
-}
-
-.muted {
-  color: #888;
-  font-size: 24rpx;
-}
-
-.title {
-  font-size: 32rpx;
-  font-weight: 600;
-  margin-bottom: 16rpx;
 }
 
 .divider {

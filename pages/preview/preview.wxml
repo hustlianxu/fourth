@@ -1,9 +1,9 @@
 <view class="preview-page">
   <!-- 顶部工具栏 -->
   <view class="toolbar">
-    <view class="back-btn" style="{{backBtnStyle}}" bindtap="onBack">← 返回</view>
+    <view class="back-btn" bindtap="onBack">← 返回</view>
     <view class="toolbar-title">调整水印</view>
-    <view class="save-btn" style="{{saveBtnStyle}}" bindtap="onSave">保存</view>
+    <view class="save-btn" bindtap="onSave">保存</view>
   </view>
 
   <!-- 预览区域 -->

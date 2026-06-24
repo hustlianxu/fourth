@@ -29,11 +29,33 @@
   background: #f7f8fa;
   border: 2rpx solid transparent;
   box-sizing: border-box;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.tpl-item:active {
+  opacity: 0.85;
 }
 
 .tpl-item.selected {
   border-color: #07c160;
   background: #eafff3;
+}
+
+.tpl-check {
+  position: absolute;
+  top: 12rpx;
+  right: 12rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #07c160;
+  color: #fff;
+  font-size: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
 }
 
 .tpl-name {

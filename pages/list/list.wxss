@@ -1,3 +1,51 @@
+/* 骨架屏 */
+.skeleton-list {
+  padding: 24rpx 0;
+}
+
+.skeleton-card {
+  display: flex;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.skeleton-thumb {
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 12rpx;
+  background: #e8e8e8;
+  flex-shrink: 0;
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-body {
+  flex: 1;
+  margin-left: 24rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16rpx;
+}
+
+.skeleton-line {
+  height: 28rpx;
+  border-radius: 8rpx;
+  background: #e8e8e8;
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-line.w60 { width: 60%; }
+.skeleton-line.w40 { width: 40%; }
+.skeleton-line.w80 { width: 80%; }
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
 /* 空状态 */
 .empty {
   text-align: center;

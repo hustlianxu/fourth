@@ -48,6 +48,25 @@ Page({
 
   onReady() {},
 
+  // 返回上一页
+  onBack() {
+    wx.navigateBack();
+  },
+
+  // 显示操作菜单
+  onShowMenu() {
+    const that = this;
+    wx.showActionSheet({
+      itemList: ['删除记录'],
+      itemColor: '#ff4d4f',
+      success(res) {
+        if (res.tapIndex === 0) {
+          that.onDelete();
+        }
+      }
+    });
+  },
+
   onShow() {
     this.load();
   },

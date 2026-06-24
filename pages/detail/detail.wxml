@@ -1,4 +1,11 @@
 <view class="container" wx:if="{{record}}">
+  <!-- 顶部导航栏 -->
+  <view class="detail-nav">
+    <view class="nav-back" bindtap="onBack">←</view>
+    <view class="nav-title">{{record.templateName}}</view>
+    <view class="nav-more" bindtap="onShowMenu">⋮</view>
+  </view>
+
   <!-- 图片区域（编辑模式下可拖拽水印） -->
   <view class="img-area"
     style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;"
@@ -88,6 +95,4 @@
     <view class="btn secondary" bindtap="onSaveAlbum" style="flex:1;margin-right:16rpx;">保存到相册</view>
     <view class="btn" bindtap="onEditToggle" style="flex:1;">{{editing ? '保存修改' : '编辑字段'}}</view>
   </view>
-
-  <view class="btn danger" bindtap="onDelete" style="margin-top:16rpx;">删除本条记录</view>
 </view>

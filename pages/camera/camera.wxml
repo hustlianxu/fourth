@@ -1,4 +1,7 @@
 <view class="camera-wrap">
+  <!-- 拍照闪光动画 -->
+  <view class="flash-overlay {{flashAnim ? 'flash' : ''}}"></view>
+
   <!-- 相机取景框（绝对定位参考系） -->
   <view class="camera-viewport">
     <camera

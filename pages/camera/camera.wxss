@@ -7,6 +7,29 @@
   position: relative;
 }
 
+/* ===== 拍照闪光动画 ===== */
+.flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.flash-overlay.flash {
+  animation: flashAnim 0.3s ease-out;
+}
+
+@keyframes flashAnim {
+  0% { opacity: 0; }
+  20% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
 /* ===== 相机取景框（绝对定位参考系） ===== */
 .camera-viewport {
   position: relative;
@@ -41,15 +64,19 @@
 
 .pos-grid {
   display: grid;
-  grid-template-columns: repeat(3, 32rpx);
-  grid-template-rows: repeat(3, 32rpx);
-  gap: 6rpx;
+  grid-template-columns: repeat(3, 48rpx);
+  grid-template-rows: repeat(3, 48rpx);
+  gap: 8rpx;
 }
 
 .pos-dot {
   background-color: rgba(255, 255, 255, 0.25);
   border-radius: 50%;
   border: 2rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.pos-dot:active {
+  background-color: rgba(255, 255, 255, 0.4);
 }
 
 .pos-dot.active {
@@ -177,12 +204,22 @@
   font-size: 30rpx;
   font-weight: 500;
   flex: 1;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
 }
 
 .btn.secondary {
   background: rgba(255, 255, 255, 0.9);
   color: #07c160;
   border: 2rpx solid #07c160;
+}
+
+.btn.secondary:active {
+  opacity: 0.7;
 }
 
 .btn.primary-outline {

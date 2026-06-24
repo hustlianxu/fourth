@@ -1,3 +1,47 @@
+/* 顶部导航栏 */
+.detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 24rpx;
+  padding-top: calc(16rpx + env(safe-area-inset-top));
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-back {
+  font-size: 40rpx;
+  color: #333;
+  padding: 8rpx 16rpx;
+}
+
+.nav-back:active {
+  opacity: 0.6;
+}
+
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #222;
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.nav-more {
+  font-size: 40rpx;
+  color: #666;
+  padding: 8rpx 16rpx;
+}
+
+.nav-more:active {
+  opacity: 0.6;
+}
+
 .img-area {
   position: relative;
   margin-bottom: 16rpx;
