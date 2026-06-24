@@ -462,10 +462,13 @@ Page({
       storage.add(record);
       console.log('[Camera] 记录已保存:', record.id);
 
+      // 4. 同步保存带水印成片到系统相册（永久备份，防清理缓存丢失）
+      this._saveToAlbum(outPath);
+
       wx.hideLoading();
       wx.showToast({ title: '已保存', icon: 'success' });
 
-      // 4. 跳转详情页（redirectTo 替换当前页，避免返回到拍照页）
+      // 5. 跳转详情页（redirectTo 替换当前页，避免返回到拍照页）
       setTimeout(() => {
         wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });
       }, 500);
@@ -475,6 +478,35 @@ Page({
       console.error('[Camera] 保存失败:', e);
       wx.showToast({ title: '保存失败: ' + (e.message || '').slice(0, 20), icon: 'none', duration: 3000 });
     }
+  },
+
+  // 保存到系统相册（失败不阻塞主流程，仅提示）
+  _saveToAlbum(filePath) {
+    wx.saveImageToPhotosAlbum({
+      filePath: filePath,
+      success: () => {
+        console.log('[Camera] 已保存到系统相册');
+      },
+      fail: (err) => {
+        console.warn('[Camera] 保存到相册失败:', JSON.stringify(err));
+        // 权限拒绝时引导用户授权
+        if (err.errMsg && err.errMsg.indexOf('auth deny') >= 0) {
+          wx.showModal({
+            title: '提示',
+            content: '保存到相册需要授权，是否前往设置开启？',
+            confirmText: '去设置',
+            success: (res) => {
+              if (res.confirm) {
+                wx.openSetting();
+              }
+            }
+          });
+        } else {
+          // 其他失败原因静默处理，不阻塞主流程
+          wx.showToast({ title: '相册备份失败，记录已保存', icon: 'none' });
+        }
+      }
+    });
   },
 
   onPickImage() {
