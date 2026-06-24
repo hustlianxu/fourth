@@ -61,7 +61,6 @@
 .wm-preview {
   position: absolute;
   z-index: 40;
-  pointer-events: none;
   max-width: 45%;
 }
 
@@ -91,130 +90,76 @@
 .wm-preview--bottom-center{ bottom: 4%; left: 50%; transform: translateX(-50%); }
 .wm-preview--bottom-right { bottom: 4%; right: 4%; }
 
-/* ===== 底部操作栏 ===== */
-.bottom-bar {
+/* ===== 水印预览可拖拽 ===== */
+.wm-drag-handle {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  padding-bottom: 6rpx;
+  margin-bottom: 6rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.15);
+}
+
+/* ===== 字段行 ===== */
+.wm-field-row {
+  padding: 4rpx 0;
+  white-space: nowrap;
+}
+
+.wm-field-label {
+  color: #ffe58f;
+}
+
+.wm-field-value {
+  color: #fff;
+}
+
+.wm-field-empty .wm-field-value {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.wm-field-editing {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4rpx;
+  padding: 2rpx 4rpx;
+}
+
+/* ===== 行内编辑 ===== */
+.wm-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.wm-edit-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  font-size: inherit;
+  min-width: 120rpx;
+}
+
+.wm-edit-ok {
+  color: #07c160;
+  font-size: 120%;
+  font-weight: bold;
+  padding: 0 4rpx;
+}
+
+/* ===== 底部按钮栏（固定） ===== */
+.bottom-bar-fixed {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: #fff;
-  border-radius: 24rpx 24rpx 0 0;
-  box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.12);
-  z-index: 60;
-  transition: all 0.25s ease;
-  max-height: 100rpx;
-  overflow: hidden;
-}
-
-.bottom-bar.open {
-  max-height: 75vh;
-}
-
-/* 收起时的概要行 */
-.summary-row {
-  display: flex;
-  align-items: center;
-  padding: 16rpx 24rpx;
-}
-
-.summary-tags {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow: hidden;
-  flex: 1;
-  gap: 8rpx;
-}
-
-.sum-tag {
-  display: inline-block;
-  padding: 6rpx 12rpx;
-  background: #e6f7ee;
-  color: #07c160;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-  white-space: nowrap;
-  max-width: 180rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.expand-tag {
-  font-size: 24rpx;
-  color: #07c160;
-  font-weight: 500;
-  padding-left: 8rpx;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-/* 展开的表单区域 */
-.form-body {
-  padding: 0 24rpx 24rpx;
-  max-height: calc(75vh - 88rpx);
-  overflow-y: auto;
-}
-
-.fields {
-  margin-bottom: 20rpx;
-}
-
-.field {
-  padding: 14rpx 0;
-  border-bottom: 1rpx solid #f0f0f0;
-}
-
-.f-label {
-  font-size: 24rpx;
-  color: #666;
-  margin-bottom: 8rpx;
-  display: flex;
-  align-items: center;
-}
-
-.req {
-  color: #ff4d4f;
-  margin-left: 6rpx;
-}
-
-.f-input {
-  background: #f7f8fa;
-  padding: 14rpx;
-  border-radius: 8rpx;
-  font-size: 28rpx;
-}
-
-.f-textarea {
-  background: #f7f8fa;
-  padding: 14rpx;
-  border-radius: 8rpx;
-  font-size: 28rpx;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 100rpx;
-  line-height: 1.5;
-}
-
-.mini-btn {
-  background: #e6f7ee;
-  color: #07c160;
-  padding: 10rpx 18rpx;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  flex-shrink: 0;
-  margin-left: 10rpx;
-}
-
-.form-actions {
   display: flex;
   gap: 16rpx;
-}
-
-.bottom-actions {
-  display: flex;
-  gap: 10rpx;
-  flex-shrink: 0;
-  margin-left: 8rpx;
-  width: 380rpx;
+  padding: 20rpx 24rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  z-index: 60;
 }
 
 /* ===== 底部按钮 ===== */
@@ -230,7 +175,7 @@
 }
 
 .btn.secondary {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.9);
   color: #07c160;
   border: 2rpx solid #07c160;
 }
@@ -238,19 +183,55 @@
 .btn.primary-outline {
   background: #07c160;
   color: #fff;
-  border: 2rpx solid #07c160;
-  font-size: 24rpx;
 }
 
-/* ===== 预览页 ===== */
-.preview {
-  width: 100%;
-  height: 72vh;
-  background: #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ===== 遮罩 ===== */
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
 }
+
+/* ===== 模板选择弹层 ===== */
+.picker {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 24rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  z-index: 101;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.picker-item {
+  padding: 20rpx 16rpx;
+  border-radius: 12rpx;
+  background: #f7f8fa;
+}
+
+.picker-item.selected {
+  background: #eafff3;
+  border: 2rpx solid #07c160;
+}
+
+.tpl-name { font-size: 28rpx; font-weight: 600; }
+.tpl-desc { font-size: 24rpx; color: #666; margin-top: 4rpx; }
 
 .preview-img {
   width: 100%;
