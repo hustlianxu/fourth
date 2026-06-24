@@ -30,6 +30,7 @@ Page({
     scaleLabel: '100%',
     opacityLabel: '85%',
     widthLabel: '42%',
+    wmFontSize: 14,
     displayFields: [],
     QUICK_POS: QUICK_POS,
     currentPos: 'br',
@@ -181,6 +182,7 @@ Page({
     const wmHeight = padding * 2 + estimatedLines * lineHeight;
     this.wmWidth = Math.round(cw * (this.data.wmWidthRatio || 0.42) * scale);
     this.wmHeight = wmHeight;
+    this.setData({ wmFontSize: fontSize });
     return { cw, ch, margin };
   },
 

@@ -42,8 +42,8 @@
           </view>
           <text class="wm-drag-label">拖动调整位置</text>
         </view>
-        <!-- 水印内容 -->
-        <view class="wm-content">
+        <!-- 水印内容（字号与 watermark.js 公式对齐） -->
+        <view class="wm-content" style="font-size: {{wmFontSize}}px">
           <view wx:for="{{displayFields}}" wx:key="key" class="wm-row">
             <text class="wm-label">{{item.label}}:</text>
             <text class="wm-value">{{item.value || '-'}}</text>

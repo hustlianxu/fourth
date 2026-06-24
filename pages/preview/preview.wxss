@@ -151,12 +151,10 @@
 }
 
 .wm-label {
-  font-size: 22rpx;
   color: rgba(255,255,255,0.7);
 }
 
 .wm-value {
-  font-size: 26rpx;
   color: #fff;
   font-weight: 500;
 }

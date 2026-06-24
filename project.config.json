@@ -44,7 +44,7 @@
     "ignoreUploadUnusedFiles": true,
     "compileWorklet": false,
     "localPlugins": false,
-    "condition": false,
+    "condition": true,
     "swc": false,
     "disableSWC": true
   },
@@ -58,5 +58,8 @@
     "tabSize": 2
   },
   "miniprogramRoot": "./",
-  "simulatorPluginLibVersion": {}
+  "simulatorPluginLibVersion": {
+    "wxext14566970e7e9f62": "2.27.3"
+  },
+  "projectArchitecture": "multiPlatform"
 }
