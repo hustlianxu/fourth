@@ -424,11 +424,7 @@ Page({
       const imgH = photoInfo.height || 1440;
       const tpl = this.data.template;
 
-      // 1. 持久化原图（供详情页重新渲染水印使用）
-      const persistentPath = await this._persistOriginalPhoto(photo);
-      console.log('[Camera] 原图持久化:', persistentPath);
-
-      // 2. 渲染水印图片（用模板预设位置，不传 customX/customY）
+      // 1. 先用临时路径渲染水印图片（saveFile 会移动临时文件，必须先渲染）
       const outPath = await watermark.renderWatermarkedImage({
         imagePath: photo,
         template: tpl,
@@ -440,6 +436,10 @@ Page({
         widthRatio: 0.42
       });
       console.log('[Camera] 水印渲染完成:', outPath);
+
+      // 2. 持久化原图（供详情页重新渲染水印使用）
+      const persistentPath = await this._persistOriginalPhoto(photo);
+      console.log('[Camera] 原图持久化:', persistentPath);
 
       // 3. 入库
       const record = {
