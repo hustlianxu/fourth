@@ -1,0 +1,43 @@
+/* 
+此文件为开发者工具生成，生成时间: 2026/6/24上午1:07:48
+使用方法：
+在 index.wxss 文件末尾引入样式
+```
+@import "./index-wxa-auto-dark.wxss";
+```
+ */
+
+@media (prefers-color-scheme: dark) {
+    .hero {
+        background: rgb(0, 0, 0);
+        color: rgb(17, 17, 17);
+    }
+
+    .tpl-item {
+        background: rgb(22, 22, 24);
+    }
+
+    .tpl-item.selected {
+        border-color: rgb(0, 105, 12);
+        background: rgb(5, 25, 15);
+    }
+
+    .tpl-desc {
+        color: rgb(149, 149, 149);
+    }
+
+    .tag {
+        background: rgb(16, 29, 23);
+        color: rgb(0, 105, 12);
+    }
+
+    .btn.outline {
+        background: rgb(17, 17, 17);
+        color: rgb(0, 105, 12);
+        border: rgb(0, 0, 0);
+    }
+
+    .footer {
+        color: rgb(99, 99, 99);
+    }
+}
