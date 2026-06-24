@@ -34,6 +34,29 @@ const TEMPLATES = [
   },
 
   {
+    id: 'minimal',
+    name: '极简模板',
+    description: '货号 + 单价 + 描述 + 装箱数 + 体积 + 件数',
+    position: 'bottom-center',
+    style: {
+      fontSize: 22,
+      color: '#ffffff',
+      background: 'rgba(0,0,0,0.70)',
+      padding: 14,
+      borderRadius: 10,
+      lineHeight: 1.35
+    },
+    fields: [
+      { key: 'modelo', label: '货号 · Modelo', type: 'text', placeholder: '如：RL-034', required: false },
+      { key: 'precio', label: '单价 · Precio ￥', type: 'text', placeholder: '如：¥11', required: false },
+      { key: 'desEs', label: '描述 · Des.', type: 'textarea', placeholder: '如：6 estrellas grande', required: false, multiline: true },
+      { key: 'pzs', label: '装箱数 · Pzas/Caja', type: 'text', placeholder: '如：48 pzs / caja', required: false },
+      { key: 'volumen', label: '体积 · Cúbico', type: 'text', placeholder: '如：0.125 m³', required: false },
+      { key: 'cajas', label: '件数 · Cajas', type: 'text', placeholder: '如：50 cajas', required: false }
+    ]
+  },
+
+  {
     id: 'handwriteSimple',
     name: '手写·精简',
     description: 'Formato corto · 货号 + 西语描述 + 单价 + 装箱数 + 日期',
@@ -60,7 +83,17 @@ const TEMPLATES = [
 ];
 
 function getTemplateById(id) {
-  return TEMPLATES.find((t) => t.id === id);
+  // 先查内置模板
+  const builtIn = TEMPLATES.find((t) => t.id === id);
+  if (builtIn) return builtIn;
+  // 再查自定义模板（避免循环引用，内联读取存储）
+  try {
+    const custom = wx.getStorageSync('watermark_custom_tpls');
+    if (Array.isArray(custom)) {
+      return custom.find((t) => t.id === id) || null;
+    }
+  } catch (e) {}
+  return null;
 }
 
 function getDefaultValues(template, extras = {}) {
