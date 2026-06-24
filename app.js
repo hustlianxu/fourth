@@ -20,7 +20,6 @@ App({
     }
   },
   globalData: {
-    userInfo: null,
-    previewData: null
+    userInfo: null
   }
 });

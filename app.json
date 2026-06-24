@@ -2,7 +2,6 @@
   "pages": [
     "pages/index/index",
     "pages/camera/camera",
-    "pages/preview/preview",
     "pages/list/list",
     "pages/detail/detail",
     "pages/template/template"

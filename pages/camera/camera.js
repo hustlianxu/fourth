@@ -366,7 +366,7 @@ Page({
       src: tempPath,
       success: (info) => {
         console.log('[Camera] 拍照分辨率:', info.width, 'x', info.height, '(type:', info.type, ')');
-        that._goPreview(tempPath, { width: info.width, height: info.height });
+        that._saveAndGoDetail(tempPath, { width: info.width, height: info.height });
       },
       fail: (err) => {
         console.error('[Camera] getImageInfo 失败 (retry=' + retryCount + '):', JSON.stringify(err));
@@ -377,30 +377,103 @@ Page({
             filePath: tempPath,
             success: (fileInfo) => {
               console.warn('[Camera] getImageInfo 最终失败，文件大小:', fileInfo.size, '使用估算 3024x4032');
-              that._goPreview(tempPath, { width: 3024, height: 4032 });
+              that._saveAndGoDetail(tempPath, { width: 3024, height: 4032 });
             },
-            fail: () => that._goPreview(tempPath, { width: 3024, height: 4032 })
+            fail: () => that._saveAndGoDetail(tempPath, { width: 3024, height: 4032 })
           });
         }
       }
     });
   },
 
-
-  _goPreview(photo, photoInfo) {
-    try {
-      const template = Object.assign({}, this.data.template, { position: this.data.wPos });
-      getApp().globalData.previewData = {
-        photo, photoInfo: JSON.stringify(photoInfo),
-        template: JSON.stringify(template), values: JSON.stringify(this.data.values)
-      };
-      wx.navigateTo({
-        url: '/pages/preview/preview',
-        fail: (err) => { console.error('navigateTo failed:', err); getApp().globalData.previewData = null; }
+  // 将临时照片持久化到用户目录，防止被微信回收
+  _persistOriginalPhoto(tempPath) {
+    return new Promise((resolve) => {
+      const fs = wx.getFileSystemManager();
+      fs.saveFile({
+        tempFilePath: tempPath,
+        success: (res) => {
+          console.log('[Camera] saveFile 成功:', res.savedFilePath);
+          resolve(res.savedFilePath);
+        },
+        fail: (err) => {
+          console.warn('[Camera] saveFile 失败，尝试 copyFile:', err);
+          const dest = wx.env.USER_DATA_PATH + '/photo_' + Date.now() + '.jpg';
+          fs.copyFile({
+            srcPath: tempPath,
+            destPath: dest,
+            success: () => {
+              console.log('[Camera] copyFile 成功:', dest);
+              resolve(dest);
+            },
+            fail: (err2) => {
+              console.error('[Camera] 持久化失败，使用临时路径:', err2);
+              resolve(tempPath);
+            }
+          });
+        }
       });
+    });
+  },
+
+  // 一步保存：渲染水印 → 持久化原图 → 入库 → 跳转详情页
+  async _saveAndGoDetail(photo, photoInfo) {
+    wx.showLoading({ title: '保存中...', mask: true });
+    try {
+      const imgW = photoInfo.width || 1080;
+      const imgH = photoInfo.height || 1440;
+      const tpl = this.data.template;
+
+      // 1. 持久化原图（供详情页重新渲染水印使用）
+      const persistentPath = await this._persistOriginalPhoto(photo);
+      console.log('[Camera] 原图持久化:', persistentPath);
+
+      // 2. 渲染水印图片（用模板预设位置，不传 customX/customY）
+      const outPath = await watermark.renderWatermarkedImage({
+        imagePath: photo,
+        template: tpl,
+        values: this.data.values,
+        imgW: imgW,
+        imgH: imgH,
+        customScale: this.data.wmScale,
+        opacity: 0.85,
+        widthRatio: 0.42
+      });
+      console.log('[Camera] 水印渲染完成:', outPath);
+
+      // 3. 入库
+      const record = {
+        id: storage.genId(),
+        templateId: tpl.id,
+        templateName: tpl.name,
+        watermarkPosition: this.data.wPos,
+        watermarkScale: this.data.wmScale,
+        watermarkOpacity: 0.85,
+        watermarkWidthRatio: 0.42,
+        values: this.data.values,
+        imagePath: outPath,
+        originalPath: persistentPath,
+        width: imgW,
+        height: imgH,
+        createdAt: Date.now(),
+        ocr: null,
+        verifyIssues: []
+      };
+      storage.add(record);
+      console.log('[Camera] 记录已保存:', record.id);
+
+      wx.hideLoading();
+      wx.showToast({ title: '已保存', icon: 'success' });
+
+      // 4. 跳转详情页（redirectTo 替换当前页，避免返回到拍照页）
+      setTimeout(() => {
+        wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });
+      }, 500);
+
     } catch (e) {
-      console.error('_goPreview error:', e);
-      wx.showToast({ title: '跳转失败', icon: 'none' });
+      wx.hideLoading();
+      console.error('[Camera] 保存失败:', e);
+      wx.showToast({ title: '保存失败: ' + (e.message || '').slice(0, 20), icon: 'none', duration: 3000 });
     }
   },
 
@@ -410,8 +483,8 @@ Page({
       success: (res) => {
         wx.getImageInfo({
           src: res.tempFiles[0].tempFilePath,
-          success: (info) => this._goPreview(info.path, { width: info.width, height: info.height }),
-          fail: () => this._goPreview(res.tempFiles[0].tempFilePath, { width: 1080, height: 1440 })
+          success: (info) => this._saveAndGoDetail(info.path, { width: info.width, height: info.height }),
+          fail: () => this._saveAndGoDetail(res.tempFiles[0].tempFilePath, { width: 1080, height: 1440 })
         });
       }
     });
