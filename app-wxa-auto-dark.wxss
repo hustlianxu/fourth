@@ -94,6 +94,32 @@
     }
 
     /* 详情页面 */
+    .detail-nav {
+        background: rgb(17, 17, 17);
+    }
+
+    .nav-back {
+        background: rgb(42, 42, 42);
+        color: rgb(231, 231, 231);
+    }
+
+    .nav-back:active {
+        background: rgb(55, 55, 55);
+    }
+
+    .nav-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .nav-more {
+        background: rgb(42, 42, 42);
+        color: rgb(149, 149, 149);
+    }
+
+    .nav-more:active {
+        background: rgb(55, 55, 55);
+    }
+
     .img-area {
         background: rgb(42, 42, 42);
     }
@@ -117,10 +143,77 @@
     .f-edit {
         background: rgb(29, 29, 29);
         color: rgb(231, 231, 231);
+        border: 1rpx solid rgb(42, 42, 42);
     }
 
     .setting-label {
         color: rgb(149, 149, 149);
+    }
+
+    .setting-val {
+        color: rgb(0, 105, 12);
+    }
+
+    .issue {
+        color: rgb(250, 173, 20);
+    }
+
+    /* 列表页面补充 */
+    .skeleton-card {
+        background: rgb(17, 17, 17);
+    }
+
+    .skeleton-thumb,
+    .skeleton-line {
+        background: rgb(42, 42, 42);
+    }
+
+    .record-time {
+        color: rgb(115, 115, 115);
+    }
+
+    .folder-tab-add {
+        background: rgb(29, 29, 29);
+        border-color: rgb(55, 55, 55);
+        color: rgb(149, 149, 149);
+    }
+
+    .folder-empty {
+        color: rgb(115, 115, 115);
+    }
+
+    .export-hint {
+        color: rgb(0, 105, 12);
+    }
+
+    .export-info {
+        color: rgb(149, 149, 149);
+    }
+
+    .export-link {
+        color: rgb(0, 105, 12);
+    }
+
+    /* 弹窗补充 */
+    .folder-modal {
+        background: rgb(17, 17, 17);
+    }
+
+    .folder-modal-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .folder-modal-desc {
+        color: rgb(149, 149, 149);
+    }
+
+    .folder-modal-input {
+        background: rgb(29, 29, 29);
+        color: rgb(231, 231, 231);
+    }
+
+    .picker-item:active {
+        background: rgb(5, 25, 15);
     }
 
     /* 模板管理页面 */
@@ -264,6 +357,22 @@
         color: rgb(231, 231, 231);
     }
 
+    .bottom-panel {
+        background: rgb(17, 17, 17);
+    }
+
+    .panel-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .panel-toggle {
+        background: rgb(42, 42, 42);
+    }
+
+    .toggle-icon {
+        color: rgb(149, 149, 149);
+    }
+
     .setting-panel {
         background: rgb(17, 17, 17);
     }
@@ -273,6 +382,22 @@
     }
 
     .setting-val {
+        color: rgb(0, 105, 12);
+    }
+
+    .scale-value,
+    .opacity-value {
+        color: rgb(0, 105, 12);
+    }
+
+    .pos-btn {
+        background: rgb(29, 29, 29);
+        color: rgb(149, 149, 149);
+    }
+
+    .pos-btn.active {
+        background: rgb(5, 25, 15);
+        border-color: rgb(0, 105, 12);
         color: rgb(0, 105, 12);
     }
 

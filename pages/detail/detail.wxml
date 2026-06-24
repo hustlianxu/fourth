@@ -2,7 +2,7 @@
   <!-- 顶部导航栏 -->
   <view class="detail-nav">
     <view class="nav-back" bindtap="onBack">←</view>
-    <view class="nav-title">{{record.templateName}}</view>
+    <view class="nav-title">{{record.customName || record.templateName}}</view>
     <view class="nav-more" bindtap="onShowMenu">⋮</view>
   </view>
 
@@ -33,7 +33,7 @@
 
   <view class="card">
     <view class="row between">
-      <view class="title">{{record.templateName}}</view>
+      <view class="title">{{record.customName || record.templateName}}</view>
       <view class="muted">{{timeText}}</view>
     </view>
 

@@ -22,6 +22,15 @@
         background: rgb(5, 25, 15);
     }
 
+    .tpl-check {
+        background: rgb(0, 105, 12);
+        color: rgb(255, 255, 255);
+    }
+
+    .tpl-name {
+        color: rgb(231, 231, 231);
+    }
+
     .tpl-desc {
         color: rgb(149, 149, 149);
     }
