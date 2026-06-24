@@ -5,6 +5,9 @@ const exporter = require('../../utils/exporter.js');
 
 const MAX_FOLDERS = 30;
 
+// 左滑操作按钮总宽度（4个按钮 × 70px ≈ 280px）
+const SWIPE_ACTION_WIDTH = 280;
+
 Page({
   data: {
     list: [],
@@ -46,6 +49,79 @@ Page({
     this._loadList();
     // 模拟短暂加载状态（让骨架屏可见）
     setTimeout(() => this.setData({ loading: false }), 300);
+  },
+
+  // ===== 左滑手势状态 =====
+  _swipeStartX: 0,
+  _swipeStartY: 0,
+  _swipeRecordId: '',
+  _swipeStartSwipeX: 0,
+  _swipeMoved: false,
+
+  // 记录卡片触摸开始
+  onRecordTouchStart(e) {
+    if (this.data.exportMode) return;
+    const id = e.currentTarget.dataset.id;
+    this._swipeStartX = e.touches[0].clientX;
+    this._swipeStartY = e.touches[0].clientY;
+    this._swipeRecordId = id;
+    this._swipeMoved = false;
+    const record = this.data.list.find(r => r.id === id);
+    this._swipeStartSwipeX = record ? record._swipeX : 0;
+  },
+
+  // 记录卡片触摸移动
+  onRecordTouchMove(e) {
+    if (this.data.exportMode) return;
+    if (!this._swipeRecordId) return;
+    const dx = e.touches[0].clientX - this._swipeStartX;
+    const dy = e.touches[0].clientY - this._swipeStartY;
+    // 水平滑动为主才处理
+    if (Math.abs(dx) < Math.abs(dy)) return;
+    this._swipeMoved = true;
+    let newX = this._swipeStartSwipeX - dx;
+    // 限制范围：0 到 SWIPE_ACTION_WIDTH
+    newX = Math.max(0, Math.min(newX, SWIPE_ACTION_WIDTH));
+    this._updateRecordSwipe(this._swipeRecordId, { _swipeX: newX, _swiping: true, _swipeAnim: false, _swipeActionsW: SWIPE_ACTION_WIDTH });
+  },
+
+  // 记录卡片触摸结束
+  onRecordTouchEnd() {
+    if (this.data.exportMode) return;
+    if (!this._swipeRecordId) return;
+    const record = this.data.list.find(r => r.id === this._swipeRecordId);
+    if (!record) {
+      this._swipeRecordId = '';
+      return;
+    }
+    // 滑动超过一半则展开，否则收起
+    const threshold = SWIPE_ACTION_WIDTH / 2;
+    const finalX = record._swipeX >= threshold ? SWIPE_ACTION_WIDTH : 0;
+    this._updateRecordSwipe(this._swipeRecordId, { _swipeX: finalX, _swiping: false, _swipeAnim: true, _swipeActionsW: finalX });
+    this._swipeRecordId = '';
+  },
+
+  // 更新单条记录的滑动状态
+  _updateRecordSwipe(id, patch) {
+    const list = this.data.list.map(r => r.id === id ? Object.assign({}, r, patch) : r);
+    this.setData({ list });
+  },
+
+  // 收起所有展开的记录
+  _collapseAllSwipe() {
+    const list = this.data.list.map(r => Object.assign({}, r, {
+      _swipeX: 0,
+      _swiping: false,
+      _swipeAnim: true,
+      _swipeActionsW: 0
+    }));
+    this.setData({ list });
+  },
+
+  // 点击已展开的记录时收起（而非进入详情）
+  onRecordTapCollapse(e) {
+    const id = e.currentTarget.dataset.id;
+    this._updateRecordSwipe(id, { _swipeX: 0, _swiping: false, _swipeAnim: true, _swipeActionsW: 0 });
   },
 
   // ===== 数据加载 =====
@@ -92,7 +168,11 @@ Page({
       return Object.assign({}, item, {
         timeText: templates.formatDateTime(date),
         summary: this._buildSummary(item),
-        _checked: false
+        _checked: false,
+        _swipeX: 0,
+        _swiping: false,
+        _swipeAnim: true,
+        _swipeActionsW: 0
       });
     });
     // 按创建时间倒序
@@ -359,6 +439,32 @@ Page({
 
   closeDeleteFolderModal() {
     this.setData({ showDeleteFolderModal: false });
+  },
+
+  // ===== 记录左滑按钮事件 =====
+
+  onSwipeRename(e) {
+    const id = e.currentTarget.dataset.id;
+    this._collapseAllSwipe();
+    this.onRenameStart(id);
+  },
+
+  onSwipeMove(e) {
+    const id = e.currentTarget.dataset.id;
+    this._collapseAllSwipe();
+    this.onMoveStart(id);
+  },
+
+  onSwipeCopy(e) {
+    const id = e.currentTarget.dataset.id;
+    this._collapseAllSwipe();
+    this.onCopyStart(id);
+  },
+
+  onSwipeDelete(e) {
+    const id = e.currentTarget.dataset.id;
+    this._collapseAllSwipe();
+    this.onRecordDelete(id);
   },
 
   // ===== 记录长按操作 =====

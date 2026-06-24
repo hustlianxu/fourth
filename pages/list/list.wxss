@@ -133,15 +133,28 @@
   font-size: 28rpx;
 }
 
+/* 记录卡片容器（左滑结构） */
+.record-wrap {
+  position: relative;
+  margin-bottom: 16rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.03);
+}
+
 /* 记录卡片 */
 .record {
   background: #fff;
   border-radius: 16rpx;
   padding: 16rpx;
-  margin-bottom: 16rpx;
   display: flex;
   align-items: stretch;
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.03);
+  position: relative;
+  z-index: 2;
+}
+
+.record.swiping {
+  border-radius: 16rpx;
 }
 
 .record-thumb {
@@ -180,6 +193,59 @@
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+}
+
+/* ===== 左滑操作按钮组 ===== */
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.swipe-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 140rpx;
+  gap: 6rpx;
+}
+
+.swipe-icon {
+  font-size: 36rpx;
+  line-height: 1;
+}
+
+.swipe-label {
+  font-size: 20rpx;
+  color: #fff;
+  opacity: 0.9;
+}
+
+/* 半透明风格，符合当前主题 */
+.swipe-rename {
+  background: rgba(7, 193, 96, 0.78);
+}
+
+.swipe-move {
+  background: rgba(24, 144, 255, 0.78);
+}
+
+.swipe-copy {
+  background: rgba(114, 46, 209, 0.78);
+}
+
+.swipe-delete {
+  background: rgba(255, 77, 79, 0.82);
+}
+
+.swipe-btn:active {
+  opacity: 0.7;
 }
 
 /* 导出模式提示 */
@@ -227,14 +293,17 @@
   font-size: 26rpx;
 }
 
-.record.export-selectable {
+.record-wrap.export-selectable {
   padding-left: 12rpx;
 }
 
-.record.selected {
+.record-wrap.selected {
   background: #e6f7ee;
-  border: 2rpx solid #07c160;
   box-shadow: 0 2rpx 12rpx rgba(7,193,96,0.15);
+}
+
+.record-wrap.selected .record {
+  background: transparent;
 }
 
 .checkbox {
@@ -425,6 +494,10 @@
     background: rgb(17, 17, 17);
   }
 
+  .record-wrap {
+    box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.2);
+  }
+
   .record-thumb {
     background: rgb(42, 42, 42);
   }
@@ -441,9 +514,29 @@
     color: rgb(149, 149, 149);
   }
 
-  .record.selected {
+  .record-wrap.selected {
     background: rgb(5, 25, 15);
-    border-color: rgb(0, 105, 12);
+  }
+
+  .record-wrap.selected .record {
+    background: transparent;
+  }
+
+  /* 左滑按钮暗黑模式：略加深背景以保持对比度 */
+  .swipe-rename {
+    background: rgba(7, 193, 96, 0.85);
+  }
+
+  .swipe-move {
+    background: rgba(24, 144, 255, 0.85);
+  }
+
+  .swipe-copy {
+    background: rgba(114, 46, 209, 0.85);
+  }
+
+  .swipe-delete {
+    background: rgba(255, 77, 79, 0.88);
   }
 
   .checkbox {

@@ -85,21 +85,47 @@
     <view
       wx:for="{{list}}"
       wx:key="id"
-      class="record {{exportMode ? 'export-selectable' : ''}} {{exportMode && item._checked ? 'selected' : ''}}"
+      class="record-wrap {{exportMode ? 'export-selectable' : ''}} {{exportMode && item._checked ? 'selected' : ''}}"
       data-id="{{item.id}}"
-      bindtap="{{exportMode ? 'toggleSelect' : 'goDetail'}}"
+      bindtap="{{exportMode ? 'toggleSelect' : (item._swipeX > 0 ? 'onRecordTapCollapse' : 'goDetail')}}"
       bindlongpress="{{!exportMode ? 'onRecordLongPress' : ''}}"
+      bindtouchstart="{{!exportMode ? 'onRecordTouchStart' : ''}}"
+      bindtouchmove="{{!exportMode ? 'onRecordTouchMove' : ''}}"
+      bindtouchend="{{!exportMode ? 'onRecordTouchEnd' : ''}}"
+      bindtouchcancel="{{!exportMode ? 'onRecordTouchEnd' : ''}}"
     >
-      <!-- 导出模式勾选框 -->
-      <view wx:if="{{exportMode}}" class="checkbox {{item._checked ? 'checked' : ''}}">
-        <text wx:if="{{item._checked}}">✓</text>
+      <view class="record {{item._swiping ? 'swiping' : ''}}" style="transform: translateX({{-item._swipeX}}px); transition: {{item._swipeAnim ? 'transform 0.25s ease' : 'none'}};">
+        <!-- 导出模式勾选框 -->
+        <view wx:if="{{exportMode}}" class="checkbox {{item._checked ? 'checked' : ''}}">
+          <text wx:if="{{item._checked}}">✓</text>
+        </view>
+
+        <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
+        <view class="record-body">
+          <view class="record-title">{{item.customName || item.templateName}}</view>
+          <view class="record-time">{{item.timeText}}</view>
+          <view class="record-summary">{{item.summary}}</view>
+        </view>
       </view>
 
-      <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
-      <view class="record-body">
-        <view class="record-title">{{item.customName || item.templateName}}</view>
-        <view class="record-time">{{item.timeText}}</view>
-        <view class="record-summary">{{item.summary}}</view>
+      <!-- 左滑操作按钮组 -->
+      <view wx:if="{{!exportMode}}" class="swipe-actions" style="width: {{item._swipeActionsW || 0}}px;">
+        <view class="swipe-btn swipe-rename" data-id="{{item.id}}" catchtap="onSwipeRename">
+          <text class="swipe-icon">✎</text>
+          <text class="swipe-label">重命名</text>
+        </view>
+        <view class="swipe-btn swipe-move" data-id="{{item.id}}" catchtap="onSwipeMove">
+          <text class="swipe-icon">📁</text>
+          <text class="swipe-label">移动</text>
+        </view>
+        <view class="swipe-btn swipe-copy" data-id="{{item.id}}" catchtap="onSwipeCopy">
+          <text class="swipe-icon">⧉</text>
+          <text class="swipe-label">复制</text>
+        </view>
+        <view class="swipe-btn swipe-delete" data-id="{{item.id}}" catchtap="onSwipeDelete">
+          <text class="swipe-icon">🗑</text>
+          <text class="swipe-label">删除</text>
+        </view>
       </view>
     </view>
 
