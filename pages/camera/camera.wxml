@@ -13,9 +13,9 @@
     <view
       wx:if="{{template.fields.length > 0}}"
       class="wm-preview"
-      style="left: {{wmX}}px; top: {{wmY}}px; transform: scale({{wmScale}}); transform-origin: left top;"
+      style="{{wmPosStyle}} {{wmTransform}}"
     >
-      <view class="wm-preview-bg" style="font-size: {{wmPreviewFontSize}}px">
+      <view class="wm-preview-bg" style="font-size: {{wmPreviewFontSize}}px; padding: {{wmPadding}}px">
         <!-- 拖拽手柄 -->
         <view
           class="wm-drag-handle"
@@ -70,7 +70,6 @@
   <view class="bottom-bar-fixed">
     <view class="btn secondary" bindtap="onPickImage">相册</view>
     <view class="btn" bindtap="onTakePhoto">拍照</view>
-    <view class="btn primary-outline" bindtap="onTakeHighQualityPhoto">高清</view>
   </view>
 
 </view>

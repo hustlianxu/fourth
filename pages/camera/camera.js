@@ -25,15 +25,19 @@ Page({
     photoInfo: null,
     stage: 'camera',
     showTplPicker: false,
-    wPos: 'bottom-left',
+    wPos: 'bottom-center',
     POSITIONS: POSITIONS,
     // 水印浮层
     wmX: 0,
     wmY: 0,
+    wmBottom: 0,
+    wmTransform: '',
+    wmPosStyle: '',
     wmScale: 1.0,
     scaleLabel: '100%',
     wmPreviewFields: [],
     wmPreviewFontSize: 14,
+    wmPadding: 8,
     // 行内编辑
     editingFieldKey: '',
     editValue: '',
@@ -64,7 +68,7 @@ Page({
       template: tpl,
       templates: templates.TEMPLATES,
       values: defaultVals,
-      wPos: (tpl && tpl.position) || 'bottom-left'
+      wPos: (tpl && tpl.position) || 'bottom-center'
     });
     this._calcWmPreview();
     this._applyWmPosition();
@@ -84,22 +88,40 @@ Page({
   },
 
   _applyWmPosition() {
-    // 根据 wPos 计算取景框内坐标
+    const s = this.data.wmScale;
     const margin = this.viewportW * 0.04;
-    // 估算水印尺寸
-    const wmW = this.viewportW * 0.30; // 预览宽度约取景框 30%
-    const wmH = 80;
-    let x, y;
+    const vW = (this._wmEstW || this.viewportW * 0.42) * s;
+    const isLeft = this.data.wPos.indexOf('left') >= 0;
+    const isRight = this.data.wPos.indexOf('right') >= 0;
+    const isTop = this.data.wPos.indexOf('top') >= 0;
+    const isBottom = this.data.wPos.indexOf('bottom') >= 0;
 
-    if (this.data.wPos.indexOf('left') >= 0) x = margin;
-    else if (this.data.wPos.indexOf('right') >= 0) x = this.viewportW - wmW - margin;
-    else x = (this.viewportW - wmW) / 2;
+    let x, style;
+    if (isLeft) x = margin;
+    else if (isRight) x = this.viewportW - vW - margin;
+    else x = (this.viewportW - vW) / 2;
 
-    if (this.data.wPos.indexOf('top') >= 0) y = margin;
-    else if (this.data.wPos.indexOf('bottom') >= 0) y = this.viewportH - wmH - margin - 60;
-    else y = (this.viewportH - wmH) / 2;
+    style = 'left: ' + Math.round(x) + 'px; ';
 
-    this.setData({ wmX: Math.round(x), wmY: Math.round(y) });
+    if (isBottom) {
+      this.setData({
+        wmX: Math.round(x), wmBottom: Math.round(margin),
+        wmPosStyle: 'left: ' + Math.round(x) + 'px; bottom: ' + Math.round(margin) + 'px;',
+        wmTransform: 'transform-origin: left bottom; transform: scale(' + s + ');'
+      });
+    } else if (isTop) {
+      this.setData({
+        wmX: Math.round(x), wmY: Math.round(margin),
+        wmPosStyle: 'left: ' + Math.round(x) + 'px; top: ' + Math.round(margin) + 'px;',
+        wmTransform: 'transform-origin: left top; transform: scale(' + s + ');'
+      });
+    } else {
+      this.setData({
+        wmX: Math.round(x), wmY: 0,
+        wmPosStyle: 'left: ' + Math.round(x) + 'px; top: 50%;',
+        wmTransform: 'transform-origin: left center; transform: translateY(-50%) scale(' + s + ');'
+      });
+    }
   },
 
   // ===== 水印预览 =====
@@ -114,10 +136,17 @@ Page({
     }));
     const viewportW = wx.getWindowInfo().windowWidth;
     const ratio = viewportW / 750;
-    const previewFontSize = Math.max(10, Math.round(22 * ratio * this.data.wmScale));
+    const previewFontSize = Math.max(10, Math.round(22 * ratio));
+    // 未缩放尺寸（CSS transform: scale 会处理缩放）
+    const lineHeight = Math.round(previewFontSize * 1.6);
+    const fieldCount = previewFields.length;
+    const padding = Math.round(14 * ratio);
+    this._wmEstW = this.viewportW * 0.42;
+    this._wmEstH = fieldCount * 2 * lineHeight + padding * 2 + 30;
     this.setData({
       wmPreviewFields: previewFields,
-      wmPreviewFontSize: previewFontSize
+      wmPreviewFontSize: previewFontSize,
+      wmPadding: padding
     });
   },
 
@@ -162,7 +191,7 @@ Page({
       this.dragStartX = touch.clientX;
       this.dragStartY = touch.clientY;
       this.wmStartX = this.data.wmX;
-      this.wmStartY = this.data.wmY;
+      this.wmStartY = (this.data.wmPosStyle.indexOf('bottom') >= 0) ? this.data.wmBottom : this.data.wmY;
     } else if (e.touches.length === 2) {
       this.isPinching = true;
       this.isDragging = false;
@@ -179,11 +208,23 @@ Page({
       const dx = e.touches[0].clientX - this.dragStartX;
       const dy = e.touches[0].clientY - this.dragStartY;
       let newX = this.wmStartX + dx;
-      let newY = this.wmStartY + dy;
-      // 限制在取景框内
-      newX = Math.max(0, Math.min(newX, this.viewportW - 100));
-      newY = Math.max(0, Math.min(newY, this.viewportH - 60));
-      this.setData({ wmX: Math.round(newX), wmY: Math.round(newY) });
+      const s = this.data.wmScale;
+      newX = Math.max(0, Math.min(newX, this.viewportW - (this._wmEstW || 120) * s));
+      if (this.data.wmPosStyle.indexOf('bottom') >= 0) {
+        let newB = this.wmStartY - dy;
+        newB = Math.max(0, Math.min(newB, this.viewportH - 40));
+        this.setData({
+          wmX: Math.round(newX), wmBottom: Math.round(newB),
+          wmPosStyle: 'left: ' + Math.round(newX) + 'px; bottom: ' + Math.round(newB) + 'px;'
+        });
+      } else {
+        let newY = this.wmStartY + dy;
+        newY = Math.max(-this.viewportH * 0.3, Math.min(newY, this.viewportH - 40));
+        this.setData({
+          wmX: Math.round(newX), wmY: Math.round(newY),
+          wmPosStyle: 'left: ' + Math.round(newX) + 'px; top: ' + Math.round(newY) + 'px;'
+        });
+      }
     } else if (this.isPinching && e.touches.length === 2) {
       const dist = Math.hypot(
         e.touches[1].clientX - e.touches[0].clientX,
@@ -266,7 +307,7 @@ Page({
     this.setData({
       template: tpl,
       values: templates.getDefaultValues(tpl, { location: this.data.values.location }),
-      wPos: (tpl && tpl.position) || 'bottom-left'
+      wPos: (tpl && tpl.position) || 'bottom-center'
     });
     this._calcWmPreview();
     this._applyWmPosition();
@@ -339,23 +380,6 @@ Page({
     });
   },
 
-  onTakeHighQualityPhoto() {
-    if (!this.validate()) return;
-    wx.chooseMedia({
-      count: 1, mediaType: ['image'], sourceType: ['camera'], sizeType: ['original'],
-      success: (res) => {
-        const file = res.tempFiles[0];
-        wx.getImageInfo({
-          src: file.tempFilePath,
-          success: (info) => this._goPreview(file.tempFilePath, { width: info.width, height: info.height }),
-          fail: () => this._goPreview(file.tempFilePath, { width: 2736, height: 3648 })
-        });
-      },
-      fail: (err) => {
-        if (err.errMsg && err.errMsg.indexOf('cancel') === -1) wx.showToast({ title: '拍摄失败', icon: 'none' });
-      }
-    });
-  },
 
   _goPreview(photo, photoInfo) {
     try {

@@ -131,7 +131,7 @@ Page({
     this._calcImgDisplaySize();
 
     // 初始化水印位置：根据用户在相机页选择的位置计算
-    const posId = this.data.template.position || 'bottom-left';
+    const posId = this.data.template.position || 'bottom-center';
     this._applyPosition(posId);
   },
 
@@ -174,7 +174,7 @@ Page({
     const margin = Math.round(cw * 0.04);
     const ratio = cw / 750;
     const scale = this.data.wmScale || 1;
-    const fontSize = Math.round(22 * ratio * scale);
+    const fontSize = Math.round(22 * ratio);
     const lineHeight = Math.round(fontSize * 1.7);
     const padding = Math.round(14 * ratio * scale);
     const fieldCount = (this.data.displayFields && this.data.displayFields.length) || 0;
@@ -206,7 +206,7 @@ Page({
       'bottom-center':{ qid: 'bc', x: 'center',y: 'bottom' },
       'bottom-right': { qid: 'br', x: 'right', y: 'bottom' }
     };
-    const pos = POS_MAP[posId] || POS_MAP['bottom-left'];
+    const pos = POS_MAP[posId] || POS_MAP['bottom-center'];
 
     let newX, newY;
     if (pos.x === 'left') newX = margin;
@@ -344,7 +344,7 @@ Page({
     const QID_TO_POS = { tl:'top-left', tc:'top-center', tr:'top-right',
       cl:'center-left', cc:'center', cr:'center-right',
       bl:'bottom-left', bc:'bottom-center', br:'bottom-right' };
-    this._applyPosition(QID_TO_POS[this.data.currentPos] || 'bottom-left');
+    this._applyPosition(QID_TO_POS[this.data.currentPos] || 'bottom-center');
   },
 
   // 透明度滑块

@@ -103,8 +103,13 @@
 
 /* ===== 字段行 ===== */
 .wm-field-row {
-  padding: 4rpx 0;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  padding: 2rpx 0;
+}
+
+.wm-field-value {
+  padding-left: 1em;
 }
 
 .wm-field-label {
