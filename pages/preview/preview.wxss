@@ -6,49 +6,37 @@
   flex-direction: column;
 }
 
-/* 顶部工具栏 */
-.toolbar {
+/* 返回按钮 - 固定定位，与胶囊平齐（top/left/height 由 JS 动态设置） */
+.back-btn {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  color: #fff;
+  font-size: 36rpx;
+  z-index: 100;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24rpx;
-  /* padding-top 需大于胶囊按钮底部（约 safe-area + 88rpx），留出间距到 96rpx */
-  padding-top: calc(96rpx + env(safe-area-inset-top));
-  padding-bottom: 16rpx;
-  background: rgba(0,0,0,0.7);
-  z-index: 100;
-}
-
-.back-btn {
-  font-size: 28rpx;
-  color: #fff;
-  padding: 8rpx 16rpx;
-  flex-shrink: 0;
+  justify-content: center;
+  width: 64rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .back-btn:active {
   opacity: 0.6;
+  background: rgba(0, 0, 0, 0.6);
 }
 
-.toolbar-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #fff;
-  flex: 1;
-  text-align: center;
-}
-
+/* 保存按钮 - 固定定位，与胶囊平齐，位于胶囊左侧（top/right/height 由 JS 动态设置） */
 .save-btn {
+  position: fixed;
   background: #07c160;
   color: #fff;
-  padding: 12rpx 32rpx;
   border-radius: 999rpx;
-  font-size: 28rpx;
-  flex-shrink: 0;
+  font-size: 26rpx;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28rpx;
   transition: opacity 0.15s;
 }
 
@@ -64,8 +52,6 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  /* 与 toolbar 高度匹配：96rpx(padding-top) + 工具栏内容 + 16rpx(padding-bottom) */
-  padding-top: calc(188rpx + env(safe-area-inset-top));
   padding-bottom: 0;
 }
 

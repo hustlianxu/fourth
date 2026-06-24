@@ -1,13 +1,10 @@
 <view class="preview-page">
-  <!-- 顶部工具栏 -->
-  <view class="toolbar">
-    <view class="back-btn" bindtap="onBack">← 返回</view>
-    <view class="toolbar-title">调整水印</view>
-    <view class="save-btn" bindtap="onSave">保存</view>
-  </view>
+  <!-- 顶部固定按钮（与微信胶囊平齐） -->
+  <view class="back-btn" style="{{backBtnStyle}}" bindtap="onBack">←</view>
+  <view class="save-btn" style="{{saveBtnStyle}}" bindtap="onSave">保存</view>
 
   <!-- 预览区域 -->
-  <view class="preview-area">
+  <view class="preview-area" style="padding-top: {{previewPadTop}};">
     <!-- 图片容器（承载所有触摸事件） -->
     <view class="img-container"
       style="width:{{imgDisplayWidth}}px;height:{{imgDisplayHeight}}px;"

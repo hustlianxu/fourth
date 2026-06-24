@@ -38,7 +38,8 @@ Page({
     imgDisplayWidth: 300,
     imgDisplayHeight: 400,
     saveBtnStyle: '',   // 保存按钮动态定位样式
-    backBtnStyle: ''    // 返回按钮动态定位样式（与保存按钮水平对齐）
+    backBtnStyle: '',   // 返回按钮动态定位样式（与保存按钮水平对齐）
+    previewPadTop: ''    // 预览区域顶部留白（基于胶囊底部位置）
   },
 
   isDragging: false,
@@ -60,21 +61,25 @@ Page({
     this.screenWidth = windowInfo.windowWidth;
     this.screenHeight = windowInfo.windowHeight;
 
-    // 获取微信原生胶囊按钮位置，避免保存按钮被遮挡
+    // 获取微信原生胶囊按钮位置，让保存按钮与胶囊平齐、位于胶囊左侧
     try {
       const capsule = wx.getMenuButtonBoundingClientRect();
       // 保存按钮放在胶囊左侧，间距 12px
       const saveRight = windowInfo.windowWidth - capsule.left + 12;
       const saveTop = capsule.top;
       const btnLineHeight = capsule.height; // 与胶囊同高，保证对齐
+      // 预览区域顶部留白：胶囊底部 + 16px 间距
+      const previewPadTop = (capsule.bottom + 16) + 'px';
       this.setData({
         saveBtnStyle: 'right: ' + saveRight + 'px; top: ' + saveTop + 'px; height: ' + btnLineHeight + 'px; line-height: ' + btnLineHeight + 'px;',
-        backBtnStyle: 'left: 12px; top: ' + saveTop + 'px; height: ' + btnLineHeight + 'px; line-height: ' + btnLineHeight + 'px;'
+        backBtnStyle: 'left: 12px; top: ' + saveTop + 'px; height: ' + btnLineHeight + 'px; line-height: ' + btnLineHeight + 'px;',
+        previewPadTop: previewPadTop
       });
     } catch (e) {
       this.setData({
-        saveBtnStyle: 'right: 100px; top: 48px;',
-        backBtnStyle: 'left: 12px; top: 48px;'
+        saveBtnStyle: 'right: 100px; top: 48px; height: 32px; line-height: 32px;',
+        backBtnStyle: 'left: 12px; top: 48px; height: 32px; line-height: 32px;',
+        previewPadTop: '96px'
       });
     }
 
