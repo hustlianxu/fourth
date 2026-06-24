@@ -1,8 +1,8 @@
-/* 右上角操作浮层按钮 */
+/* 右上角操作浮层按钮 - 紧贴右侧，胶囊按钮下方 */
 .action-fab {
   position: fixed;
-  top: calc(16rpx + env(safe-area-inset-top));
-  right: calc(180rpx + env(safe-area-inset-right));
+  top: calc(96rpx + env(safe-area-inset-top));
+  right: calc(16rpx + env(safe-area-inset-right));
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
@@ -29,11 +29,11 @@
   z-index: 199;
 }
 
-/* 浮层菜单 */
+/* 浮层菜单 - 紧贴右侧 */
 .action-menu {
   position: fixed;
-  top: calc(90rpx + env(safe-area-inset-top));
-  right: calc(180rpx + env(safe-area-inset-right));
+  top: calc(170rpx + env(safe-area-inset-top));
+  right: calc(16rpx + env(safe-area-inset-right));
   background: #fff;
   border-radius: 12rpx;
   box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.15);
@@ -65,14 +65,16 @@
 
 .img-area {
   position: relative;
-  margin-bottom: 16rpx;
+  margin: 0 auto 16rpx;
   border-radius: 16rpx;
   overflow: hidden;
   background: #eee;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .big-img {
-  width: 100%;
   border-radius: 16rpx;
   background: #eee;
   display: block;

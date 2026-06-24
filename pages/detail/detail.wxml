@@ -16,7 +16,7 @@
     bindtouchmove="onTouchMove"
     bindtouchend="onTouchEnd"
   >
-    <image class="big-img" src="{{displayPhoto}}" mode="widthFix" style="width:100%;height:100%;" bindtap="onPreview"></image>
+    <image class="big-img" src="{{displayPhoto}}" mode="aspectFit" style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;" bindtap="onPreview"></image>
 
     <!-- 编辑模式：可拖动水印层 -->
     <view wx:if="{{showWmOverlay}}" class="detail-wm-layer"
