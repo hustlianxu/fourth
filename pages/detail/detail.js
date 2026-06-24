@@ -181,6 +181,10 @@ Page({
     this.lastPinchDist = 0;
   },
 
+  // 浮层按钮触摸事件 - 阻止冒泡，避免触发水印拖拽
+  onFabTouchStart() {},
+  onFabTouchMove() {},
+
   // === 编辑切换 ===
   async onEditToggle() {
     if (this.data.editing) {
@@ -276,7 +280,13 @@ Page({
     const key = e.currentTarget.dataset.key;
     const val = e.detail.value;
     const editValues = Object.assign({}, this.data.editValues, { [key]: val });
-    this.setData({ editValues });
+    // 实时刷新水印预览内容
+    const displayFields = this.data.fields.filter(f => editValues[f.key]).map(f => ({
+      key: f.key,
+      label: f.label,
+      value: editValues[f.key]
+    }));
+    this.setData({ editValues, displayFields });
   },
 
   onScaleChange(e) {

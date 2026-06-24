@@ -1,12 +1,12 @@
-/* 右上角操作浮层按钮 - 紧贴右侧，胶囊按钮下方 */
+/* 右上角操作浮层按钮 - 绝对定位于图片右上角 */
 .action-fab {
-  position: fixed;
-  top: calc(96rpx + env(safe-area-inset-top));
-  right: calc(16rpx + env(safe-area-inset-right));
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.45);
   color: #fff;
   font-size: 36rpx;
   display: flex;
@@ -17,7 +17,7 @@
 }
 
 .action-fab:active {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.65);
   transform: scale(0.92);
 }
 
@@ -29,10 +29,10 @@
   z-index: 199;
 }
 
-/* 浮层菜单 - 紧贴右侧 */
+/* 浮层菜单 - 固定定位，出现在按钮下方 */
 .action-menu {
   position: fixed;
-  top: calc(170rpx + env(safe-area-inset-top));
+  top: calc(200rpx + env(safe-area-inset-top));
   right: calc(16rpx + env(safe-area-inset-right));
   background: #fff;
   border-radius: 12rpx;
@@ -122,7 +122,6 @@
 .detail-wm-row {
   display: flex;
   flex-direction: column;
-  margin-bottom: 4rpx;
 }
 
 .detail-wm-row:last-child {
@@ -139,13 +138,16 @@
   margin-right: 6rpx;
 }
 
+/* 行高与 watermark.js 中 lineHeight=1.35 保持一致 */
 .detail-wm-label {
-  font-size: 18rpx;
+  font-size: 20rpx;
+  line-height: 1.35;
   color: rgba(255,230,140,0.85);
 }
 
 .detail-wm-value {
   font-size: 20rpx;
+  line-height: 1.35;
   color: #fff;
 }
 

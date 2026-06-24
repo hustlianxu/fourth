@@ -1,7 +1,7 @@
 <view class="container" wx:if="{{record}}">
-  <!-- 右上角操作浮层 -->
-  <view class="action-fab" bindtap="onToggleActionMenu">⋮</view>
+  <!-- 浮层菜单遮罩（全屏） -->
   <view class="action-menu-mask" wx:if="{{showActionMenu}}" bindtap="onToggleActionMenu"></view>
+  <!-- 浮层菜单（固定定位） -->
   <view class="action-menu" wx:if="{{showActionMenu}}">
     <view class="action-menu-item danger" bindtap="onDeleteFromMenu">
       <text class="action-menu-icon">🗑</text>
@@ -13,10 +13,13 @@
   <view class="img-area"
     style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;"
     bindtouchstart="onTouchStart"
-    bindtouchmove="onTouchMove"
+    catchtouchmove="onTouchMove"
     bindtouchend="onTouchEnd"
   >
     <image class="big-img" src="{{displayPhoto}}" mode="aspectFit" style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;" bindtap="onPreview"></image>
+
+    <!-- 右上角操作浮层按钮（绝对定位于图片右上角） -->
+    <view class="action-fab" catchtap="onToggleActionMenu" catchtouchstart="onFabTouchStart" catchtouchmove="onFabTouchMove">⋮</view>
 
     <!-- 编辑模式：可拖动水印层 -->
     <view wx:if="{{showWmOverlay}}" class="detail-wm-layer"
