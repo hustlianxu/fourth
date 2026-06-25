@@ -9,14 +9,14 @@
     </view>
   </view>
 
-  <!-- 图片区域（编辑模式下可拖拽水印） -->
+  <!-- 图片区域（编辑模式下可拖拽水印，宽度自动撑满 container 内容区） -->
   <view class="img-area"
-    style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;"
+    style="height:{{imgDisplayH}}px;"
     bindtouchstart="onTouchStart"
     catchtouchmove="onTouchMove"
     bindtouchend="onTouchEnd"
   >
-    <image class="big-img" src="{{displayPhoto}}" mode="aspectFit" style="width:{{imgDisplayW}}px;height:{{imgDisplayH}}px;" bindtap="onPreview"></image>
+    <image class="big-img" src="{{displayPhoto}}" mode="aspectFit" style="width:100%;height:{{imgDisplayH}}px;" bindtap="onPreview"></image>
 
     <!-- 右上角操作浮层按钮（绝对定位于图片右上角） -->
     <view class="action-fab" catchtap="onToggleActionMenu" id="actionFab">⋮</view>

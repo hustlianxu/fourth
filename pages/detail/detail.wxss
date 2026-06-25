@@ -65,7 +65,7 @@
 
 .img-area {
   position: relative;
-  margin: 0 auto 16rpx;
+  margin-bottom: 16rpx;
   border-radius: 16rpx;
   overflow: hidden;
   background: #eee;

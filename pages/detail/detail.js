@@ -83,10 +83,10 @@ Page({
       value: f.value
     }));
 
-    // 计算图片显示尺寸（image 用 widthFix 模式，宽度撑满）
+    // 计算图片显示尺寸（宽度与下方卡片对齐：container padding 24rpx*2 = 48rpx）
     const imgW = record.width || 1080;
     const imgH = record.height || 1440;
-    const displayW = this.screenWidth - 48; // container padding
+    const displayW = this.screenWidth - 48; // 与 .card 外层宽度一致
     const displayH = displayW * (imgH / imgW);
 
     const date = new Date(record.createdAt);
