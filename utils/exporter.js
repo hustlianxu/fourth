@@ -1,5 +1,8 @@
 // utils/exporter.js
 // 导出记录为 Excel（HTML 格式，VML 嵌入原图，行高按图片比例自适应，列宽自适应内容）
+// 导出时自动翻译：desEs 有值 desZh 空 → 译为中文；desZh 有值 desEs 空 → 译为西语
+
+var translator = require('./translator.js');
 
 var COLUMNS = [
   { key: 'imagePath', header: 'FOTO', isImage: true },
@@ -105,7 +108,26 @@ function buildColGroup(colWidths) {
   return html;
 }
 
-async function buildHtmlTable(records) {
+async function buildHtmlTable(records, onProgress) {
+  // 翻译预处理：自动填充空缺的描述列
+  // desEs 有值 desZh 空 → 译为中文填第4列
+  // desZh 有值 desEs 空 → 译为西语填第3列
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i];
+    if (!rec.values) rec.values = {};
+    var desEs = rec.values.desEs || '';
+    var desZh = rec.values.desZh || '';
+    if (desEs.trim() && !desZh.trim()) {
+      if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
+      var translated = await translator.translate(desEs, 'es', 'zh');
+      if (translated) rec.values.desZh = translated;
+    } else if (desZh.trim() && !desEs.trim()) {
+      if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
+      var translated2 = await translator.translate(desZh, 'zh', 'es');
+      if (translated2) rec.values.desEs = translated2;
+    }
+  }
+
   var colWidths = calcColumnWidths(records);
 
   var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
@@ -174,12 +196,12 @@ async function buildHtmlTable(records) {
   return html;
 }
 
-function exportToExcel(records, customFileName) {
+function exportToExcel(records, customFileName, onProgress) {
   if (!records || records.length === 0) throw new Error('没有选中任何记录');
 
   console.log('[Exporter] 导出记录数:', records.length, '自定义文件名:', customFileName || '(无)');
 
-  return buildHtmlTable(records).then(function (html) {
+  return buildHtmlTable(records, onProgress).then(function (html) {
     var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
     var fileName = baseName + '.xls';
     var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
@@ -207,4 +229,4 @@ function exportToExcel(records, customFileName) {
   });
 }
 
-module.exports = { exportToExcel: exportToExcel, sanitizeFileName: sanitizeFileName, COLUMNS: COLUMNS };
+module.exports = { exportToExcel: exportToExcel, sanitizeFileName: sanitizeFileName, COLUMNS: COLUMNS, buildHtmlTable: buildHtmlTable };

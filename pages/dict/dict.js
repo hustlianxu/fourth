@@ -1,0 +1,168 @@
+// pages/dict/dict.js
+const translator = require('../../utils/translator.js');
+const builtin = require('../../utils/builtinDict.js');
+
+const PROVIDER_PRESETS = {
+  deepseek: { baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  zhipu:   { baseURL: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+  qwen:    { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
+  custom:  { baseURL: '', model: '' }
+};
+
+Page({
+  data: {
+    activeTab: 'custom',          // 'custom' | 'builtin' | 'api'
+    // 自定义词典
+    customDict: [],
+    // 内置词典
+    builtinDict: [],
+    filteredBuiltin: [],
+    searchKeyword: '',
+    // 词条编辑弹层
+    showEditModal: false,
+    editingIndex: -1,
+    editZh: '',
+    editEs: '',
+    // API 配置
+    provider: 'deepseek',
+    baseURL: '',
+    apiKey: '',
+    model: '',
+    testResult: ''
+  },
+
+  onLoad() {
+    this.setData({
+      customDict: translator.getUserDict(),
+      builtinDict: builtin.BUILTIN_DICT,
+      filteredBuiltin: builtin.BUILTIN_DICT
+    });
+    this._loadConfig();
+  },
+
+  _loadConfig() {
+    const cfg = translator.getConfig() || {};
+    const provider = cfg.provider || 'deepseek';
+    const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
+    this.setData({
+      provider: provider,
+      baseURL: cfg.baseURL || preset.baseURL,
+      apiKey: cfg.apiKey || '',
+      model: cfg.model || preset.model
+    });
+  },
+
+  // ===== Tab 切换 =====
+  onSwitchTab(e) {
+    this.setData({ activeTab: e.currentTarget.dataset.tab });
+  },
+
+  // ===== 自定义词典 CRUD =====
+  onAddItem() {
+    this.setData({ showEditModal: true, editingIndex: -1, editZh: '', editEs: '' });
+  },
+
+  onEditItem(e) {
+    const idx = e.currentTarget.dataset.index;
+    const item = this.data.customDict[idx];
+    this.setData({ showEditModal: true, editingIndex: idx, editZh: item.zh, editEs: item.es });
+  },
+
+  onDeleteItem(e) {
+    const idx = e.currentTarget.dataset.index;
+    const item = this.data.customDict[idx];
+    const that = this;
+    wx.showModal({
+      title: '删除词条',
+      content: '确定删除「' + item.zh + ' ↔ ' + item.es + '」？',
+      success(res) {
+        if (!res.confirm) return;
+        const list = that.data.customDict.slice();
+        list.splice(idx, 1);
+        translator.setUserDict(list);
+        that.setData({ customDict: list });
+        wx.showToast({ title: '已删除', icon: 'success' });
+      }
+    });
+  },
+
+  onCloseEdit() {
+    this.setData({ showEditModal: false });
+  },
+
+  onEditZhInput(e) { this.setData({ editZh: e.detail.value }); },
+  onEditEsInput(e) { this.setData({ editEs: e.detail.value }); },
+
+  onConfirmEdit() {
+    const zh = this.data.editZh.trim();
+    const es = this.data.editEs.trim();
+    if (!zh) { wx.showToast({ title: '请输入中文', icon: 'none' }); return; }
+    if (!es) { wx.showToast({ title: '请输入西语', icon: 'none' }); return; }
+
+    const list = this.data.customDict.slice();
+    if (this.data.editingIndex >= 0) {
+      list[this.data.editingIndex] = { zh: zh, es: es };
+    } else {
+      list.push({ zh: zh, es: es });
+    }
+    translator.setUserDict(list);
+    this.setData({ customDict: list, showEditModal: false });
+    wx.showToast({ title: '已保存', icon: 'success' });
+  },
+
+  // ===== 内置词典搜索 =====
+  onSearchInput(e) {
+    const kw = (e.detail.value || '').trim().toLowerCase();
+    if (!kw) {
+      this.setData({ searchKeyword: kw, filteredBuiltin: this.data.builtinDict });
+      return;
+    }
+    const filtered = this.data.builtinDict.filter(function (item) {
+      return item.zh.toLowerCase().indexOf(kw) >= 0 || item.es.toLowerCase().indexOf(kw) >= 0;
+    });
+    this.setData({ searchKeyword: kw, filteredBuiltin: filtered });
+  },
+
+  // ===== API 配置 =====
+  onPickProvider(e) {
+    const p = e.currentTarget.dataset.provider;
+    const preset = PROVIDER_PRESETS[p];
+    this.setData({
+      provider: p,
+      baseURL: preset.baseURL || this.data.baseURL,
+      model: preset.model || this.data.model
+    });
+  },
+
+  onBaseURLInput(e) { this.setData({ baseURL: e.detail.value }); },
+  onModelInput(e) { this.setData({ model: e.detail.value }); },
+  onAPIKeyInput(e) { this.setData({ apiKey: e.detail.value }); },
+
+  onSaveConfig() {
+    const cfg = {
+      provider: this.data.provider,
+      baseURL: this.data.baseURL.trim(),
+      apiKey: this.data.apiKey.trim(),
+      model: this.data.model.trim()
+    };
+    if (!cfg.baseURL || !cfg.apiKey || !cfg.model) {
+      wx.showToast({ title: '请填写完整配置', icon: 'none' });
+      return;
+    }
+    translator.setConfig(cfg);
+    wx.showToast({ title: '配置已保存', icon: 'success' });
+  },
+
+  onTestTranslate() {
+    const cfg = translator.getConfig();
+    if (!cfg || !cfg.apiKey) {
+      wx.showToast({ title: '请先保存配置', icon: 'none' });
+      return;
+    }
+    this.setData({ testResult: '翻译中...' });
+    const that = this;
+    translator.translate('con luz y música', 'es', 'zh').then(function (result) {
+      that.setData({ testResult: 'con luz y música  →  ' + (result || '(无结果)') });
+    });
+  }
+});

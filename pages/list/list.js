@@ -301,6 +301,10 @@ Page({
     wx.navigateTo({ url: '/pages/camera/camera' });
   },
 
+  goDict() {
+    wx.navigateTo({ url: '/pages/dict/dict' });
+  },
+
   // ===== 文件夹Tab交互 =====
 
   onSelectFolder(e) {
@@ -891,7 +895,9 @@ Page({
     wx.showLoading({ title: '正在生成...', mask: true });
 
     try {
-      await exporter.exportToExcel(selected, customFileName);
+      await exporter.exportToExcel(selected, customFileName, function (msg) {
+        wx.showLoading({ title: msg, mask: true });
+      });
 
       wx.hideLoading();
       wx.showToast({ title: '导出完成', icon: 'success' });

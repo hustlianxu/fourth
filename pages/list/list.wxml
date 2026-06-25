@@ -54,7 +54,7 @@
     <!-- ===== 顶部操作栏（渐进式：选中态保留导出/新增，标题变✕已选，左侧加红色删除） ===== -->
     <block wx:if="{{!exportMode}}">
       <view class="row between" style="margin-bottom:24rpx;">
-        <!-- 选中态：✕已选X条 + 全选/取消链接；普通态：共N条 -->
+        <!-- 选中态：✕已选X条 + 全选/取消链接；普通态：共N条 + 词典入口 -->
         <view class="row" style="align-items:center;">
           <block wx:if="{{batchMode}}">
             <view class="batch-exit" bindtap="onBatchCancel">✕</view>
@@ -63,6 +63,7 @@
           </block>
           <block wx:else>
             <view class="title" style="margin:0;">共 {{list.length}} 条</view>
+            <view class="dict-entry-btn" bindtap="goDict">📚 词典</view>
           </block>
         </view>
         <view class="row">

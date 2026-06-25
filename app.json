@@ -4,7 +4,8 @@
     "pages/camera/camera",
     "pages/list/list",
     "pages/detail/detail",
-    "pages/template/template"
+    "pages/template/template",
+    "pages/dict/dict"
   ],
   "window": {
     "backgroundTextStyle": "light",
