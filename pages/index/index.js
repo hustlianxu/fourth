@@ -21,11 +21,6 @@ Page({
     });
   },
 
-  onShow() {
-    const list = storage.getAll();
-    this.setData({ total: list.length });
-  },
-
   onSelectTemplate(e) {
     const id = e.currentTarget.dataset.id;
     this.setData({ selectedId: id });
