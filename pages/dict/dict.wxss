@@ -202,10 +202,12 @@
 .search-input {
   width: 100%;
   background: #f7f8fa;
-  padding: 20rpx 24rpx;
+  padding: 24rpx 28rpx;
   border-radius: 32rpx;
-  font-size: 26rpx;
+  font-size: 28rpx;
   box-sizing: border-box;
+  min-height: 80rpx;
+  line-height: 1.5;
 }
 
 /* ===== 表单 ===== */
