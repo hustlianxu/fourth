@@ -7,6 +7,8 @@ const MAX_FOLDERS = 30;
 
 // 左滑操作按钮总宽度（4个按钮 × 70px ≈ 280px）
 const SWIPE_ACTION_WIDTH = 280;
+// 右滑选中触发阈值（px）
+const SWIPE_SELECT_THRESHOLD = 60;
 
 Page({
   data: {
@@ -42,6 +44,10 @@ Page({
     deleteFolderId: '',
     deleteFolderName: '',
     deleteFolderCount: 0,
+    // 批量选择模式（右滑触发，与导出模式独立）
+    batchMode: false,
+    batchSelectedCount: 0,
+    showBatchDeleteModal: false,
   },
 
   onShow() {
@@ -51,12 +57,13 @@ Page({
     setTimeout(() => this.setData({ loading: false }), 300);
   },
 
-  // ===== 左滑手势状态 =====
+  // ===== 左滑/右滑手势状态 =====
   _swipeStartX: 0,
   _swipeStartY: 0,
   _swipeRecordId: '',
   _swipeStartSwipeX: 0,
   _swipeMoved: false,
+  _swipeDirection: '',  // 'left' 左滑操作 | 'right' 右滑选中
 
   // 记录卡片触摸开始
   onRecordTouchStart(e) {
@@ -66,6 +73,7 @@ Page({
     this._swipeStartY = e.touches[0].clientY;
     this._swipeRecordId = id;
     this._swipeMoved = false;
+    this._swipeDirection = '';
     const record = this.data.list.find(r => r.id === id);
     this._swipeStartSwipeX = record ? record._swipeX : 0;
   },
@@ -79,8 +87,18 @@ Page({
     // 水平滑动为主才处理
     if (Math.abs(dx) < Math.abs(dy)) return;
     this._swipeMoved = true;
+    // 确定方向（首次移动时锁定）
+    if (!this._swipeDirection) {
+      this._swipeDirection = dx > 0 ? 'right' : 'left';
+    }
+
+    if (this._swipeDirection === 'right') {
+      // 右滑：选中流程，不移动卡片（仅反馈），批量模式下实时切换选中
+      return;
+    }
+
+    // 左滑：展开操作按钮
     let newX = this._swipeStartSwipeX - dx;
-    // 限制范围：0 到 SWIPE_ACTION_WIDTH
     newX = Math.max(0, Math.min(newX, SWIPE_ACTION_WIDTH));
     this._updateRecordSwipe(this._swipeRecordId, { _swipeX: newX, _swiping: true, _swipeAnim: false, _swipeActionsW: SWIPE_ACTION_WIDTH });
   },
@@ -92,13 +110,23 @@ Page({
     const record = this.data.list.find(r => r.id === this._swipeRecordId);
     if (!record) {
       this._swipeRecordId = '';
+      this._swipeDirection = '';
       return;
     }
-    // 滑动超过一半则展开，否则收起
+    const direction = this._swipeDirection;
+    this._swipeRecordId = '';
+    this._swipeDirection = '';
+
+    // 右滑选中：超过阈值则选中该记录并进入批量模式
+    if (direction === 'right' && this._swipeMoved) {
+      this._enterBatchAndToggle(record.id);
+      return;
+    }
+
+    // 左滑：滑动超过一半则展开，否则收起
     const threshold = SWIPE_ACTION_WIDTH / 2;
     const finalX = record._swipeX >= threshold ? SWIPE_ACTION_WIDTH : 0;
-    this._updateRecordSwipe(this._swipeRecordId, { _swipeX: finalX, _swiping: false, _swipeAnim: true, _swipeActionsW: finalX });
-    this._swipeRecordId = '';
+    this._updateRecordSwipe(record.id, { _swipeX: finalX, _swiping: false, _swipeAnim: true, _swipeActionsW: finalX });
   },
 
   // 更新单条记录的滑动状态
@@ -718,6 +746,94 @@ Page({
       return item;
     });
     this.setData({ list, selectedCount: 0 });
+  },
+
+  // ===== 批量选择模式（右滑触发，与导出模式独立） =====
+
+  // 右滑触发：进入批量模式并选中当前记录
+  _enterBatchAndToggle(id) {
+    // 先确保进入批量模式
+    const wasInBatch = this.data.batchMode;
+    if (!wasInBatch) {
+      // 进入批量模式：清空旧的选中态
+      const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
+      const idx = list.findIndex(r => r.id === id);
+      if (idx >= 0) list[idx]._checked = true;
+      this._collapseAllSwipe();
+      this.setData({ list, batchMode: true, batchSelectedCount: 1 });
+    } else {
+      // 已在批量模式：切换当前记录选中态
+      let count = 0;
+      const list = this.data.list.map(item => {
+        if (item.id === id) item._checked = !item._checked;
+        if (item._checked) count++;
+        return item;
+      });
+      // 若全部取消选中，退出批量模式
+      if (count === 0) {
+        this.setData({ list, batchMode: false, batchSelectedCount: 0 });
+      } else {
+        this.setData({ list, batchSelectedCount: count });
+      }
+    }
+  },
+
+  // 批量模式下点击记录：切换选中态
+  onBatchToggle(e) {
+    if (!this.data.batchMode) return;
+    const id = e.currentTarget.dataset.id;
+    let count = 0;
+    const list = this.data.list.map(item => {
+      if (item.id === id) item._checked = !item._checked;
+      if (item._checked) count++;
+      return item;
+    });
+    if (count === 0) {
+      this.setData({ list, batchMode: false, batchSelectedCount: 0 });
+    } else {
+      this.setData({ list, batchSelectedCount: count });
+    }
+  },
+
+  // 批量模式：全选当前列表
+  onBatchSelectAll() {
+    const list = this.data.list.map(item => Object.assign({}, item, { _checked: true }));
+    this.setData({ list, batchSelectedCount: list.length });
+  },
+
+  // 批量模式：退出
+  onBatchCancel() {
+    const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
+    this.setData({ list, batchMode: false, batchSelectedCount: 0 });
+  },
+
+  // 批量删除：弹出二次确认
+  onBatchDeleteStart() {
+    if (this.data.batchSelectedCount === 0) return;
+    this.setData({ showBatchDeleteModal: true });
+  },
+
+  closeBatchDeleteModal() {
+    this.setData({ showBatchDeleteModal: false });
+  },
+
+  // 确认批量删除
+  onBatchDeleteConfirm() {
+    const selected = this.data.list.filter(item => item._checked);
+    const ids = selected.map(item => item.id);
+    this.setData({ showBatchDeleteModal: false });
+    wx.showLoading({ title: '删除中...', mask: true });
+    try {
+      ids.forEach(id => storage.remove(id));
+      wx.hideLoading();
+      wx.showToast({ title: '已删除 ' + ids.length + ' 条', icon: 'success' });
+      this.setData({ batchMode: false, batchSelectedCount: 0 });
+      this._loadFolders();
+      this._loadList();
+    } catch (e) {
+      wx.hideLoading();
+      wx.showToast({ title: '删除失败', icon: 'none' });
+    }
   },
 
   // ===== 导出 =====

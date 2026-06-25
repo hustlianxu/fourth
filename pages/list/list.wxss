@@ -293,6 +293,61 @@
   font-size: 26rpx;
 }
 
+/* ===== 批量选择模式 ===== */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 16rpx 0;
+  margin-bottom: 8rpx;
+}
+
+.batch-bar-info {
+  font-size: 26rpx;
+  color: #666;
+  flex: 1;
+}
+
+.batch-bar-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.batch-link {
+  color: #07c160;
+  font-size: 26rpx;
+  padding: 8rpx 0;
+}
+
+.btn.batch-delete-btn {
+  background: #ff4d4f;
+  color: #fff;
+  padding: 12rpx 24rpx;
+  border-radius: 10rpx;
+  font-size: 26rpx;
+}
+
+.btn.batch-delete-btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.batch-hint {
+  text-align: center;
+  color: #999;
+  font-size: 22rpx;
+  padding: 4rpx 0 12rpx;
+}
+
+.record-wrap.batch-selectable {
+  padding-left: 12rpx;
+}
+
+.record-wrap.batch-selectable .record {
+  align-items: center;
+}
+
 .record-wrap.export-selectable {
   padding-left: 12rpx;
 }
@@ -558,6 +613,22 @@
 
   .export-link {
     color: rgb(0, 105, 12);
+  }
+
+  .batch-bar-info {
+    color: rgb(149, 149, 149);
+  }
+
+  .batch-link {
+    color: rgb(0, 105, 12);
+  }
+
+  .batch-hint {
+    color: rgb(99, 99, 99);
+  }
+
+  .btn.batch-delete-btn {
+    background: rgb(255, 77, 79);
   }
 
   .folder-modal {
