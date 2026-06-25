@@ -208,12 +208,19 @@ Page({
       }
     }
 
+    // batchMode 下保留已有选中态（防止 onShow 切回前台时 _checked 被重置）
+    const prevCheckedMap = {};
+    if (this.data.batchMode) {
+      this.data.list.forEach(r => {
+        if (r._checked) prevCheckedMap[r.id] = true;
+      });
+    }
     const list = raw.map((item) => {
       const date = new Date(item.createdAt);
       return Object.assign({}, item, {
         timeText: templates.formatDateTime(date),
         summary: this._buildSummary(item),
-        _checked: false,
+        _checked: !!prevCheckedMap[item.id],
         _swipeX: 0,
         _swiping: false,
         _swipeAnim: true,
