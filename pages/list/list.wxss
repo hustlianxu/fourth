@@ -320,6 +320,33 @@
   padding: 8rpx 0;
 }
 
+/* 选中态：✕退出按钮 */
+.batch-exit {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #f5f5f5;
+  color: #666;
+  font-size: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.batch-exit:active {
+  background: #e5e5e5;
+  transform: scale(0.92);
+}
+
+/* 选中态：已选X条标题 */
+.batch-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+}
+
 .btn.batch-delete-btn {
   background: #ff4d4f;
   color: #fff;
@@ -629,6 +656,19 @@
 
   .btn.batch-delete-btn {
     background: rgb(255, 77, 79);
+  }
+
+  .batch-exit {
+    background: rgb(40, 40, 40);
+    color: rgb(149, 149, 149);
+  }
+
+  .batch-exit:active {
+    background: rgb(55, 55, 55);
+  }
+
+  .batch-title {
+    color: rgb(231, 231, 231);
   }
 
   .folder-modal {

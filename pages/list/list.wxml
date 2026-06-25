@@ -51,28 +51,28 @@
       </view>
     </scroll-view>
 
-    <!-- ===== 顶部操作栏（普通模式） ===== -->
-    <block wx:if="{{!exportMode && !batchMode}}">
+    <!-- ===== 顶部操作栏（渐进式：选中态保留导出/新增，标题变✕已选，左侧加红色删除） ===== -->
+    <block wx:if="{{!exportMode}}">
       <view class="row between" style="margin-bottom:24rpx;">
-        <view class="title" style="margin:0;">共 {{list.length}} 条</view>
+        <!-- 选中态：✕已选X条 + 全选/取消链接；普通态：共N条 -->
+        <view class="row" style="align-items:center;">
+          <block wx:if="{{batchMode}}">
+            <view class="batch-exit" bindtap="onBatchCancel">✕</view>
+            <view class="batch-title">已选 {{batchSelectedCount}} 条</view>
+            <text class="batch-link" bindtap="onBatchSelectAll" style="margin-left:16rpx;">全选</text>
+          </block>
+          <block wx:else>
+            <view class="title" style="margin:0;">共 {{list.length}} 条</view>
+          </block>
+        </view>
         <view class="row">
+          <!-- 选中态：红色删除按钮（与导出同等大小） -->
+          <view wx:if="{{batchMode}}" class="btn batch-delete-btn" bindtap="onBatchDeleteStart" style="padding:12rpx 24rpx;margin-right:12rpx;">删除</view>
           <view class="btn secondary" bindtap="toggleExportMode" style="padding:12rpx 24rpx;margin-right:12rpx;">导出</view>
           <view class="btn secondary" bindtap="goCamera" style="padding:12rpx 24rpx;">+ 新增</view>
         </view>
       </view>
-    </block>
-
-    <!-- ===== 批量选择模式操作栏 ===== -->
-    <block wx:elif="{{batchMode}}">
-      <view class="batch-bar">
-        <view class="batch-bar-info">已选 {{batchSelectedCount}} 条</view>
-        <view class="batch-bar-actions">
-          <text class="batch-link" bindtap="onBatchSelectAll">全选</text>
-          <text class="batch-link" bindtap="onBatchCancel">取消</text>
-        </view>
-        <view class="btn batch-delete-btn" bindtap="onBatchDeleteStart">批量删除</view>
-      </view>
-      <view class="batch-hint">右滑记录可选中，点击记录切换选中</view>
+      <view wx:if="{{batchMode}}" class="batch-hint">点击记录切换选中，右滑可选中</view>
     </block>
 
     <!-- ===== 导出模式操作栏 ===== -->
@@ -102,10 +102,10 @@
       data-id="{{item.id}}"
       bindtap="{{exportMode ? 'toggleSelect' : (batchMode ? 'onBatchToggle' : (item._swipeX > 0 ? 'onRecordTapCollapse' : 'goDetail'))}}"
       bindlongpress="{{(!exportMode && !batchMode) ? 'onRecordLongPress' : ''}}"
-      bindtouchstart="{{(!exportMode && !batchMode) ? 'onRecordTouchStart' : ''}}"
-      bindtouchmove="{{(!exportMode && !batchMode) ? 'onRecordTouchMove' : ''}}"
-      bindtouchend="{{(!exportMode && !batchMode) ? 'onRecordTouchEnd' : ''}}"
-      bindtouchcancel="{{(!exportMode && !batchMode) ? 'onRecordTouchEnd' : ''}}"
+      bindtouchstart="{{(!exportMode) ? 'onRecordTouchStart' : ''}}"
+      bindtouchmove="{{(!exportMode) ? 'onRecordTouchMove' : ''}}"
+      bindtouchend="{{(!exportMode) ? 'onRecordTouchEnd' : ''}}"
+      bindtouchcancel="{{(!exportMode) ? 'onRecordTouchEnd' : ''}}"
     >
       <view class="record {{item._swiping ? 'swiping' : ''}}" style="transform: translateX({{-item._swipeX}}px); transition: {{item._swipeAnim ? 'transform 0.25s ease' : 'none'}};">
         <!-- 导出/批量模式勾选框 -->

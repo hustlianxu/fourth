@@ -93,11 +93,12 @@ Page({
     }
 
     if (this._swipeDirection === 'right') {
-      // 右滑：选中流程，不移动卡片（仅反馈），批量模式下实时切换选中
+      // 右滑：选中流程，不移动卡片
       return;
     }
 
-    // 左滑：展开操作按钮
+    // 左滑：展开操作按钮（仅普通模式）
+    if (this.data.batchMode) return;
     let newX = this._swipeStartSwipeX - dx;
     newX = Math.max(0, Math.min(newX, SWIPE_ACTION_WIDTH));
     this._updateRecordSwipe(this._swipeRecordId, { _swipeX: newX, _swiping: true, _swipeAnim: false, _swipeActionsW: SWIPE_ACTION_WIDTH });
@@ -117,13 +118,24 @@ Page({
     this._swipeRecordId = '';
     this._swipeDirection = '';
 
-    // 右滑选中：超过阈值则选中该记录并进入批量模式
+    // 右滑：选中流程
     if (direction === 'right' && this._swipeMoved) {
-      this._enterBatchAndToggle(record.id);
+      // 左滑展开状态下右滑 → 先收起回原位，不触发选中
+      if (this._swipeStartSwipeX > 0) {
+        this._updateRecordSwipe(record.id, { _swipeX: 0, _swiping: false, _swipeAnim: true, _swipeActionsW: 0 });
+        return;
+      }
+      // 原位右滑 → 切换选中态（已进入选中态）或进入选中态
+      if (this.data.batchMode) {
+        this.onBatchToggle({ currentTarget: { dataset: { id: record.id } } });
+      } else {
+        this._enterBatchAndToggle(record.id);
+      }
       return;
     }
 
-    // 左滑：滑动超过一半则展开，否则收起
+    // 左滑：滑动超过一半则展开，否则收起（仅普通模式）
+    if (this.data.batchMode) return;
     const threshold = SWIPE_ACTION_WIDTH / 2;
     const finalX = record._swipeX >= threshold ? SWIPE_ACTION_WIDTH : 0;
     this._updateRecordSwipe(record.id, { _swipeX: finalX, _swiping: false, _swipeAnim: true, _swipeActionsW: finalX });
@@ -748,37 +760,19 @@ Page({
     this.setData({ list, selectedCount: 0 });
   },
 
-  // ===== 批量选择模式（右滑触发，与导出模式独立） =====
+  // ===== 批量选择模式（右滑触发，渐进式选中态，不替换顶部栏） =====
 
-  // 右滑触发：进入批量模式并选中当前记录
+  // 右滑触发：进入选中态并选中当前记录
   _enterBatchAndToggle(id) {
-    // 先确保进入批量模式
-    const wasInBatch = this.data.batchMode;
-    if (!wasInBatch) {
-      // 进入批量模式：清空旧的选中态
-      const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
-      const idx = list.findIndex(r => r.id === id);
-      if (idx >= 0) list[idx]._checked = true;
-      this._collapseAllSwipe();
-      this.setData({ list, batchMode: true, batchSelectedCount: 1 });
-    } else {
-      // 已在批量模式：切换当前记录选中态
-      let count = 0;
-      const list = this.data.list.map(item => {
-        if (item.id === id) item._checked = !item._checked;
-        if (item._checked) count++;
-        return item;
-      });
-      // 若全部取消选中，退出批量模式
-      if (count === 0) {
-        this.setData({ list, batchMode: false, batchSelectedCount: 0 });
-      } else {
-        this.setData({ list, batchSelectedCount: count });
-      }
-    }
+    // 进入选中态：清空旧选中态并选中当前记录
+    const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
+    const idx = list.findIndex(r => r.id === id);
+    if (idx >= 0) list[idx]._checked = true;
+    this._collapseAllSwipe();
+    this.setData({ list, batchMode: true, batchSelectedCount: 1 });
   },
 
-  // 批量模式下点击记录：切换选中态
+  // 选中态下点击记录：切换选中态
   onBatchToggle(e) {
     if (!this.data.batchMode) return;
     const id = e.currentTarget.dataset.id;
@@ -788,23 +782,29 @@ Page({
       if (item._checked) count++;
       return item;
     });
+    // 选中数归0 → 自动退出选中态
     if (count === 0) {
-      this.setData({ list, batchMode: false, batchSelectedCount: 0 });
+      this._exitBatchMode(list);
     } else {
       this.setData({ list, batchSelectedCount: count });
     }
   },
 
-  // 批量模式：全选当前列表
+  // 选中态：全选当前列表
   onBatchSelectAll() {
     const list = this.data.list.map(item => Object.assign({}, item, { _checked: true }));
     this.setData({ list, batchSelectedCount: list.length });
   },
 
-  // 批量模式：退出
+  // 退出选中态（点✕或取消）
   onBatchCancel() {
-    const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
-    this.setData({ list, batchMode: false, batchSelectedCount: 0 });
+    this._exitBatchMode();
+  },
+
+  // 内部：退出选中态，清空选中标记
+  _exitBatchMode(list) {
+    const newList = (list || this.data.list).map(item => Object.assign({}, item, { _checked: false }));
+    this.setData({ list: newList, batchMode: false, batchSelectedCount: 0 });
   },
 
   // 批量删除：弹出二次确认
