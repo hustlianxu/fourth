@@ -41,6 +41,7 @@ Page({
   wmStartY: 0,
   wmWidth: 0,
   wmHeight: 60,
+  wmMeasuredHeight: 0, // 水印层实际渲染高度（未含 scale）
 
   onLoad(options) {
     this.recordId = options.id;
@@ -160,8 +161,10 @@ Page({
       const dy = e.touches[0].clientY - this.dragStartY;
       let newX = this.wmStartX + dx;
       let newY = this.wmStartY + dy;
-      newX = Math.max(0, Math.min(newX, this.data.imgDisplayW - 80));
-      newY = Math.max(0, Math.min(newY, this.data.imgDisplayH - 30));
+      // 基于实际水印尺寸限制边界，确保水印不拖出图片范围
+      const bounds = this._getDragBounds();
+      newX = Math.max(bounds.minX, Math.min(newX, bounds.maxX));
+      newY = Math.max(bounds.minY, Math.min(newY, bounds.maxY));
       this.setData({ editWmX: newX, editWmY: newY });
     } else if (this.isPinching && e.touches.length === 2) {
       const t1 = e.touches[0];
@@ -175,6 +178,56 @@ Page({
       }
       this.lastPinchDist = dist;
     }
+  },
+
+  // 计算水印拖拽边界：水印必须完全包含在图片实际显示区域内
+  _getDragBounds() {
+    const record = this.data.record;
+    const imgW = record.width || 1080;
+    const imgH = record.height || 1440;
+    // 图片实际显示尺寸（aspectFit 等比缩放居中）
+    const containerW = this.data.imgDisplayW;
+    const containerH = this.data.imgDisplayH;
+    const imgRatio = imgW / imgH;
+    const containerRatio = containerW / containerH;
+    let imgDisplayW, imgDisplayH, imgOffsetX, imgOffsetY;
+    if (imgRatio > containerRatio) {
+      // 图片更宽，以容器宽度为准，上下留黑
+      imgDisplayW = containerW;
+      imgDisplayH = containerW / imgRatio;
+      imgOffsetX = 0;
+      imgOffsetY = (containerH - imgDisplayH) / 2;
+    } else {
+      // 图片更高，以容器高度为准，左右留黑
+      imgDisplayH = containerH;
+      imgDisplayW = containerH * imgRatio;
+      imgOffsetX = (containerW - imgDisplayW) / 2;
+      imgOffsetY = 0;
+    }
+    // 水印层实际尺寸（widthRatio 相对容器宽度，再经 scale 缩放）
+    const wmWidth = containerW * this.data.editWidthRatio * this.data.editScale;
+    // 水印高度用测量的实际值（含 scale 后的视觉高度），无测量值时用估算
+    const wmHeight = (this.wmMeasuredHeight || 60) * this.data.editScale;
+    return {
+      minX: imgOffsetX,
+      maxX: imgOffsetX + imgDisplayW - wmWidth,
+      minY: imgOffsetY,
+      maxY: imgOffsetY + imgDisplayH - wmHeight
+    };
+  },
+
+  // 测量水印层实际渲染高度（用于精确计算拖拽边界）
+  _measureWmHeight() {
+    if (!this.data.showWmOverlay) return;
+    wx.createSelectorQuery()
+      .in(this)
+      .select('#wmLayer')
+      .boundingClientRect((rect) => {
+        if (rect && rect.height > 0) {
+          this.wmMeasuredHeight = rect.height / this.data.editScale;
+        }
+      })
+      .exec();
   },
 
   onTouchEnd() {
@@ -245,6 +298,8 @@ Page({
         opacityLabel: Math.round((rec.watermarkOpacity || 0.85) * 100) + '%',
         widthLabel: Math.round((rec.watermarkWidthRatio || 0.42) * 100) + '%'
       });
+      // 等待水印层渲染完成后测量实际高度
+      setTimeout(() => this._measureWmHeight(), 50);
     }
   },
 
@@ -285,6 +340,8 @@ Page({
       value: editValues[f.key]
     }));
     this.setData({ editValues, displayFields });
+    // 字段变化可能导致水印行数变化，高度随之变化，延迟测量
+    setTimeout(() => this._measureWmHeight(), 50);
   },
 
   onScaleChange(e) {
@@ -301,6 +358,8 @@ Page({
     const v = e.detail.value;
     this.wmWidth = this.data.imgDisplayW * v;
     this.setData({ editWidthRatio: v, widthLabel: Math.round(v * 100) + '%' });
+    // 宽度变化后水印换行可能变化，延迟测量高度
+    setTimeout(() => this._measureWmHeight(), 50);
   },
 
   onDelete() {

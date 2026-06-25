@@ -22,7 +22,7 @@
     <view class="action-fab" catchtap="onToggleActionMenu" id="actionFab">⋮</view>
 
     <!-- 编辑模式：可拖动水印层 -->
-    <view wx:if="{{showWmOverlay}}" class="detail-wm-layer"
+    <view wx:if="{{showWmOverlay}}" class="detail-wm-layer" id="wmLayer"
       style="left:{{editWmX}}px;top:{{editWmY}}px;opacity:{{editOpacity}};transform:scale({{editScale}});width:{{editWidthRatio * 100}}%;">
       <view class="detail-wm-handle">
         <view class="wm-drag-dots">
