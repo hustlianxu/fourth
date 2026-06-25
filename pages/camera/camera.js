@@ -58,7 +58,7 @@ Page({
   viewportH: 0,
 
   onLoad(options) {
-    const tplId = options.templateId || 'handwrite';
+    const tplId = options.templateId || 'minimal';
     const tpl = templates.getTemplateById(tplId);
     const defaultVals = templates.getDefaultValues(tpl);
     const windowInfo = wx.getWindowInfo();
