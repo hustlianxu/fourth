@@ -141,10 +141,15 @@ Page({
     this._updateRecordSwipe(record.id, { _swipeX: finalX, _swiping: false, _swipeAnim: true, _swipeActionsW: finalX });
   },
 
-  // 更新单条记录的滑动状态
+  // 更新单条记录的滑动状态（路径式 setData，避免重建整个 list 数组导致抖动）
   _updateRecordSwipe(id, patch) {
-    const list = this.data.list.map(r => r.id === id ? Object.assign({}, r, patch) : r);
-    this.setData({ list });
+    const idx = this.data.list.findIndex(r => r.id === id);
+    if (idx < 0) return;
+    const data = {};
+    Object.keys(patch).forEach(k => {
+      data['list[' + idx + '].' + k] = patch[k];
+    });
+    this.setData(data);
   },
 
   // 收起所有展开的记录
