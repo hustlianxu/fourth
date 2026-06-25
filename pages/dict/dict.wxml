@@ -1,7 +1,8 @@
 <view class="container">
-  <!-- 顶部 Tab：自定义词典 / 内置词典 / API 配置 -->
+  <!-- 顶部 Tab：自定义词典 / 白名单 / 内置词典 / API 配置 -->
   <view class="tabs">
     <view class="tab {{activeTab === 'custom' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="custom">我的词典</view>
+    <view class="tab {{activeTab === 'whitelist' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="whitelist">白名单</view>
     <view class="tab {{activeTab === 'builtin' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="builtin">内置词典</view>
     <view class="tab {{activeTab === 'api' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="api">翻译引擎</view>
   </view>
@@ -35,6 +36,37 @@
       </view>
 
       <view class="btn add-btn" bindtap="onAddItem">+ 添加词条</view>
+    </view>
+  </block>
+
+  <!-- ===== 白名单 ===== -->
+  <block wx:if="{{activeTab === 'whitelist'}}">
+    <view class="section">
+      <view class="section-title">不翻译词表</view>
+      <view class="section-desc">白名单中的词在翻译时保留原文。包含内置通用词（单位/缩写）+ 你自定义的词。</view>
+
+      <view class="whitelist-group">
+        <view class="whitelist-group-title">自定义白名单（{{customWhitelist.length}}）</view>
+        <view wx:if="{{customWhitelist.length === 0}}" class="empty-mini">还没有自定义白名单词</view>
+        <view wx:else class="chip-list">
+          <view wx:for="{{customWhitelist}}" wx:key="index" class="chip chip-removable">
+            <text>{{item}}</text>
+            <text class="chip-x" data-index="{{index}}" catchtap="onRemoveWhitelist">✕</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="whitelist-add">
+        <input class="whitelist-input" placeholder="输入要不翻译的词，如：CTN" value="{{newWhitelistWord}}" bindinput="onNewWhitelistInput" confirm-type="done" bindconfirm="onAddWhitelist" />
+        <view class="btn whitelist-add-btn" bindtap="onAddWhitelist">添加</view>
+      </view>
+
+      <view class="whitelist-group">
+        <view class="whitelist-group-title">内置白名单（{{builtinWhitelist.length}}，只读）</view>
+        <view class="chip-list">
+          <view wx:for="{{builtinWhitelist}}" wx:key="*this" class="chip chip-builtin">{{item}}</view>
+        </view>
+      </view>
     </view>
   </block>
 
@@ -98,6 +130,34 @@
       </view>
 
       <view class="btn save-btn" bindtap="onSaveConfig">保存配置</view>
+
+      <!-- Prompt 编辑区 -->
+      <view class="prompt-section">
+        <view class="form-label">翻译 Prompt</view>
+        <view class="section-desc">
+          自定义后永久生效（不再用默认）。支持占位符：
+          <text class="placeholder-tag">{source}</text> 源语言、
+          <text class="placeholder-tag">{target}</text> 目标语言、
+          <text class="placeholder-tag">{whitelist}</text> 白名单词列表、
+          <text class="placeholder-tag">{text}</text> 待翻译文本。
+        </view>
+        <textarea
+          class="form-textarea"
+          placeholder="留空则恢复默认 prompt"
+          value="{{customPrompt}}"
+          bindinput="onPromptInput"
+          auto-height
+          maxlength="-1"
+        />
+        <view class="prompt-actions">
+          <view class="btn secondary prompt-btn" bindtap="onResetPrompt">恢复默认</view>
+          <view class="btn prompt-btn" bindtap="onSavePrompt">保存 Prompt</view>
+        </view>
+        <view wx:if="{{promptPreview}}" class="prompt-preview">
+          <view class="prompt-preview-title">当前实际 prompt 预览（ES→ZH 示例）：</view>
+          <view class="prompt-preview-text">{{promptPreview}}</view>
+        </view>
+      </view>
 
       <view class="btn test-btn" bindtap="onTestTranslate">测试翻译</view>
 

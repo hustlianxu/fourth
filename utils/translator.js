@@ -15,7 +15,19 @@ var builtin = require('./builtinDict.js');
 // ============ 用户词典 & API 配置 存取 ============
 
 var STORAGE_DICT_KEY = 'watermark_custom_dict';
+var STORAGE_WHITELIST_KEY = 'watermark_custom_whitelist';
 var STORAGE_CONFIG_KEY = 'watermark_translator_config';
+var STORAGE_PROMPT_KEY = 'watermark_translator_prompt';
+
+// 默认 prompt 模板，使用 {whitelist} 占位符在调用时注入当前白名单
+var DEFAULT_PROMPT_TEMPLATE =
+  '你是一名外贸翻译助手，请将以下{source}翻译为{target}。\n' +
+  '要求：\n' +
+  '1. 保留原文中的数字、货号、通用符号（如 × · + / , .）不翻译；\n' +
+  '2. 以下词汇为通用单位或国际通用词，必须原样保留不要翻译：{whitelist}\n' +
+  '3. 除此之外的所有自然语言（包括常见西班牙语名词如 luz/灯、música/音乐、estrellas/星星 等）都必须翻译；\n' +
+  '4. 直接返回翻译结果，不要解释，不要加引号，不要添加多余内容。\n\n' +
+  '原文：{text}';
 
 function getUserDict() {
   try {
@@ -28,6 +40,23 @@ function setUserDict(dict) {
   wx.setStorageSync(STORAGE_DICT_KEY, dict || []);
 }
 
+// 用户自定义白名单（与内置白名单合并使用）
+function getUserWhitelist() {
+  try {
+    var w = wx.getStorageSync(STORAGE_WHITELIST_KEY);
+    return Array.isArray(w) ? w : [];
+  } catch (e) { return []; }
+}
+
+function setUserWhitelist(list) {
+  wx.setStorageSync(STORAGE_WHITELIST_KEY, list || []);
+}
+
+// 合并后的白名单（内置 + 用户自定义）
+function getMergedWhitelist() {
+  return builtin.WHITELIST.concat(getUserWhitelist());
+}
+
 function getConfig() {
   try {
     var c = wx.getStorageSync(STORAGE_CONFIG_KEY);
@@ -37,6 +66,22 @@ function getConfig() {
 
 function setConfig(cfg) {
   wx.setStorageSync(STORAGE_CONFIG_KEY, cfg || null);
+}
+
+// 自定义 prompt（录入一次后永久生效，未录入则用 DEFAULT_PROMPT_TEMPLATE）
+function getCustomPrompt() {
+  try {
+    var p = wx.getStorageSync(STORAGE_PROMPT_KEY);
+    return (typeof p === 'string' && p.trim()) ? p : null;
+  } catch (e) { return null; }
+}
+
+function setCustomPrompt(prompt) {
+  wx.setStorageSync(STORAGE_PROMPT_KEY, prompt || '');
+}
+
+function getDefaultPromptTemplate() {
+  return DEFAULT_PROMPT_TEMPLATE;
 }
 
 // ============ 本地匹配 ============
@@ -54,7 +99,7 @@ function buildIndex() {
   return { esToZh: esToZh, zhToEs: zhToEs };
 }
 
-// 判断是否白名单（数字、单位、纯符号）
+// 判断是否白名单（数字、单位、纯符号、内置+用户白名单）
 function isWhitelist(token) {
   if (!token) return false;
   // 纯数字（含小数）
@@ -63,10 +108,11 @@ function isWhitelist(token) {
   if (/^\d+(\.\d+)?[a-zA-Z²³¹º]+$/.test(token)) return true;
   // 货币符号 + 数字
   if (/^[¥$€]\d+/.test(token)) return true;
-  // 精确匹配白名单
+  // 精确匹配白名单（内置 + 用户自定义）
   var lower = token.toLowerCase();
-  for (var i = 0; i < builtin.WHITELIST.length; i++) {
-    var w = builtin.WHITELIST[i];
+  var merged = getMergedWhitelist();
+  for (var i = 0; i < merged.length; i++) {
+    var w = merged[i];
     if (w === token || w.toLowerCase() === lower) return true;
   }
   return false;
@@ -116,18 +162,30 @@ function localTranslateSegment(text, from, to, index) {
 
 // ============ LLM API 调用 ============
 
+// 构建最终 prompt（自定义优先，否则用默认模板并注入当前白名单）
+// 支持占位符：{source} {target} {whitelist} {text}
+function buildPrompt(text, from, to) {
+  var targetName = to === 'zh' ? '中文' : '西班牙语';
+  var sourceName = from === 'zh' ? '中文' : '西班牙语';
+  // 白名单拼接为逗号分隔字符串
+  var whitelistStr = getMergedWhitelist().join(', ');
+
+  var template = getCustomPrompt() || DEFAULT_PROMPT_TEMPLATE;
+  var prompt = template
+    .replace(/\{source\}/g, sourceName)
+    .replace(/\{target\}/g, targetName)
+    .replace(/\{whitelist\}/g, whitelistStr)
+    .replace(/\{text\}/g, text);
+  return prompt;
+}
+
 function callLLM(text, from, to) {
   var cfg = getConfig();
   if (!cfg || !cfg.apiKey || !cfg.baseURL) {
     return Promise.resolve(null);
   }
 
-  var targetName = to === 'zh' ? '中文' : '西班牙语';
-  var sourceName = from === 'zh' ? '中文' : '西班牙语';
-  var prompt = '你是一名外贸翻译助手，请将以下' + sourceName + '翻译为' + targetName +
-    '。要求：保留原文中的数字、单位（如 m³、kg、pzs、cajas、pcs、ctn）、货号、' +
-    '通用符号（如 × · + /）和英文缩写（如 LED、RGB、USB）不翻译，只翻译自然语言部分。' +
-    '直接返回翻译结果，不要解释，不要加引号。\n\n原文：' + text;
+  var prompt = buildPrompt(text, from, to);
 
   var model = cfg.model || 'deepseek-chat';
   var data = {
@@ -216,8 +274,15 @@ module.exports = {
   translate: translate,
   getUserDict: getUserDict,
   setUserDict: setUserDict,
+  getUserWhitelist: getUserWhitelist,
+  setUserWhitelist: setUserWhitelist,
+  getMergedWhitelist: getMergedWhitelist,
   getConfig: getConfig,
   setConfig: setConfig,
+  getCustomPrompt: getCustomPrompt,
+  setCustomPrompt: setCustomPrompt,
+  getDefaultPromptTemplate: getDefaultPromptTemplate,
+  buildPrompt: buildPrompt,
   isWhitelist: isWhitelist,
   buildIndex: buildIndex,
   localTranslateSegment: localTranslateSegment

@@ -11,9 +11,13 @@ const PROVIDER_PRESETS = {
 
 Page({
   data: {
-    activeTab: 'custom',          // 'custom' | 'builtin' | 'api'
+    activeTab: 'custom',          // 'custom' | 'whitelist' | 'builtin' | 'api'
     // 自定义词典
     customDict: [],
+    // 白名单
+    customWhitelist: [],
+    builtinWhitelist: [],
+    newWhitelistWord: '',
     // 内置词典
     builtinDict: [],
     filteredBuiltin: [],
@@ -28,16 +32,23 @@ Page({
     baseURL: '',
     apiKey: '',
     model: '',
+    // Prompt
+    customPrompt: '',
+    promptPreview: '',
     testResult: ''
   },
 
   onLoad() {
     this.setData({
       customDict: translator.getUserDict(),
+      customWhitelist: translator.getUserWhitelist(),
+      builtinWhitelist: builtin.WHITELIST,
       builtinDict: builtin.BUILTIN_DICT,
-      filteredBuiltin: builtin.BUILTIN_DICT
+      filteredBuiltin: builtin.BUILTIN_DICT,
+      customPrompt: translator.getCustomPrompt() || ''
     });
     this._loadConfig();
+    this._refreshPromptPreview();
   },
 
   _loadConfig() {
@@ -108,6 +119,63 @@ Page({
     translator.setUserDict(list);
     this.setData({ customDict: list, showEditModal: false });
     wx.showToast({ title: '已保存', icon: 'success' });
+  },
+
+  // ===== 白名单管理 =====
+  onNewWhitelistInput(e) {
+    this.setData({ newWhitelistWord: e.detail.value });
+  },
+
+  onAddWhitelist() {
+    const word = (this.data.newWhitelistWord || '').trim();
+    if (!word) { wx.showToast({ title: '请输入词', icon: 'none' }); return; }
+    // 去重（与自定义 + 内置白名单比对）
+    const merged = translator.getMergedWhitelist();
+    const exists = merged.some(function (w) { return w.toLowerCase() === word.toLowerCase(); });
+    if (exists) { wx.showToast({ title: '该词已在白名单', icon: 'none' }); return; }
+
+    const list = this.data.customWhitelist.slice();
+    list.push(word);
+    translator.setUserWhitelist(list);
+    this.setData({ customWhitelist: list, newWhitelistWord: '' });
+    this._refreshPromptPreview();
+    wx.showToast({ title: '已添加', icon: 'success' });
+  },
+
+  onRemoveWhitelist(e) {
+    const idx = e.currentTarget.dataset.index;
+    const list = this.data.customWhitelist.slice();
+    const removed = list[idx];
+    list.splice(idx, 1);
+    translator.setUserWhitelist(list);
+    this.setData({ customWhitelist: list });
+    this._refreshPromptPreview();
+    wx.showToast({ title: '已移除 ' + removed, icon: 'none' });
+  },
+
+  // ===== Prompt 管理 =====
+  onPromptInput(e) {
+    this.setData({ customPrompt: e.detail.value });
+  },
+
+  onSavePrompt() {
+    const p = this.data.customPrompt.trim();
+    translator.setCustomPrompt(p);
+    this._refreshPromptPreview();
+    wx.showToast({ title: p ? 'Prompt 已保存' : '已恢复默认 Prompt', icon: 'success' });
+  },
+
+  onResetPrompt() {
+    this.setData({ customPrompt: '' });
+    translator.setCustomPrompt('');
+    this._refreshPromptPreview();
+    wx.showToast({ title: '已恢复默认', icon: 'none' });
+  },
+
+  // 刷新 prompt 预览（用示例文本 con luz y música 演示）
+  _refreshPromptPreview() {
+    const preview = translator.buildPrompt('con luz y música', 'es', 'zh');
+    this.setData({ promptPreview: preview });
   },
 
   // ===== 内置词典搜索 =====

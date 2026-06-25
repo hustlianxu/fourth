@@ -287,6 +287,136 @@
   word-break: break-all;
 }
 
+/* ===== 白名单 ===== */
+.whitelist-group {
+  margin-top: 24rpx;
+}
+
+.whitelist-group-title {
+  font-size: 26rpx;
+  color: #555;
+  margin-bottom: 12rpx;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.chip {
+  padding: 10rpx 20rpx;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.chip-builtin {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.chip-removable {
+  background: rgba(7, 193, 96, 0.08);
+  color: #07c160;
+  border: 2rpx solid rgba(7, 193, 96, 0.3);
+  box-sizing: border-box;
+}
+
+.chip-x {
+  font-size: 22rpx;
+  color: #07c160;
+  padding-left: 8rpx;
+}
+
+.whitelist-add {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 24rpx;
+  align-items: center;
+}
+
+.whitelist-input {
+  flex: 1;
+  background: #f7f8fa;
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  min-height: 80rpx;
+}
+
+.whitelist-add-btn {
+  flex-shrink: 0;
+  padding: 20rpx 32rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
+
+/* ===== Prompt 编辑 ===== */
+.prompt-section {
+  margin-top: 32rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #f0f0f0;
+}
+
+.form-textarea {
+  width: 100%;
+  background: #f7f8fa;
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  box-sizing: border-box;
+  line-height: 1.6;
+  min-height: 200rpx;
+  margin-bottom: 16rpx;
+}
+
+.placeholder-tag {
+  display: inline-block;
+  background: rgba(7, 193, 96, 0.1);
+  color: #07c160;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 24rpx;
+  margin: 0 2rpx;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.prompt-btn {
+  flex: 1;
+  padding: 22rpx;
+  font-size: 30rpx;
+}
+
+.prompt-preview {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  background: #f7f8fa;
+  border-radius: 12rpx;
+  border-left: 6rpx solid #07c160;
+}
+
+.prompt-preview-title {
+  font-size: 24rpx;
+  color: #888;
+  margin-bottom: 8rpx;
+}
+
+.prompt-preview-text {
+  font-size: 24rpx;
+  color: #444;
+  line-height: 1.6;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
 /* ===== 编辑弹层 ===== */
 .modal-mask {
   position: fixed;
@@ -440,5 +570,56 @@
 
   .modal-title {
     color: rgb(231, 231, 231);
+  }
+
+  .whitelist-group-title {
+    color: rgb(149, 149, 149);
+  }
+
+  .chip-builtin {
+    background: rgb(40, 40, 40);
+    color: rgb(149, 149, 149);
+  }
+
+  .chip-removable {
+    background: rgba(0, 200, 80, 0.12);
+    color: rgb(0, 200, 80);
+    border-color: rgba(0, 200, 80, 0.3);
+  }
+
+  .chip-x {
+    color: rgb(0, 200, 80);
+  }
+
+  .whitelist-input {
+    background: rgb(40, 40, 40);
+    color: rgb(231, 231, 231);
+  }
+
+  .prompt-section {
+    border-top-color: rgb(40, 40, 40);
+  }
+
+  .form-textarea {
+    background: rgb(40, 40, 40);
+    color: rgb(231, 231, 231);
+  }
+
+  .placeholder-tag {
+    background: rgba(0, 200, 80, 0.15);
+    color: rgb(0, 200, 80);
+  }
+
+  .prompt-preview {
+    background: rgb(40, 40, 40);
+    border-left-color: rgb(0, 200, 80);
+  }
+
+  .prompt-preview-title {
+    color: rgb(149, 149, 149);
+  }
+
+  .prompt-preview-text {
+    color: rgb(180, 180, 180);
   }
 }
