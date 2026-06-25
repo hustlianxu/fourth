@@ -17,7 +17,8 @@ var builtin = require('./builtinDict.js');
 var STORAGE_DICT_KEY = 'watermark_custom_dict';
 var STORAGE_WHITELIST_KEY = 'watermark_custom_whitelist';
 var STORAGE_CONFIG_KEY = 'watermark_translator_config';
-var STORAGE_APIKEYS_KEY = 'watermark_translator_apikeys'; // 按 provider 独立存 key
+var STORAGE_APIKEYS_KEY = 'watermark_translator_apikeys';       // 旧版：仅按 provider 存 apiKey（兼容迁移用）
+var STORAGE_PROFILES_KEY = 'watermark_translator_profiles';     // 新版：按 provider 存 {baseURL, model, apiKey}
 var STORAGE_PROMPT_KEY = 'watermark_translator_prompt';
 
 // 默认 prompt 模板，使用 {source} {target} {whitelist} {text} 占位符
@@ -59,67 +60,73 @@ function getMergedWhitelist() {
 }
 
 // 获取当前配置：{ provider, baseURL, model, apiKey }
-// apiKey 按 provider 独立存储，切换 provider 自动加载对应 key
+// baseURL/model/apiKey 全部按 provider 独立存储，切换 provider 自动加载对应配置
 function getConfig() {
   try {
     var c = wx.getStorageSync(STORAGE_CONFIG_KEY);
     if (!c || typeof c !== 'object') return null;
     var provider = c.provider || 'deepseek';
-    var apiKey = '';
-    try {
-      var keys = wx.getStorageSync(STORAGE_APIKEYS_KEY);
-      if (keys && typeof keys === 'object') apiKey = keys[provider] || '';
-    } catch (e) {}
     return {
       provider: provider,
-      baseURL: c.baseURL || '',
-      model: c.model || '',
-      apiKey: apiKey
+      baseURL: getBaseURL(provider),
+      model: getModel(provider),
+      apiKey: getApiKey(provider)
     };
   } catch (e) { return null; }
 }
 
-// 保存配置（apiKey 按 provider 单独存）
+// 保存配置
+// - provider 存到 STORAGE_CONFIG_KEY（记录当前选中）
+// - baseURL/model/apiKey 按 provider 独立存到 STORAGE_PROFILES_KEY
 function setConfig(cfg) {
   cfg = cfg || {};
   var provider = cfg.provider || 'deepseek';
-  // 主配置只存 provider/baseURL/model，不存 apiKey
-  wx.setStorageSync(STORAGE_CONFIG_KEY, {
-    provider: provider,
-    baseURL: cfg.baseURL || '',
-    model: cfg.model || ''
-  });
-  // apiKey 按 provider 独立存
-  if (cfg.apiKey !== undefined && cfg.apiKey !== null) {
-    var keys = {};
-    try {
-      var existing = wx.getStorageSync(STORAGE_APIKEYS_KEY);
-      if (existing && typeof existing === 'object') keys = existing;
-    } catch (e) {}
-    keys[provider] = cfg.apiKey || '';
-    wx.setStorageSync(STORAGE_APIKEYS_KEY, keys);
-  }
+  // 主配置只存当前选中的 provider
+  wx.setStorageSync(STORAGE_CONFIG_KEY, { provider: provider });
+  // 按 provider 存 baseURL/model/apiKey
+  var profiles = _readProfiles();
+  var p = profiles[provider] || {};
+  if (cfg.baseURL !== undefined && cfg.baseURL !== null) p.baseURL = cfg.baseURL || '';
+  if (cfg.model !== undefined && cfg.model !== null) p.model = cfg.model || '';
+  if (cfg.apiKey !== undefined && cfg.apiKey !== null) p.apiKey = cfg.apiKey || '';
+  profiles[provider] = p;
+  wx.setStorageSync(STORAGE_PROFILES_KEY, profiles);
 }
 
-// 获取指定 provider 的 apiKey（用于编辑页回显）
-function getApiKey(provider) {
+// 读取所有 provider 的配置档案
+function _readProfiles() {
   try {
-    var keys = wx.getStorageSync(STORAGE_APIKEYS_KEY);
-    if (keys && typeof keys === 'object') return keys[provider] || '';
+    var p = wx.getStorageSync(STORAGE_PROFILES_KEY);
+    if (p && typeof p === 'object') return p;
   } catch (e) {}
-  return '';
+  return {};
 }
 
-// 设置指定 provider 的 apiKey
-function setApiKey(provider, apiKey) {
-  var keys = {};
-  try {
-    var existing = wx.getStorageSync(STORAGE_APIKEYS_KEY);
-    if (existing && typeof existing === 'object') keys = existing;
-  } catch (e) {}
-  keys[provider] = apiKey || '';
-  wx.setStorageSync(STORAGE_APIKEYS_KEY, keys);
+function _writeProfile(provider, field, value) {
+  var profiles = _readProfiles();
+  var p = profiles[provider] || {};
+  p[field] = value || '';
+  profiles[provider] = p;
+  wx.setStorageSync(STORAGE_PROFILES_KEY, profiles);
 }
+
+function _readProfile(provider, field) {
+  var profiles = _readProfiles();
+  var p = profiles[provider] || {};
+  return p[field] || '';
+}
+
+// 获取/设置指定 provider 的 baseURL
+function getBaseURL(provider) { return _readProfile(provider, 'baseURL'); }
+function setBaseURL(provider, url) { _writeProfile(provider, 'baseURL', url); }
+
+// 获取/设置指定 provider 的 model
+function getModel(provider) { return _readProfile(provider, 'model'); }
+function setModel(provider, model) { _writeProfile(provider, 'model', model); }
+
+// 获取/设置指定 provider 的 apiKey
+function getApiKey(provider) { return _readProfile(provider, 'apiKey'); }
+function setApiKey(provider, apiKey) { _writeProfile(provider, 'apiKey', apiKey); }
 
 // 自定义 prompt（录入一次后永久生效，未录入则用 DEFAULT_PROMPT_TEMPLATE）
 function getCustomPrompt() {
@@ -356,6 +363,10 @@ module.exports = {
   setConfig: setConfig,
   getApiKey: getApiKey,
   setApiKey: setApiKey,
+  getBaseURL: getBaseURL,
+  setBaseURL: setBaseURL,
+  getModel: getModel,
+  setModel: setModel,
   getCustomPrompt: getCustomPrompt,
   setCustomPrompt: setCustomPrompt,
   getDefaultPromptTemplate: getDefaultPromptTemplate,

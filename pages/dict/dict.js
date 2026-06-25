@@ -75,16 +75,30 @@ Page({
       provider = 'glm';
       const oldKey = translator.getApiKey('zhipu');
       if (oldKey) translator.setApiKey('glm', oldKey);
-      translator.setConfig({ provider: 'glm', baseURL: cfg.baseURL, model: cfg.model });
+      translator.setConfig({ provider: 'glm' });
     }
     const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
-    // apiKey 按 provider 独立存储，切换 provider 时加载对应 key
-    const apiKey = translator.getApiKey(provider);
+    // baseURL/model/apiKey 按 provider 独立读取，未存过则用预设填充
+    let baseURL = translator.getBaseURL(provider);
+    if (!baseURL) { baseURL = preset.baseURL; translator.setBaseURL(provider, baseURL); }
+    let model = translator.getModel(provider);
+    if (!model) { model = preset.model; translator.setModel(provider, model); }
+    let apiKey = translator.getApiKey(provider);
+    // 旧版数据迁移：STORAGE_APIKEYS_KEY → STORAGE_PROFILES_KEY
+    if (!apiKey) {
+      try {
+        const oldKeys = wx.getStorageSync('watermark_translator_apikeys');
+        if (oldKeys && oldKeys[provider]) {
+          apiKey = oldKeys[provider];
+          translator.setApiKey(provider, apiKey);
+        }
+      } catch (e) {}
+    }
     this.setData({
       provider: provider,
-      baseURL: cfg.baseURL || preset.baseURL,
+      baseURL: baseURL,
       apiKey: apiKey || '',
-      model: cfg.model || preset.model,
+      model: model,
       providerList: PROVIDER_KEYS.map(k => ({
         key: k,
         label: PROVIDER_LABELS[k] || k,
@@ -224,17 +238,25 @@ Page({
   // ===== API 配置 =====
   onPickProvider(e) {
     const p = e.currentTarget.dataset.provider;
-    // 先保存当前 provider 的 key（避免切换时丢失）
+    // 1) 先保存当前 provider 的 baseURL/model/apiKey（避免切换时丢失）
+    translator.setBaseURL(this.data.provider, this.data.baseURL.trim());
+    translator.setModel(this.data.provider, this.data.model.trim());
     if (this.data.apiKey) {
       translator.setApiKey(this.data.provider, this.data.apiKey.trim());
     }
-    const preset = PROVIDER_PRESETS[p];
-    // 加载目标 provider 的 key
+    // 2) 加载目标 provider 的配置（未存过则用预设填充）
+    const preset = PROVIDER_PRESETS[p] || PROVIDER_PRESETS.custom;
+    let newBaseURL = translator.getBaseURL(p);
+    if (!newBaseURL) { newBaseURL = preset.baseURL; translator.setBaseURL(p, newBaseURL); }
+    let newModel = translator.getModel(p);
+    if (!newModel) { newModel = preset.model; translator.setModel(p, newModel); }
     const newApiKey = translator.getApiKey(p);
+    // 3) 自动保存当前选中的 provider（切页面回来仍能记住）
+    translator.setConfig({ provider: p });
     this.setData({
       provider: p,
-      baseURL: preset.baseURL || this.data.baseURL,
-      model: preset.model || this.data.model,
+      baseURL: newBaseURL || '',
+      model: newModel || '',
       apiKey: newApiKey || '',
       providerList: PROVIDER_KEYS.map(k => ({
         key: k,
@@ -244,12 +266,22 @@ Page({
     });
   },
 
-  onBaseURLInput(e) { this.setData({ baseURL: e.detail.value }); },
-  onModelInput(e) { this.setData({ model: e.detail.value }); },
+  onBaseURLInput(e) {
+    const v = e.detail.value;
+    this.setData({ baseURL: v });
+    // 实时按 provider 单独存（边输入边保存）
+    translator.setBaseURL(this.data.provider, v.trim());
+  },
+  onModelInput(e) {
+    const v = e.detail.value;
+    this.setData({ model: v });
+    // 实时按 provider 单独存
+    translator.setModel(this.data.provider, v.trim());
+  },
   onAPIKeyInput(e) {
     const v = e.detail.value;
     this.setData({ apiKey: v });
-    // 实时按 provider 单独存（边输入边保存，避免丢失）
+    // 实时按 provider 单独存
     translator.setApiKey(this.data.provider, v.trim());
   },
 
