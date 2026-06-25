@@ -42,6 +42,7 @@ Page({
   wmWidth: 0,
   wmHeight: 60,
   wmMeasuredHeight: 0, // 水印层实际渲染高度（未含 scale）
+  _wmPosFromString: false, // 当前水印位置是否来自字符串估算（需测量后修正）
 
   onLoad(options) {
     this.recordId = options.id;
@@ -111,12 +112,64 @@ Page({
   _calcWmDisplayPos(record) {
     const imgW = record.width || 1080;
     const imgH = record.height || 1440;
-    const wmX = record.watermarkX || 0;
-    const wmY = record.watermarkY || 0;
-    return {
-      x: wmX * (this.data.imgDisplayW / imgW),
-      y: wmY * (this.data.imgDisplayH / imgH)
-    };
+
+    // 已有精确坐标（编辑保存过的记录）→ 直接换算为显示坐标
+    if (record.watermarkX != null && record.watermarkY != null) {
+      this._wmPosFromString = false;
+      return {
+        x: record.watermarkX * (this.data.imgDisplayW / imgW),
+        y: record.watermarkY * (this.data.imgDisplayH / imgH)
+      };
+    }
+
+    // 无精确坐标（拍照入库的新记录）→ 根据位置字符串计算，镜像 watermark.js 的定位逻辑
+    this._wmPosFromString = true;
+    return this._calcPosFromString(record);
+  },
+
+  // 根据位置字符串计算水印显示坐标（镜像 watermark.js 的定位逻辑）
+  // blockHKnown 为已测量的水印块高度（含 scale 后的视觉高度），缺省时用估算值
+  _calcPosFromString(record, blockHKnown) {
+    const imgW = record.width || 1080;
+    const tpl = templates.getTemplateById(record.templateId);
+    const position = (tpl && tpl.position) || record.watermarkPosition || 'bottom-left';
+    const style = (tpl && tpl.style) || {};
+    const scale = record.watermarkScale || 1;
+    const widthRatio = record.watermarkWidthRatio || 0.42;
+
+    // 镜像 watermark.js 的尺寸计算（display 坐标系，与原图等比例）
+    const dW = this.data.imgDisplayW;
+    const dH = this.data.imgDisplayH;
+    const ratioD = dW / 750;
+    const fontSizeD = Math.max(14, Math.round((style.fontSize || 22) * ratioD * scale));
+    const lineHeightD = Math.round(fontSizeD * (style.lineHeight || 1.7));
+    const paddingD = Math.round((style.padding || 14) * ratioD * scale);
+    const blockWD = Math.round(dW * widthRatio * scale);
+
+    // 水印块高度：优先用测量值，否则按字段数估算（宽模式每字段~1.5行，窄模式~2行）
+    let blockHD;
+    if (blockHKnown != null) {
+      blockHD = blockHKnown;
+    } else {
+      const fieldCount = (this.data.displayFields || []).length;
+      const estLines = Math.max(1, Math.round(fieldCount * (widthRatio >= 0.5 ? 1.5 : 2)));
+      blockHD = paddingD * 2 + estLines * lineHeightD;
+    }
+
+    const marginD = Math.round(dW * 0.04);
+    const cxD = (dW - blockWD) / 2;
+
+    let x = marginD, y = marginD;
+    // X：与 watermark.js 一致
+    if (position.endsWith('left')) x = marginD;
+    else if (position.endsWith('center')) x = cxD;
+    else if (position.endsWith('right')) x = dW - blockWD - marginD;
+    // Y：与 watermark.js 一致
+    if (position.startsWith('top')) y = marginD;
+    else if (position.startsWith('center')) y = (dH - blockHD) / 2;
+    else y = dH - blockHD - marginD; // bottom
+
+    return { x: Math.max(0, x), y: Math.max(0, y) };
   },
 
   onPreview() {
@@ -228,6 +281,12 @@ Page({
       .boundingClientRect((rect) => {
         if (rect && rect.height > 0) {
           this.wmMeasuredHeight = rect.height / this.data.editScale;
+          // 若初始位置来自字符串估算，用实测高度修正位置，使预览与实际水印更精准对齐
+          if (this._wmPosFromString) {
+            const corrected = this._calcPosFromString(this.data.record, rect.height);
+            this.setData({ editWmX: corrected.x, editWmY: corrected.y });
+            this._wmPosFromString = false;
+          }
         }
       })
       .exec();
