@@ -30,11 +30,12 @@
   100% { opacity: 0; }
 }
 
-/* ===== 相机取景框（绝对定位参考系） ===== */
+/* ===== 相机取景框（绝对定位参考系，撑满底部按钮上方空间） ===== */
 .camera-viewport {
   position: relative;
   width: 100%;
-  height: 72vh;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ===== 相机画面 ===== */
@@ -181,10 +182,9 @@
   padding: 0 4rpx;
 }
 
-/* ===== 底部按钮栏（固定） ===== */
+/* ===== 底部按钮栏（占位，位于 flex 容器末尾） ===== */
 .bottom-bar-fixed {
-  position: absolute;
-  bottom: 0;
+  position: relative;
   left: 0;
   right: 0;
   display: flex;
