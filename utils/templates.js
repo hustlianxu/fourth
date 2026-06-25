@@ -59,7 +59,7 @@ const TEMPLATES = [
   {
     id: 'handwriteSimple',
     name: '手写·精简',
-    description: 'Formato corto · 货号 + 西语描述 + 单价 + 装箱数 + 日期',
+    description: 'Formato corto · 货号 + 西语描述 + 单价 + 装箱数 + 体积',
     position: 'bottom-right',
     style: {
       fontSize: 24,
@@ -76,8 +76,7 @@ const TEMPLATES = [
       { key: 'precio', label: '单价 · Precio', type: 'text', placeholder: '如：¥11', required: false },
       { key: 'pzs', label: '每箱 · Pzs / caja', type: 'text', placeholder: '如：48 pzs / caja', required: false },
       { key: 'cajas', label: '件数 · Total', type: 'text', placeholder: '如：10 cajas', required: false },
-      { key: 'peso', label: '重量 · Peso', type: 'text', placeholder: '如：2.5 kg', required: false },
-      { key: 'fecha', label: '日期 · Fecha', type: 'datetime', required: false }
+      { key: 'volumen', label: '体积 · Volumen', type: 'text', placeholder: '如：0.125 m³', required: false }
     ]
   }
 ];
