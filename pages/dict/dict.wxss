@@ -232,15 +232,20 @@
   line-height: 1.5;
 }
 
-/* ===== 服务商选择 ===== */
+/* ===== 服务商选择（横向滚动） ===== */
+.provider-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
 .provider-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   gap: 12rpx;
+  padding: 4rpx 0;
 }
 
 .provider-chip {
-  padding: 12rpx 24rpx;
+  padding: 14rpx 28rpx;
   border-radius: 32rpx;
   background: #f5f5f5;
   color: #666;
@@ -248,13 +253,15 @@
   border: 2rpx solid transparent;
   transition: all 0.2s;
   box-sizing: border-box;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .provider-chip.on {
-  background: rgba(7, 193, 96, 0.08);
+  background: rgba(7, 193, 96, 0.1);
   color: #07c160;
   border-color: #07c160;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ===== 警告 ===== */

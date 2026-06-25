@@ -98,20 +98,25 @@
     <view class="section">
       <view class="section-title">LLM 翻译引擎</view>
       <view class="section-desc">
-        本地词典未命中的词条会调用 LLM 翻译。支持 OpenAI 兼容协议（DeepSeek/智谱 GLM/通义千问等）。
+        本地词典未命中的词条会调用 LLM 翻译。支持 OpenAI 兼容协议（DeepSeek / 智谱 GLM / 通义千问 / 阿里百炼 / MiniMax / 小米 MiMo / 自定义）。
       </view>
       <view class="api-warn">
         ⚠ API Key 仅保存在小程序本地存储，不会上传服务器。但小程序代码可被反编译，请使用专门的小流量 Key。
       </view>
 
       <view class="form-item">
-        <view class="form-label">服务商快捷填充</view>
-        <view class="provider-list">
-          <view class="provider-chip {{provider === 'deepseek' ? 'on' : ''}}" bindtap="onPickProvider" data-provider="deepseek">DeepSeek</view>
-          <view class="provider-chip {{provider === 'zhipu' ? 'on' : ''}}" bindtap="onPickProvider" data-provider="zhipu">智谱 GLM</view>
-          <view class="provider-chip {{provider === 'qwen' ? 'on' : ''}}" bindtap="onPickProvider" data-provider="qwen">通义千问</view>
-          <view class="provider-chip {{provider === 'custom' ? 'on' : ''}}" bindtap="onPickProvider" data-provider="custom">自定义</view>
-        </view>
+        <view class="form-label">选择并启用翻译引擎（可左右滑动）</view>
+        <scroll-view class="provider-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="provider-list">
+            <view
+              wx:for="{{providerList}}"
+              wx:key="key"
+              class="provider-chip {{item.active ? 'on' : ''}}"
+              bindtap="onPickProvider"
+              data-provider="{{item.key}}"
+            >{{item.label}}</view>
+          </view>
+        </scroll-view>
       </view>
 
       <view class="form-item">

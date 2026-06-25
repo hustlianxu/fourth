@@ -3,12 +3,26 @@ const translator = require('../../utils/translator.js');
 const builtin = require('../../utils/builtinDict.js');
 
 const PROVIDER_PRESETS = {
-  deepseek: { baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
-  zhipu:   { baseURL: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
-  qwen:    { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
-  mimo:    { baseURL: 'https://api.xiaomimimo.com/v1', model: 'mimo-v2.5-pro' },
-  custom:  { baseURL: '', model: '' }
+  deepseek: { baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash' },
+  glm:      { baseURL: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+  qwen:     { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
+  bailian:  { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+  minimax:  { baseURL: 'https://api.minimaxi.com/v1', model: 'MiniMax-M3' },
+  mimo:     { baseURL: 'https://api.xiaomimimo.com/v1', model: 'mimo-v2.5-pro' },
+  custom:   { baseURL: '', model: '' }
 };
+
+const PROVIDER_LABELS = {
+  deepseek: 'DeepSeek',
+  glm:      '智谱GLM',
+  qwen:     '通义千问',
+  bailian:  '阿里百炼',
+  minimax:  'MiniMax',
+  mimo:     '小米MiMo',
+  custom:   '自定义'
+};
+
+const PROVIDER_KEYS = ['deepseek', 'glm', 'qwen', 'bailian', 'minimax', 'mimo', 'custom'];
 
 Page({
   data: {
@@ -30,6 +44,7 @@ Page({
     editEs: '',
     // API 配置
     provider: 'deepseek',
+    providerList: [],
     baseURL: '',
     apiKey: '',
     model: '',
@@ -54,7 +69,14 @@ Page({
 
   _loadConfig() {
     const cfg = translator.getConfig() || {};
-    const provider = cfg.provider || 'deepseek';
+    let provider = cfg.provider || 'deepseek';
+    // 数据迁移：旧版用 'zhipu'，现统一为 'glm'
+    if (provider === 'zhipu') {
+      provider = 'glm';
+      const oldKey = translator.getApiKey('zhipu');
+      if (oldKey) translator.setApiKey('glm', oldKey);
+      translator.setConfig({ provider: 'glm', baseURL: cfg.baseURL, model: cfg.model });
+    }
     const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
     // apiKey 按 provider 独立存储，切换 provider 时加载对应 key
     const apiKey = translator.getApiKey(provider);
@@ -62,7 +84,12 @@ Page({
       provider: provider,
       baseURL: cfg.baseURL || preset.baseURL,
       apiKey: apiKey || '',
-      model: cfg.model || preset.model
+      model: cfg.model || preset.model,
+      providerList: PROVIDER_KEYS.map(k => ({
+        key: k,
+        label: PROVIDER_LABELS[k] || k,
+        active: k === provider
+      }))
     });
   },
 
@@ -208,7 +235,12 @@ Page({
       provider: p,
       baseURL: preset.baseURL || this.data.baseURL,
       model: preset.model || this.data.model,
-      apiKey: newApiKey || ''
+      apiKey: newApiKey || '',
+      providerList: PROVIDER_KEYS.map(k => ({
+        key: k,
+        label: PROVIDER_LABELS[k] || k,
+        active: k === p
+      }))
     });
   },
 
