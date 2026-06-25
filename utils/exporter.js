@@ -119,12 +119,14 @@ async function buildHtmlTable(records, onProgress) {
     var desZh = rec.values.desZh || '';
     if (desEs.trim() && !desZh.trim()) {
       if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
-      var translated = await translator.translate(desEs, 'es', 'zh');
-      if (translated) rec.values.desZh = translated;
+      var r1 = await translator.translate(desEs, 'es', 'zh', true);
+      console.log('[Exporter] ES→ZH 行' + (i + 1), r1.debug, '原文:', desEs, '译文:', r1.result);
+      if (r1.result) rec.values.desZh = r1.result;
     } else if (desZh.trim() && !desEs.trim()) {
       if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
-      var translated2 = await translator.translate(desZh, 'zh', 'es');
-      if (translated2) rec.values.desEs = translated2;
+      var r2 = await translator.translate(desZh, 'zh', 'es', true);
+      console.log('[Exporter] ZH→ES 行' + (i + 1), r2.debug, '原文:', desZh, '译文:', r2.result);
+      if (r2.result) rec.values.desEs = r2.result;
     }
   }
 

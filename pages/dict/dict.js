@@ -6,6 +6,7 @@ const PROVIDER_PRESETS = {
   deepseek: { baseURL: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   zhipu:   { baseURL: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
   qwen:    { baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
+  mimo:    { baseURL: 'https://api.xiaomimimo.com/v1', model: 'mimo-v2.5-pro' },
   custom:  { baseURL: '', model: '' }
 };
 
@@ -55,10 +56,12 @@ Page({
     const cfg = translator.getConfig() || {};
     const provider = cfg.provider || 'deepseek';
     const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.custom;
+    // apiKey 按 provider 独立存储，切换 provider 时加载对应 key
+    const apiKey = translator.getApiKey(provider);
     this.setData({
       provider: provider,
       baseURL: cfg.baseURL || preset.baseURL,
-      apiKey: cfg.apiKey || '',
+      apiKey: apiKey || '',
       model: cfg.model || preset.model
     });
   },
@@ -194,17 +197,29 @@ Page({
   // ===== API 配置 =====
   onPickProvider(e) {
     const p = e.currentTarget.dataset.provider;
+    // 先保存当前 provider 的 key（避免切换时丢失）
+    if (this.data.apiKey) {
+      translator.setApiKey(this.data.provider, this.data.apiKey.trim());
+    }
     const preset = PROVIDER_PRESETS[p];
+    // 加载目标 provider 的 key
+    const newApiKey = translator.getApiKey(p);
     this.setData({
       provider: p,
       baseURL: preset.baseURL || this.data.baseURL,
-      model: preset.model || this.data.model
+      model: preset.model || this.data.model,
+      apiKey: newApiKey || ''
     });
   },
 
   onBaseURLInput(e) { this.setData({ baseURL: e.detail.value }); },
   onModelInput(e) { this.setData({ model: e.detail.value }); },
-  onAPIKeyInput(e) { this.setData({ apiKey: e.detail.value }); },
+  onAPIKeyInput(e) {
+    const v = e.detail.value;
+    this.setData({ apiKey: v });
+    // 实时按 provider 单独存（边输入边保存，避免丢失）
+    translator.setApiKey(this.data.provider, v.trim());
+  },
 
   onSaveConfig() {
     const cfg = {
@@ -224,13 +239,35 @@ Page({
   onTestTranslate() {
     const cfg = translator.getConfig();
     if (!cfg || !cfg.apiKey) {
-      wx.showToast({ title: '请先保存配置', icon: 'none' });
+      wx.showToast({ title: '请先填写并保存 API Key', icon: 'none' });
       return;
     }
-    this.setData({ testResult: '翻译中...' });
+    this.setData({ testResult: '翻译中（调用 ' + cfg.provider + '）...' });
     const that = this;
-    translator.translate('con luz y música', 'es', 'zh').then(function (result) {
-      that.setData({ testResult: 'con luz y música  →  ' + (result || '(无结果)') });
+    // withDebug=true 返回 {result, debug}
+    translator.translate('con luz y música', 'es', 'zh', true).then(function (r) {
+      const result = (r && r.result) || '(无结果)';
+      const d = (r && r.debug) || {};
+      let sourceLabel = '';
+      if (d.source === 'api') {
+        sourceLabel = '✅ 走了 API（' + d.provider + '，耗时 ' + d.elapsed + 'ms）';
+      } else if (d.source === 'local_all') {
+        sourceLabel = '⚠ 全部本地命中，未调 API';
+      } else if (d.source === 'local_no_api') {
+        sourceLabel = '⚠ 未配置 API，仅本地翻译';
+      } else if (d.source === 'local_api_fail') {
+        sourceLabel = '❌ API 调用失败（' + (d.elapsed || 0) + 'ms），降级本地';
+      } else {
+        sourceLabel = '来源: ' + d.source;
+      }
+      const missInfo = d.missSegments && d.missSegments.length
+        ? '\n未命中本地词库: ' + d.missSegments.join(', ')
+        : '';
+      const reasonInfo = d.reason ? '\n原因: ' + d.reason : '';
+      that.setData({
+        testResult: 'con luz y música  →  ' + result +
+          '\n\n' + sourceLabel + missInfo + reasonInfo
+      });
     });
   }
 });

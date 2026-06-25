@@ -282,9 +282,11 @@
 }
 
 .test-result-text {
-  font-size: 28rpx;
+  font-size: 26rpx;
   color: #222;
   word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.6;
 }
 
 /* ===== 白名单 ===== */

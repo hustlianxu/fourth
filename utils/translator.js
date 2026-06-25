@@ -17,6 +17,7 @@ var builtin = require('./builtinDict.js');
 var STORAGE_DICT_KEY = 'watermark_custom_dict';
 var STORAGE_WHITELIST_KEY = 'watermark_custom_whitelist';
 var STORAGE_CONFIG_KEY = 'watermark_translator_config';
+var STORAGE_APIKEYS_KEY = 'watermark_translator_apikeys'; // 按 provider 独立存 key
 var STORAGE_PROMPT_KEY = 'watermark_translator_prompt';
 
 // 默认 prompt 模板，使用 {whitelist} 占位符在调用时注入当前白名单
@@ -57,15 +58,67 @@ function getMergedWhitelist() {
   return builtin.WHITELIST.concat(getUserWhitelist());
 }
 
+// 获取当前配置：{ provider, baseURL, model, apiKey }
+// apiKey 按 provider 独立存储，切换 provider 自动加载对应 key
 function getConfig() {
   try {
     var c = wx.getStorageSync(STORAGE_CONFIG_KEY);
-    return c && typeof c === 'object' ? c : null;
+    if (!c || typeof c !== 'object') return null;
+    var provider = c.provider || 'deepseek';
+    var apiKey = '';
+    try {
+      var keys = wx.getStorageSync(STORAGE_APIKEYS_KEY);
+      if (keys && typeof keys === 'object') apiKey = keys[provider] || '';
+    } catch (e) {}
+    return {
+      provider: provider,
+      baseURL: c.baseURL || '',
+      model: c.model || '',
+      apiKey: apiKey
+    };
   } catch (e) { return null; }
 }
 
+// 保存配置（apiKey 按 provider 单独存）
 function setConfig(cfg) {
-  wx.setStorageSync(STORAGE_CONFIG_KEY, cfg || null);
+  cfg = cfg || {};
+  var provider = cfg.provider || 'deepseek';
+  // 主配置只存 provider/baseURL/model，不存 apiKey
+  wx.setStorageSync(STORAGE_CONFIG_KEY, {
+    provider: provider,
+    baseURL: cfg.baseURL || '',
+    model: cfg.model || ''
+  });
+  // apiKey 按 provider 独立存
+  if (cfg.apiKey !== undefined && cfg.apiKey !== null) {
+    var keys = {};
+    try {
+      var existing = wx.getStorageSync(STORAGE_APIKEYS_KEY);
+      if (existing && typeof existing === 'object') keys = existing;
+    } catch (e) {}
+    keys[provider] = cfg.apiKey || '';
+    wx.setStorageSync(STORAGE_APIKEYS_KEY, keys);
+  }
+}
+
+// 获取指定 provider 的 apiKey（用于编辑页回显）
+function getApiKey(provider) {
+  try {
+    var keys = wx.getStorageSync(STORAGE_APIKEYS_KEY);
+    if (keys && typeof keys === 'object') return keys[provider] || '';
+  } catch (e) {}
+  return '';
+}
+
+// 设置指定 provider 的 apiKey
+function setApiKey(provider, apiKey) {
+  var keys = {};
+  try {
+    var existing = wx.getStorageSync(STORAGE_APIKEYS_KEY);
+    if (existing && typeof existing === 'object') keys = existing;
+  } catch (e) {}
+  keys[provider] = apiKey || '';
+  wx.setStorageSync(STORAGE_APIKEYS_KEY, keys);
 }
 
 // 自定义 prompt（录入一次后永久生效，未录入则用 DEFAULT_PROMPT_TEMPLATE）
@@ -229,14 +282,15 @@ function callLLM(text, from, to) {
 // ============ 主翻译函数 ============
 
 /**
- * 翻译文本
+ * 翻译文本（带诊断信息）
  * @param {string} text 待翻译文本
  * @param {string} from 'zh' | 'es'
  * @param {string} to   'es' | 'zh'
- * @returns {Promise<string>} 翻译结果
+ * @param {boolean} withDebug 是否返回诊断信息
+ * @returns {Promise<string|{result:string, debug:object}>} 翻译结果
  */
-function translate(text, from, to) {
-  if (!text || !text.trim()) return Promise.resolve('');
+function translate(text, from, to, withDebug) {
+  if (!text || !text.trim()) return Promise.resolve(withDebug ? { result: '', debug: { source: 'empty' } } : '');
 
   var index = buildIndex();
   var segments = splitText(text);
@@ -250,21 +304,42 @@ function translate(text, from, to) {
   // 收集未命中且非分隔符/白名单的段
   var missSegments = localResult.filter(function (item) {
     if (item.translated) return false;
-    // 跳过纯空白、纯分隔符
     if (/^[\s·×+\-\/,，.。:;：；]*$/.test(item.seg)) return false;
     return true;
   });
 
+  var localJoined = localResult.map(function (i) { return i.result; }).join('');
+
   // 全部本地命中 → 直接组装返回
   if (missSegments.length === 0) {
-    return Promise.resolve(localResult.map(function (i) { return i.result; }).join(''));
+    return Promise.resolve(withDebug
+      ? { result: localJoined, debug: { source: 'local_all', missCount: 0, missSegments: [] } }
+      : localJoined);
   }
 
-  // 有未命中段 → 调用 LLM API 翻译整段原文（保证上下文连贯）
+  // 有未命中段 → 调用 LLM API 翻译整段原文
+  var cfg = getConfig();
+  var missWords = missSegments.map(function (m) { return m.seg; });
+
+  if (!cfg || !cfg.apiKey || !cfg.baseURL) {
+    // 未配置 API → 用本地结果（未命中段保留原文）
+    return Promise.resolve(withDebug
+      ? { result: localJoined, debug: { source: 'local_no_api', missCount: missWords.length, missSegments: missWords, reason: '未配置 API' } }
+      : localJoined);
+  }
+
+  var t0 = Date.now();
   return callLLM(text, from, to).then(function (apiResult) {
-    if (apiResult) return apiResult;
-    // API 失败 → 用本地结果（未命中段保留原文）
-    return localResult.map(function (i) { return i.result; }).join('');
+    var elapsed = Date.now() - t0;
+    if (apiResult) {
+      return withDebug
+        ? { result: apiResult, debug: { source: 'api', provider: cfg.provider, elapsed: elapsed, missCount: missWords.length, missSegments: missWords } }
+        : apiResult;
+    }
+    // API 失败 → 用本地结果降级
+    return withDebug
+      ? { result: localJoined, debug: { source: 'local_api_fail', missCount: missWords.length, missSegments: missWords, elapsed: elapsed, reason: 'API 调用失败或返回空' } }
+      : localJoined;
   });
 }
 
@@ -279,6 +354,8 @@ module.exports = {
   getMergedWhitelist: getMergedWhitelist,
   getConfig: getConfig,
   setConfig: setConfig,
+  getApiKey: getApiKey,
+  setApiKey: setApiKey,
   getCustomPrompt: getCustomPrompt,
   setCustomPrompt: setCustomPrompt,
   getDefaultPromptTemplate: getDefaultPromptTemplate,
