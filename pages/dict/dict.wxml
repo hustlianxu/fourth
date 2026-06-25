@@ -140,6 +140,7 @@
           <text class="placeholder-tag">{target}</text> 目标语言、
           <text class="placeholder-tag">{whitelist}</text> 白名单词列表、
           <text class="placeholder-tag">{text}</text> 待翻译文本。
+          注意：翻译可能中→西或西→中，prompt 不要写死方向。
         </view>
         <textarea
           class="form-textarea"

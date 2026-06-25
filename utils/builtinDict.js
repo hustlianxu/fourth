@@ -15,9 +15,7 @@ var WHITELIST = [
   // 规格/通用缩写
   'RGB', 'LED', 'USB', 'DC', 'AC', 'W', 'V', 'mA', 'Hz',
   // 标点/分隔符
-  '×', '·', '-', '/', '+',
-  // 颜色代码
-  'red', 'blue', 'green', 'white', 'black', 'yellow', 'pink', 'gold', 'silver'
+  '×', '·', '-', '/', '+'
 ];
 
 // 中-西外贸常用词对照（双向）

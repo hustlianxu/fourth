@@ -20,14 +20,14 @@ var STORAGE_CONFIG_KEY = 'watermark_translator_config';
 var STORAGE_APIKEYS_KEY = 'watermark_translator_apikeys'; // 按 provider 独立存 key
 var STORAGE_PROMPT_KEY = 'watermark_translator_prompt';
 
-// 默认 prompt 模板，使用 {whitelist} 占位符在调用时注入当前白名单
+// 默认 prompt 模板，使用 {source} {target} {whitelist} {text} 占位符
+// 不假定固定方向（既可能中→西，也可能西→中）
 var DEFAULT_PROMPT_TEMPLATE =
-  '你是一名外贸翻译助手，请将以下{source}翻译为{target}。\n' +
-  '要求：\n' +
-  '1. 保留原文中的数字、货号、通用符号（如 × · + / , .）不翻译；\n' +
-  '2. 以下词汇为通用单位或国际通用词，必须原样保留不要翻译：{whitelist}\n' +
-  '3. 除此之外的所有自然语言（包括常见西班牙语名词如 luz/灯、música/音乐、estrellas/星星 等）都必须翻译；\n' +
-  '4. 直接返回翻译结果，不要解释，不要加引号，不要添加多余内容。\n\n' +
+  '请将以下文本从{source}翻译为{target}。\n' +
+  '规则：\n' +
+  '1. 数字、货号、通用符号（× · + / , . 等）保持不变；\n' +
+  '2. 以下词汇保持原文不翻译：{whitelist}\n' +
+  '3. 直接返回翻译结果，不要解释，不要加引号，不要添加任何多余内容。\n\n' +
   '原文：{text}';
 
 function getUserDict() {
