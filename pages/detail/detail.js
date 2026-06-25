@@ -84,10 +84,13 @@ Page({
       value: f.value
     }));
 
-    // 计算图片显示尺寸（宽度与下方卡片对齐：container padding 24rpx*2 = 48rpx）
+    // 计算图片显示尺寸
+    // 容器 .container 有 padding:24rpx，左右共 48rpx，需正确换算为 px
+    // （screenWidth 是 px，不能直接减 48，否则在不同设备上会偏小导致 aspectFit 留黑）
     const imgW = record.width || 1080;
     const imgH = record.height || 1440;
-    const displayW = this.screenWidth - 48; // 与 .card 外层宽度一致
+    const rpxToPx = this.screenWidth / 750;
+    const displayW = this.screenWidth - 48 * rpxToPx; // 与 .card / .img-area 实际撑满宽度一致
     const displayH = displayW * (imgH / imgW);
 
     const date = new Date(record.createdAt);

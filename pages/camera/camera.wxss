@@ -38,8 +38,13 @@
   min-height: 0;
 }
 
-/* ===== 相机画面 ===== */
+/* ===== 相机画面（绝对定位填满取景框，避免 flex 下 height:100% 解析异常导致黑屏） ===== */
 .camera {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
   background: #000;
