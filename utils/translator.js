@@ -312,6 +312,176 @@ function callLLM(text, from, to) {
   });
 }
 
+// ============ 免费词典层（MyMemory / 有道智云）============
+// 作为本地词典与大模型之间的中间层：本地未命中时优先调用免费词典
+// 用户可在设置页选择是否启用及采用哪种服务
+
+var STORAGE_FREEDICT_KEY = 'watermark_free_dict';      // {enabled, provider}
+var STORAGE_YOUDAO_KEY = 'watermark_youdao_creds';     // {appId, secret}
+var md5 = require('./md5.js').md5;
+
+// 免费词典配置：{enabled:bool, provider:'mymemory'|'youdao'|''}
+function getFreeDictConfig() {
+  try {
+    var c = wx.getStorageSync(STORAGE_FREEDICT_KEY);
+    if (!c || typeof c !== 'object') return { enabled: false, provider: '' };
+    return {
+      enabled: !!c.enabled,
+      provider: c.provider === 'youdao' ? 'youdao' : (c.provider === 'mymemory' ? 'mymemory' : '')
+    };
+  } catch (e) { return { enabled: false, provider: '' }; }
+}
+
+function setFreeDictConfig(cfg) {
+  cfg = cfg || {};
+  wx.setStorageSync(STORAGE_FREEDICT_KEY, {
+    enabled: !!cfg.enabled,
+    provider: cfg.provider || ''
+  });
+}
+
+// 有道智云凭证：{appId, secret}
+function getYoudaoCreds() {
+  try {
+    var c = wx.getStorageSync(STORAGE_YOUDAO_KEY);
+    if (!c || typeof c !== 'object') return { appId: '', secret: '' };
+    return { appId: c.appId || '', secret: c.secret || '' };
+  } catch (e) { return { appId: '', secret: '' }; }
+}
+
+function setYoudaoCreds(creds) {
+  creds = creds || {};
+  wx.setStorageSync(STORAGE_YOUDAO_KEY, {
+    appId: creds.appId || '',
+    secret: creds.secret || ''
+  });
+}
+
+// 调用 MyMemory 免费 API（无需 key）
+// 文档：https://mymemory.translated.net/doc/spec.php
+// 限额：匿名约 5000 词/天，传 email 可提升至 50000 词/天
+function callMyMemory(text, from, to) {
+  if (!text) return Promise.resolve(null);
+  var src = from === 'zh' ? 'zh' : 'es';
+  var dst = to === 'zh' ? 'zh' : 'es';
+  if (src === dst) return Promise.resolve(text);
+  return new Promise(function (resolve) {
+    wx.request({
+      url: 'https://api.mymemory.translated.net/get',
+      method: 'GET',
+      data: {
+        q: text,
+        langpair: src + '|' + dst
+      },
+      timeout: 15000,
+      success: function (res) {
+        if (res.statusCode === 200 && res.data) {
+          var rd = res.data.responseData || {};
+          var t = rd.translatedText;
+          // MyMemory 在配额耗尽/异常时返回带 "MYMEMORY WARNING" 等字样的字符串
+          if (t && typeof t === 'string' &&
+              t.indexOf('MYMEMORY WARNING') < 0 &&
+              t.toUpperCase().indexOf('INVALID') < 0 &&
+              t.toUpperCase().indexOf('PLEASE SPECIFY') < 0) {
+            // 解码常见 HTML 实体
+            t = t.replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+                 .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+            resolve(t);
+            return;
+          }
+          console.warn('[Translator] MyMemory 返回异常:', res.data);
+        }
+        resolve(null);
+      },
+      fail: function (err) {
+        console.warn('[Translator] MyMemory 调用失败:', err);
+        resolve(null);
+      }
+    });
+  });
+}
+
+// 调用有道智云 API（需 appId + secret）
+// 文档：https://ai.youdao.com/DOCSIRMA/html/trans/api/wbfy/index.html
+// 签名：sign = md5(appId + q + salt + secret)
+function callYoudao(text, from, to) {
+  if (!text) return Promise.resolve(null);
+  var creds = getYoudaoCreds();
+  if (!creds.appId || !creds.secret) return Promise.resolve(null);
+  // 有道语言代码：简体中文 zh-CHS，西班牙语 es
+  var src = from === 'zh' ? 'zh-CHS' : 'es';
+  var dst = to === 'zh' ? 'zh-CHS' : 'es';
+  if (src === dst) return Promise.resolve(text);
+  var salt = '' + Date.now();
+  var sign = md5(creds.appId + text + salt + creds.secret);
+  return new Promise(function (resolve) {
+    wx.request({
+      url: 'https://openapi.youdao.com/api',
+      method: 'GET',
+      data: {
+        q: text,
+        from: src,
+        to: dst,
+        appKey: creds.appId,
+        salt: salt,
+        sign: sign
+      },
+      timeout: 15000,
+      success: function (res) {
+        if (res.statusCode === 200 && res.data) {
+          var errorCode = res.data.errorCode;
+          // errorCode === '0' 或 0 表示成功
+          if (errorCode === '0' || errorCode === 0) {
+            var translations = res.data.translation;
+            if (translations && translations.length > 0) {
+              resolve(translations[0]);
+              return;
+            }
+          }
+          console.warn('[Translator] 有道返回错误:', errorCode, res.data);
+        }
+        resolve(null);
+      },
+      fail: function (err) {
+        console.warn('[Translator] 有道调用失败:', err);
+        resolve(null);
+      }
+    });
+  });
+}
+
+// 统一免费词典入口：按配置分派
+// 返回 Promise<string|null>，null 表示未启用或调用失败
+function callFreeDict(text, from, to) {
+  var cfg = getFreeDictConfig();
+  if (!cfg.enabled || !cfg.provider) return Promise.resolve(null);
+  if (cfg.provider === 'mymemory') return callMyMemory(text, from, to);
+  if (cfg.provider === 'youdao') return callYoudao(text, from, to);
+  return Promise.resolve(null);
+}
+
+// 内部辅助：尝试 LLM API，失败则降级本地
+// 供 translate() 复用，避免与免费词典层耦合
+function _tryLLM(text, from, to, localJoined, missWords, withDebug, cfg) {
+  if (!cfg || !cfg.apiKey || !cfg.baseURL) {
+    return Promise.resolve(withDebug
+      ? { result: localJoined, debug: { source: 'local_no_api', missCount: missWords.length, missSegments: missWords, reason: '未配置 API' } }
+      : localJoined);
+  }
+  var t0 = Date.now();
+  return callLLM(text, from, to).then(function (apiResult) {
+    var elapsed = Date.now() - t0;
+    if (apiResult) {
+      return withDebug
+        ? { result: apiResult, debug: { source: 'api', provider: cfg.provider, elapsed: elapsed, missCount: missWords.length, missSegments: missWords } }
+        : apiResult;
+    }
+    return withDebug
+      ? { result: localJoined, debug: { source: 'local_api_fail', missCount: missWords.length, missSegments: missWords, elapsed: elapsed, reason: 'API 调用失败或返回空' } }
+      : localJoined;
+  });
+}
+
 // ============ 主翻译函数 ============
 
 /**
@@ -350,30 +520,28 @@ function translate(text, from, to, withDebug) {
       : localJoined);
   }
 
-  // 有未命中段 → 调用 LLM API 翻译整段原文
+  // 有未命中段
   var cfg = getConfig();
   var missWords = missSegments.map(function (m) { return m.seg; });
+  var fdCfg = getFreeDictConfig();
 
-  if (!cfg || !cfg.apiKey || !cfg.baseURL) {
-    // 未配置 API → 用本地结果（未命中段保留原文）
-    return Promise.resolve(withDebug
-      ? { result: localJoined, debug: { source: 'local_no_api', missCount: missWords.length, missSegments: missWords, reason: '未配置 API' } }
-      : localJoined);
+  // 1) 免费词典层（如启用）：本地未命中时优先调用免费词典
+  if (fdCfg.enabled && fdCfg.provider) {
+    var fdT0 = Date.now();
+    return callFreeDict(text, from, to).then(function (fdResult) {
+      var fdElapsed = Date.now() - fdT0;
+      if (fdResult) {
+        return withDebug
+          ? { result: fdResult, debug: { source: 'free_dict', provider: fdCfg.provider, elapsed: fdElapsed, missCount: missWords.length, missSegments: missWords } }
+          : fdResult;
+      }
+      // 免费词典失败/未启用 → 继续尝试 LLM API
+      return _tryLLM(text, from, to, localJoined, missWords, withDebug, cfg);
+    });
   }
 
-  var t0 = Date.now();
-  return callLLM(text, from, to).then(function (apiResult) {
-    var elapsed = Date.now() - t0;
-    if (apiResult) {
-      return withDebug
-        ? { result: apiResult, debug: { source: 'api', provider: cfg.provider, elapsed: elapsed, missCount: missWords.length, missSegments: missWords } }
-        : apiResult;
-    }
-    // API 失败 → 用本地结果降级
-    return withDebug
-      ? { result: localJoined, debug: { source: 'local_api_fail', missCount: missWords.length, missSegments: missWords, elapsed: elapsed, reason: 'API 调用失败或返回空' } }
-      : localJoined;
-  });
+  // 2) 直接尝试 LLM API（未启用免费词典时）
+  return _tryLLM(text, from, to, localJoined, missWords, withDebug, cfg);
 }
 
 // ============ 批量翻译（合并多条为单次 API 调用） ============
@@ -427,12 +595,13 @@ function translateBatch(items, withDebug) {
     }
   });
 
-  // 未配置 API 或无待翻译项 → 直接用本地结果（用 Promise.resolve 包裹保持返回 Promise）
-  if (noApi || apiItems.length === 0) {
+  // 无待翻译项 → 直接用本地结果（全部本地命中）
+  // 注意：noApi 不能在此提前返回，否则会跳过免费词典层
+  if (apiItems.length === 0) {
     return Promise.resolve(items.map(function (item, idx) {
       var lr = localResults[idx];
       return withDebug
-        ? { result: lr.localJoined, debug: { source: noApi ? 'local_no_api' : 'local_all', missCount: lr.miss.length } }
+        ? { result: lr.localJoined, debug: { source: 'local_all', missCount: 0 } }
         : lr.localJoined;
     }));
   }
@@ -539,59 +708,111 @@ function translateBatch(items, withDebug) {
     });
   }
 
-  // 按 (from, to) 分组：同方向归一组，每组单次 API 调用
-  // 同方向场景（导出最常见）仍为 1 次请求；混合方向最多 2 次（中→西 + 西→中）
-  var groupMap = {};
-  apiItems.forEach(function (a, apiIdx) {
-    var key = a.from + '|' + a.to;
-    if (!groupMap[key]) groupMap[key] = { from: a.from, to: a.to, items: [], apiIdxList: [] };
-    groupMap[key].items.push(a);
-    groupMap[key].apiIdxList.push(apiIdx);
-  });
-  var groupKeys = Object.keys(groupMap);
+  // 免费词典层：对 apiItems 并行调用免费词典（如启用）
+  var fdCfg = getFreeDictConfig();
+  var fdPromise;
+  if (fdCfg.enabled && fdCfg.provider) {
+    fdPromise = Promise.all(apiItems.map(function (a) {
+      return callFreeDict(a.text, a.from, a.to);
+    }));
+  } else {
+    fdPromise = Promise.resolve(apiItems.map(function () { return null; }));
+  }
 
-  return Promise.all(groupKeys.map(function (gk) {
-    var g = groupMap[gk];
-    return _callGroup(g.items, g.from, g.to).then(function (gr) {
-      return { apiIdxList: g.apiIdxList, results: gr.results, source: gr.source, elapsed: gr.elapsed };
-    });
-  })).then(function (allGroups) {
-    // 合并各组结果到 apiResults（按 apiItems 顺序）
-    var apiResults = apiItems.map(function () { return null; });
-    var mergedSource = 'api_batch';
-    var maxElapsed = 0;
-    allGroups.forEach(function (ag) {
-      ag.apiIdxList.forEach(function (apiIdx, i) {
-        apiResults[apiIdx] = ag.results[i];
-      });
-      if (ag.elapsed > maxElapsed) maxElapsed = ag.elapsed;
-      if (ag.source === 'api_fail') mergedSource = 'api_fail';
-      else if (ag.source === 'api_batch_fallback' && mergedSource !== 'api_fail') mergedSource = 'api_batch_fallback';
+  return fdPromise.then(function (fdResults) {
+    // fdResults[i] 对应 apiItems[i]
+    // 仍需 LLM 的项（免费词典失败/未启用）
+    var llmItems = [];
+    var fdMap = {};  // origIdx → 免费词典结果
+    apiItems.forEach(function (a, i) {
+      if (fdResults[i]) {
+        fdMap[a.origIdx] = fdResults[i];
+      } else {
+        llmItems.push(a);
+      }
     });
 
-    // 组装最终结果（与 items 同序）
-    return items.map(function (item, idx) {
-      var lr = localResults[idx];
-      if (!lr.needApi) {
+    // 无需 LLM（全部免费词典命中）或未配置 LLM → 直接组装（本地 + 免费词典）
+    if (llmItems.length === 0 || noApi) {
+      return items.map(function (item, idx) {
+        var lr = localResults[idx];
+        if (!lr.needApi) {
+          return withDebug
+            ? { result: lr.localJoined, debug: { source: 'local_all', missCount: 0 } }
+            : lr.localJoined;
+        }
+        if (fdMap[idx]) {
+          return withDebug
+            ? { result: fdMap[idx], debug: { source: 'free_dict', provider: fdCfg.provider } }
+            : fdMap[idx];
+        }
+        // needApi 但免费词典未命中且无 LLM → 本地降级
         return withDebug
-          ? { result: lr.localJoined, debug: { source: 'local_all', missCount: 0 } }
+          ? { result: lr.localJoined, debug: { source: noApi ? 'local_no_api' : 'local_all', missCount: lr.miss.length } }
           : lr.localJoined;
-      }
-      // 在 apiItems 中的位置
-      var posInApi = -1;
-      for (var k = 0; k < apiItems.length; k++) {
-        if (apiItems[k].origIdx === idx) { posInApi = k; break; }
-      }
-      var apiResult = apiResults[posInApi];
-      if (apiResult) {
+      });
+    }
+
+    // 按 (from, to) 分组：同方向归一组，每组单次 LLM API 调用（基于 llmItems）
+    // 同方向场景（导出最常见）仍为 1 次请求；混合方向最多 2 次（中→西 + 西→中）
+    var groupMap = {};
+    llmItems.forEach(function (a, apiIdx) {
+      var key = a.from + '|' + a.to;
+      if (!groupMap[key]) groupMap[key] = { from: a.from, to: a.to, items: [], apiIdxList: [] };
+      groupMap[key].items.push(a);
+      groupMap[key].apiIdxList.push(apiIdx);
+    });
+    var groupKeys = Object.keys(groupMap);
+
+    return Promise.all(groupKeys.map(function (gk) {
+      var g = groupMap[gk];
+      return _callGroup(g.items, g.from, g.to).then(function (gr) {
+        return { apiIdxList: g.apiIdxList, results: gr.results, source: gr.source, elapsed: gr.elapsed };
+      });
+    })).then(function (allGroups) {
+      // 合并各组结果到 llmResults（按 llmItems 顺序）
+      var llmResults = llmItems.map(function () { return null; });
+      var mergedSource = 'api_batch';
+      var maxElapsed = 0;
+      allGroups.forEach(function (ag) {
+        ag.apiIdxList.forEach(function (apiIdx, i) {
+          llmResults[apiIdx] = ag.results[i];
+        });
+        if (ag.elapsed > maxElapsed) maxElapsed = ag.elapsed;
+        if (ag.source === 'api_fail') mergedSource = 'api_fail';
+        else if (ag.source === 'api_batch_fallback' && mergedSource !== 'api_fail') mergedSource = 'api_batch_fallback';
+      });
+
+      // 组装最终结果（与 items 同序）
+      return items.map(function (item, idx) {
+        var lr = localResults[idx];
+        if (!lr.needApi) {
+          return withDebug
+            ? { result: lr.localJoined, debug: { source: 'local_all', missCount: 0 } }
+            : lr.localJoined;
+        }
+        // 免费词典命中
+        if (fdMap[idx]) {
+          return withDebug
+            ? { result: fdMap[idx], debug: { source: 'free_dict', provider: fdCfg.provider } }
+            : fdMap[idx];
+        }
+        // 在 llmItems 中的位置
+        var posInLlm = -1;
+        for (var k = 0; k < llmItems.length; k++) {
+          if (llmItems[k].origIdx === idx) { posInLlm = k; break; }
+        }
+        var llmResult = llmResults[posInLlm];
+        if (llmResult) {
+          return withDebug
+            ? { result: llmResult, debug: { source: mergedSource, provider: cfg.provider, elapsed: maxElapsed, batchPos: posInLlm, batchSize: llmItems.length } }
+            : llmResult;
+        }
+        // LLM 失败 → 本地结果降级
         return withDebug
-          ? { result: apiResult, debug: { source: mergedSource, provider: cfg.provider, elapsed: maxElapsed, batchPos: posInApi, batchSize: apiItems.length } }
-          : apiResult;
-      }
-      // API 失败 → 本地结果降级
-      return withDebug
-        ? { result: lr.localJoined, debug: { source: 'local_api_fail', reason: 'API 失败或返回空', elapsed: maxElapsed } }
-        : lr.localJoined;
+          ? { result: lr.localJoined, debug: { source: 'local_api_fail', reason: 'API 失败或返回空', elapsed: maxElapsed } }
+          : lr.localJoined;
+      });
     });
   });
 }
@@ -621,5 +842,13 @@ module.exports = {
   isWhitelist: isWhitelist,
   detectLang: detectLang,
   buildIndex: buildIndex,
-  localTranslateSegment: localTranslateSegment
+  localTranslateSegment: localTranslateSegment,
+  // 免费词典层
+  getFreeDictConfig: getFreeDictConfig,
+  setFreeDictConfig: setFreeDictConfig,
+  getYoudaoCreds: getYoudaoCreds,
+  setYoudaoCreds: setYoudaoCreds,
+  callFreeDict: callFreeDict,
+  callMyMemory: callMyMemory,
+  callYoudao: callYoudao
 };

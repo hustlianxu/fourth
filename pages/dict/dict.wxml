@@ -95,6 +95,52 @@
 
   <!-- ===== API 配置 ===== -->
   <block wx:if="{{activeTab === 'api'}}">
+    <!-- 免费词典层 -->
+    <view class="section">
+      <view class="section-title">免费词典层（中间层）</view>
+      <view class="section-desc">
+        本地词典未命中时，优先调用免费翻译 API（无需 API Key）。失败或未开启时再回退到下方大模型。
+      </view>
+
+      <view class="form-item switch-row">
+        <view class="form-label">启用免费词典</view>
+        <switch checked="{{freeDictEnabled}}" bindchange="onToggleFreeDict" />
+      </view>
+
+      <block wx:if="{{freeDictEnabled}}">
+        <view class="form-item">
+          <view class="form-label">选择翻译服务</view>
+          <view class="provider-list">
+            <view class="provider-chip {{freeDictProvider === 'mymemory' ? 'on' : ''}}" bindtap="onPickFreeDictProvider" data-provider="mymemory">MyMemory（免Key）</view>
+            <view class="provider-chip {{freeDictProvider === 'youdao' ? 'on' : ''}}" bindtap="onPickFreeDictProvider" data-provider="youdao">有道智云</view>
+          </view>
+        </view>
+
+        <view wx:if="{{freeDictProvider === 'mymemory'}}" class="api-warn">
+          MyMemory 匿名额度约 5000 词/天，无需配置即可使用。额度用尽会自动回退大模型。
+        </view>
+
+        <block wx:if="{{freeDictProvider === 'youdao'}}">
+          <view class="api-warn">有道智云需配置 App ID 与密钥，标准版免费额度每秒 1 次、每月 2 万字符。</view>
+          <view class="form-item">
+            <view class="form-label">App ID</view>
+            <input class="form-input" placeholder="有道智云 App ID" value="{{youdaoAppId}}" bindinput="onYoudaoAppIdInput" />
+          </view>
+          <view class="form-item">
+            <view class="form-label">密钥（Secret）</view>
+            <input class="form-input" placeholder="有道智云 Secret" value="{{youdaoSecret}}" password bindinput="onYoudaoSecretInput" />
+          </view>
+          <view class="btn save-btn" bindtap="onSaveYoudao">保存有道凭证</view>
+        </block>
+
+        <view class="btn test-btn" bindtap="onTestFreeDict">测试免费词典</view>
+        <view wx:if="{{freeDictTestResult}}" class="test-result">
+          <view class="test-result-title">测试结果：</view>
+          <view class="test-result-text">{{freeDictTestResult}}</view>
+        </view>
+      </block>
+    </view>
+
     <view class="section">
       <view class="section-title">LLM 翻译引擎</view>
       <view class="section-desc">

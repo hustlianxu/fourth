@@ -51,7 +51,13 @@ Page({
     // Prompt
     customPrompt: '',
     promptPreview: '',
-    testResult: ''
+    testResult: '',
+    // 免费词典层
+    freeDictEnabled: false,
+    freeDictProvider: '',
+    youdaoAppId: '',
+    youdaoSecret: '',
+    freeDictTestResult: ''
   },
 
   onLoad() {
@@ -64,7 +70,77 @@ Page({
       customPrompt: translator.getCustomPrompt() || ''
     });
     this._loadConfig();
+    this._loadFreeDictConfig();
     this._refreshPromptPreview();
+  },
+
+  // ===== 免费词典层配置 =====
+  _loadFreeDictConfig() {
+    const fcfg = translator.getFreeDictConfig();
+    const yd = translator.getYoudaoCreds();
+    this.setData({
+      freeDictEnabled: fcfg.enabled,
+      freeDictProvider: fcfg.provider,
+      youdaoAppId: yd.appId,
+      youdaoSecret: yd.secret
+    });
+  },
+
+  onToggleFreeDict(e) {
+    const enabled = e.detail.value;
+    const provider = enabled ? (this.data.freeDictProvider || 'mymemory') : '';
+    translator.setFreeDictConfig({ enabled: enabled, provider: provider });
+    this.setData({ freeDictEnabled: enabled, freeDictProvider: provider });
+  },
+
+  onPickFreeDictProvider(e) {
+    const p = e.currentTarget.dataset.provider;
+    translator.setFreeDictConfig({ enabled: true, provider: p });
+    this.setData({ freeDictProvider: p });
+  },
+
+  onYoudaoAppIdInput(e) {
+    this.setData({ youdaoAppId: e.detail.value });
+  },
+
+  onYoudaoSecretInput(e) {
+    this.setData({ youdaoSecret: e.detail.value });
+  },
+
+  onSaveYoudao() {
+    const appId = (this.data.youdaoAppId || '').trim();
+    const secret = (this.data.youdaoSecret || '').trim();
+    if (!appId || !secret) {
+      wx.showToast({ title: '请填写 App ID 和密钥', icon: 'none' });
+      return;
+    }
+    translator.setYoudaoCreds({ appId: appId, secret: secret });
+    wx.showToast({ title: '已保存', icon: 'success' });
+  },
+
+  onTestFreeDict() {
+    const fcfg = translator.getFreeDictConfig();
+    if (!fcfg.enabled || !fcfg.provider) {
+      wx.showToast({ title: '请先开启免费词典', icon: 'none' });
+      return;
+    }
+    if (fcfg.provider === 'youdao') {
+      const yd = translator.getYoudaoCreds();
+      if (!yd.appId || !yd.secret) {
+        wx.showToast({ title: '请先配置有道凭证', icon: 'none' });
+        return;
+      }
+    }
+    this.setData({ freeDictTestResult: '翻译中（' + fcfg.provider + '）...' });
+    const that = this;
+    // 用一个本地未命中的中文词测试（如「西班牙语」）
+    translator.callFreeDict('西班牙语', 'zh', 'es').then(function (r) {
+      if (r) {
+        that.setData({ freeDictTestResult: '西班牙语  →  ' + r + '\n（来源：' + fcfg.provider + '）' });
+      } else {
+        that.setData({ freeDictTestResult: '调用失败或返回空，请检查网络/凭证/配额' });
+      }
+    });
   },
 
   _loadConfig() {

@@ -221,6 +221,18 @@
   margin-bottom: 8rpx;
 }
 
+/* 开关行：标签 + switch 同行 */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 0;
+}
+
+.switch-row .form-label {
+  margin-bottom: 0;
+}
+
 .form-input {
   width: 100%;
   background: #f7f8fa;
