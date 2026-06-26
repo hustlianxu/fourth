@@ -56,18 +56,58 @@ function readFileAsBase64(filePath) {
 }
 
 /**
- * 同步读取图片文件原始字节（用于 xlsx 嵌入，不压缩）
+ * 异步读取图片文件原始字节（用于 xlsx 嵌入，不压缩）
+ * 使用异步 readFile（对 wxfile://tmp_* 临时文件可靠），
+ * 而非同步 readFileSync（部分平台对临时路径会失败）
  */
-function readImageBytesSync(filePath) {
-  try {
-    var res = wx.getFileSystemManager().readFileSync(filePath);
-    if (res && res instanceof ArrayBuffer) return new Uint8Array(res);
-    if (res && res.data instanceof ArrayBuffer) return new Uint8Array(res.data);
-    return null;
-  } catch (e) {
-    console.warn('[Exporter] 读取图片字节失败:', filePath, e);
-    return null;
-  }
+function readImageBytes(filePath) {
+  return new Promise(function (resolve) {
+    if (!filePath) { resolve(null); return; }
+    wx.getFileSystemManager().readFile({
+      filePath: filePath,
+      // 不指定 encoding → 返回 ArrayBuffer
+      success: function (res) {
+        if (res && res.data instanceof ArrayBuffer) {
+          resolve(new Uint8Array(res.data));
+        } else if (res && res.data && res.data.buffer instanceof ArrayBuffer) {
+          resolve(new Uint8Array(res.data.buffer));
+        } else {
+          console.warn('[Exporter] 图片字节格式异常:', filePath, typeof res.data);
+          resolve(null);
+        }
+      },
+      fail: function (err) {
+        console.warn('[Exporter] 读取图片字节失败:', filePath, err);
+        resolve(null);
+      }
+    });
+  });
+}
+
+/**
+ * 预读所有记录的图片字节（异步，并行）
+ * 返回 { map: {recordIdx: Uint8Array}, failures: [recordIdx], total: N }
+ * 任一有 imagePath 的记录读不到字节 → 计入 failures
+ */
+function preReadImageBytes(records) {
+  var tasks = records.map(function (rec, idx) {
+    if (!rec.imagePath) return Promise.resolve({ idx: idx, bytes: null, hasPath: false });
+    return readImageBytes(rec.imagePath).then(function (bytes) {
+      return { idx: idx, bytes: bytes, hasPath: true };
+    });
+  });
+  return Promise.all(tasks).then(function (results) {
+    var map = {};
+    var failures = [];
+    results.forEach(function (r) {
+      if (r.bytes && r.bytes.length) {
+        map[r.idx] = r.bytes;
+      } else if (r.hasPath) {
+        failures.push(r.idx);
+      }
+    });
+    return { map: map, failures: failures, total: results.length };
+  });
 }
 
 /**
@@ -267,24 +307,41 @@ function preTranslateRecords(records, onProgress) {
 
 /**
  * 主路径：真实 .xlsx（OOXML，图片原始字节不压缩）
+ * 先异步预读所有图片字节（对临时文件可靠），任一读取失败则 reject 触发回退到伪 xls
  */
 function exportToXlsx(records, customFileName) {
-  return new Promise(function (resolve, reject) {
+  // 1. 异步预读所有图片字节（并行）
+  return preReadImageBytes(records).then(function (preRead) {
+    // 有图片读取失败 → reject 触发回退（用户要求：图片无法导入则回退伪 xls）
+    if (preRead.failures.length > 0) {
+      console.warn('[Exporter] 图片字节预读失败 ' + preRead.failures.length + ' 张，记录索引:',
+        preRead.failures.join(', '), '→ 触发回退伪 xls');
+      throw new Error('图片读取失败：' + preRead.failures.length + ' 张无法导入');
+    }
+
+    // 2. 构建 xlsx（同步，使用预读字节）
+    var bytes;
     try {
       var flatRecords = flattenRecords(records);
       var colWidths = calcColumnWidths(records);
-      var bytes = xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
-        getImageBytes: readImageBytesSync,
+      bytes = xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
+        imageBytesMap: preRead.map,   // 预读字节 map: {recordIdx: Uint8Array}
+        getImageBytes: null,          // 不再用同步读取
         calcRowHeight: calcRowHeight,
         calcImgDisplayH: calcImgDisplayH,
         calcColumnWidths: function () { return colWidths; },
         imgColW: IMG_CELL_W
       });
+    } catch (e) {
+      throw e instanceof Error ? e : new Error(String(e));
+    }
 
-      var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
-      var fileName = baseName + '.xlsx';
-      var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
+    // 3. 写入文件并打开
+    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
+    var fileName = baseName + '.xlsx';
+    var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
 
+    return new Promise(function (resolve, reject) {
       wx.getFileSystemManager().writeFile({
         filePath: filePath,
         data: bytes.buffer,
@@ -305,9 +362,7 @@ function exportToXlsx(records, customFileName) {
         },
         fail: function (err) { reject(new Error('写入 xlsx 失败: ' + (err && err.errMsg))); }
       });
-    } catch (e) {
-      reject(e instanceof Error ? e : new Error(String(e)));
-    }
+    });
   });
 }
 

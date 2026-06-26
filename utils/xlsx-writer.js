@@ -47,11 +47,12 @@ var IMG_COL = 0;
  */
 function buildXlsx(records, columns, helpers) {
   helpers = helpers || {};
-  var getImageBytes = helpers.getImageBytes;
+  var imageBytesMap = helpers.imageBytesMap;   // 优先：预读字节 map {recordIdx: Uint8Array}
+  var getImageBytes = helpers.getImageBytes;   // 兜底：同步读取函数（已不推荐）
   var calcRowHeight = helpers.calcRowHeight || function () { return 60; };
   var calcImgDisplayH = helpers.calcImgDisplayH || function () { return 200; };
 
-  if (!getImageBytes) throw new Error('getImageBytes is required');
+  if (!imageBytesMap && !getImageBytes) throw new Error('imageBytesMap or getImageBytes is required');
 
   // 收集所有图片字节（提前读取，便于失败时整体回退）
   var imageEntries = []; // {rId, path, bytes, ext}
@@ -60,7 +61,11 @@ function buildXlsx(records, columns, helpers) {
   for (var i = 0; i < records.length; i++) {
     var rec = records[i];
     if (!rec.imagePath) continue;
-    var bytes = getImageBytes(rec.imagePath);
+    // 优先用预读字节，兜底同步读取
+    var bytes = imageBytesMap ? imageBytesMap[i] : null;
+    if ((!bytes || !bytes.length) && getImageBytes) {
+      bytes = getImageBytes(rec.imagePath);
+    }
     if (!bytes || !bytes.length) continue;
     imgIdx++;
     var ext = 'jpeg';
