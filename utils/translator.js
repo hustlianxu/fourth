@@ -523,6 +523,22 @@ function translateBatch(items, withDebug) {
       }
     });
   }).then(function (gr) {
+    // 条数校验：若批量切分有缺失（原文含 [数字] 等导致 LLM 输出错乱），
+    // 自动回退逐条翻译，保证结果正确（牺牲请求数换稳健性）
+    var hasNull = gr.results.some(function (r) { return r == null || r === ''; });
+    if (hasNull && gr.source !== 'api_fail') {
+      console.warn('[Translator] 批量结果有缺失（' + gr.results.filter(function(r){return r==null||r==='';}).length +
+        '/' + apiItems.length + '），回退逐条翻译');
+      return Promise.all(apiItems.map(function (a) {
+        return translate(a.text, a.from, a.to, true).then(function (r) { return r.result; });
+      })).then(function (oneByOneResults) {
+        gr.results = oneByOneResults;
+        gr.source = 'api_batch_fallback';
+        return gr;
+      });
+    }
+    return gr;
+  }).then(function (gr) {
     // 组装最终结果（与 items 同序）
     return items.map(function (item, idx) {
       var lr = localResults[idx];
