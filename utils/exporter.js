@@ -275,30 +275,74 @@ function exportToExcel(records, customFileName, onProgress) {
 
 /**
  * 翻译预处理：自动填充空缺的描述列（供 xlsx / 伪 xls 两条路径共用）
+ * 翻译方向依据文本真实语言（detectLang），而非依据字段名。
+ * 规则：
+ *   - desEs 空 + desZh 有值 → 检测 desZh 语言，译为另一种语言填到 desEs
+ *   - desZh 空 + desEs 有值 → 检测 desEs 语言，译为另一种语言填到 desZh
+ *   - 两者都有值或都空 → 不处理
+ * 例如：用户在 desEs 字段输入了中文（minimal/handwriteSimple 模板只有 desEs），
+ *       detectLang 判定为 'zh' → 翻译为西语填到 desZh，同时把原中文移到 desZh 保持字段语义
  */
 function preTranslateRecords(records, onProgress) {
-  var tasks = [];
-  var _async = translator;
-  // 串行处理每条记录的翻译
   var chain = Promise.resolve();
   records.forEach(function (rec, i) {
     chain = chain.then(function () {
       if (!rec.values) rec.values = {};
-      var desEs = rec.values.desEs || '';
-      var desZh = rec.values.desZh || '';
-      if (desEs.trim() && !desZh.trim()) {
-        if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
-        return translator.translate(desEs, 'es', 'zh', true).then(function (r1) {
-          console.log('[Exporter] ES→ZH 行' + (i + 1), r1.debug, '原文:', desEs, '译文:', r1.result);
-          if (r1.result) rec.values.desZh = r1.result;
-        });
-      } else if (desZh.trim() && !desEs.trim()) {
-        if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
-        return translator.translate(desZh, 'zh', 'es', true).then(function (r2) {
-          console.log('[Exporter] ZH→ES 行' + (i + 1), r2.debug, '原文:', desZh, '译文:', r2.result);
-          if (r2.result) rec.values.desEs = r2.result;
-        });
+      var desEs = (rec.values.desEs || '').trim();
+      var desZh = (rec.values.desZh || '').trim();
+
+      // 情况1：desZh 空 + desEs 有值 → 检测 desEs 语言，译为另一语言填到 desZh
+      if (desEs && !desZh) {
+        var lang = translator.detectLang(desEs);
+        if (lang === 'zh') {
+          // desEs 实际是中文 → 译为西语填到 desEs（覆盖，因为原内容是中文应放 desZh），
+          // 然后把原中文移到 desZh
+          if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
+          return translator.translate(desEs, 'zh', 'es', true).then(function (r) {
+            console.log('[Exporter] ZH→ES 行' + (i + 1), r.debug, '原文:', desEs, '译文:', r.result);
+            if (r.result) {
+              // 原中文移到 desZh，译文填到 desEs
+              rec.values.desZh = desEs;
+              rec.values.desEs = r.result;
+            }
+          });
+        } else if (lang === 'es') {
+          // desEs 是西语 → 译为中文填到 desZh
+          if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
+          return translator.translate(desEs, 'es', 'zh', true).then(function (r) {
+            console.log('[Exporter] ES→ZH 行' + (i + 1), r.debug, '原文:', desEs, '译文:', r.result);
+            if (r.result) rec.values.desZh = r.result;
+          });
+        }
+        // unknown（纯数字/符号）→ 不处理
+        return null;
       }
+
+      // 情况2：desEs 空 + desZh 有值 → 检测 desZh 语言，译为另一语言填到 desEs
+      if (desZh && !desEs) {
+        var lang2 = translator.detectLang(desZh);
+        if (lang2 === 'zh') {
+          // desZh 是中文 → 译为西语填到 desEs
+          if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
+          return translator.translate(desZh, 'zh', 'es', true).then(function (r) {
+            console.log('[Exporter] ZH→ES 行' + (i + 1), r.debug, '原文:', desZh, '译文:', r.result);
+            if (r.result) rec.values.desEs = r.result;
+          });
+        } else if (lang2 === 'es') {
+          // desZh 实际是西语 → 译为中文填到 desZh（覆盖），原文移到 desEs
+          if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
+          return translator.translate(desZh, 'es', 'zh', true).then(function (r) {
+            console.log('[Exporter] ES→ZH 行' + (i + 1), r.debug, '原文:', desZh, '译文:', r.result);
+            if (r.result) {
+              rec.values.desEs = desZh;
+              rec.values.desZh = r.result;
+            }
+          });
+        }
+        return null;
+      }
+
+      // 情况3：两者都有值或都空 → 不处理
       return null;
     });
   });
@@ -307,10 +351,12 @@ function preTranslateRecords(records, onProgress) {
 
 /**
  * 主路径：真实 .xlsx（OOXML，图片原始字节不压缩）
- * 先异步预读所有图片字节（对临时文件可靠），任一读取失败则 reject 触发回退到伪 xls
+ * 先翻译预处理，再异步预读图片字节，任一失败则 reject 触发回退到伪 xls
  */
-function exportToXlsx(records, customFileName) {
-  // 1. 异步预读所有图片字节（并行）
+function exportToXlsx(records, customFileName, onProgress) {
+  // 1. 翻译预处理（依据文本真实语言填充 desEs/desZh）
+  return preTranslateRecords(records, onProgress).then(function () {
+  // 2. 异步预读所有图片字节（并行）
   return preReadImageBytes(records).then(function (preRead) {
     // 有图片读取失败 → reject 触发回退（用户要求：图片无法导入则回退伪 xls）
     if (preRead.failures.length > 0) {
@@ -319,7 +365,7 @@ function exportToXlsx(records, customFileName) {
       throw new Error('图片读取失败：' + preRead.failures.length + ' 张无法导入');
     }
 
-    // 2. 构建 xlsx（同步，使用预读字节）
+    // 3. 构建 xlsx（同步，使用预读字节）
     var bytes;
     try {
       var flatRecords = flattenRecords(records);
@@ -363,14 +409,17 @@ function exportToXlsx(records, customFileName) {
         fail: function (err) { reject(new Error('写入 xlsx 失败: ' + (err && err.errMsg))); }
       });
     });
-  });
+  });  // preReadImageBytes.then
+  });  // preTranslateRecords.then
 }
 
 /**
  * 回退路径：伪 .xls（HTML + VML，base64 图片）
+ * 同样先翻译预处理，确保 desEs/desZh 双语填充
  */
-function exportToLegacyXls(records, customFileName) {
-  return buildHtmlTable(records).then(function (html) {
+function exportToLegacyXls(records, customFileName, onProgress) {
+  return preTranslateRecords(records, onProgress).then(function () {
+    return buildHtmlTable(records).then(function (html) {
     var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
     var fileName = baseName + '.xls';
     var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
@@ -395,7 +444,8 @@ function exportToLegacyXls(records, customFileName) {
         fail: function (err) { reject(err); }
       });
     });
-  });
+  });  // buildHtmlTable.then
+  });  // preTranslateRecords.then
 }
 
 module.exports = {

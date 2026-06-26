@@ -146,6 +146,32 @@ function getDefaultPromptTemplate() {
 
 // ============ 本地匹配 ============
 
+// 检测文本主要语言：返回 'zh' | 'es' | 'unknown'
+// 中文：含 CJK 统一汉字（U+4E00-U+9FFF）即判定为中文
+// 否则：含拉丁字母则判定为西语（es）
+// 纯数字/符号：unknown
+function detectLang(text) {
+  if (!text) return 'unknown';
+  var s = String(text);
+  var hasCJK = false;
+  var hasLatin = false;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    // CJK 统一汉字 + 扩展A区 + 兼容汉字
+    if ((c >= 0x4E00 && c <= 0x9FFF) ||
+        (c >= 0x3400 && c <= 0x4DBF) ||
+        (c >= 0xF900 && c <= 0xFAFF)) {
+      hasCJK = true;
+    } else if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) {
+      // 基本拉丁字母
+      hasLatin = true;
+    }
+  }
+  if (hasCJK) return 'zh';
+  if (hasLatin) return 'es';
+  return 'unknown';
+}
+
 // 构建双向查询索引（每次调用时合并内置+用户词）
 function buildIndex() {
   var all = builtin.BUILTIN_DICT.concat(getUserDict());
@@ -372,6 +398,7 @@ module.exports = {
   getDefaultPromptTemplate: getDefaultPromptTemplate,
   buildPrompt: buildPrompt,
   isWhitelist: isWhitelist,
+  detectLang: detectLang,
   buildIndex: buildIndex,
   localTranslateSegment: localTranslateSegment
 };
