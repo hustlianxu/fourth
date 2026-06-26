@@ -162,10 +162,11 @@ function buildXlsx(records, columns, helpers) {
     + 'xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing">';
 
   // 列宽（Excel 列宽单位 ≈ 字符数，1 字符约 7px）
-  var colWidths = helpers.calcColumnWidths ? helpers.calcColumnWidths(records) : columns.map(function () { return 80; });
+  // calcColumnWidths 返回 {key: widthPx} 对象，需按 column.key 取值
+  var colWidthsMap = helpers.calcColumnWidths ? helpers.calcColumnWidths(records) : {};
   sheetXml += '<cols>';
   for (var i = 0; i < columns.length; i++) {
-    var w = colWidths[i] || 80;
+    var w = colWidthsMap[columns[i].key] || 80;
     // px 转 Excel 列宽单位（约 w / 7）
     var cw = Math.max(8, Math.round(w / 7));
     sheetXml += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + cw + '" customWidth="1"/>';
@@ -235,17 +236,17 @@ function buildXlsx(records, columns, helpers) {
       var rec = records[ie.recordIdx];
       var imgH = calcImgDisplayH(rec);
       var rowIdx = ie.recordIdx + 2; // 数据行从 2 开始
-      // twoCellAnchor：图片锚定到「图片单元格」范围内
+      // twoCellAnchor（editAs 默认 twoCell）：图片锚定到「图片单元格」范围
       //   from = A{rowIdx} 单元格左上角（col=IMG_COL, row=rowIdx-1, 偏移0）
       //   to   = B{rowIdx+1} 单元格左上角（col=IMG_COL+1, row=rowIdx, 偏移0）
       //   即图片完整填充该图片列单元格，视觉上"内嵌"在单元格里
-      //   editAs="oneCell"：随单元格移动但不随行列缩放变形
+      //   editAs 默认 twoCell：随单元格移动且随行列缩放（真正内嵌，调整单元格图片跟着变）
       var fromCol = IMG_COL;
       var fromRow = rowIdx - 1; // 0-based 行索引
       var toCol = IMG_COL + 1;
       var toRow = rowIdx;       // 下一行的起点
 
-      drawingXml += '<xdr:twoCellAnchor editAs="oneCell">';
+      drawingXml += '<xdr:twoCellAnchor>';
       drawingXml += '<xdr:from><xdr:col>' + fromCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + fromRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>';
       drawingXml += '<xdr:to><xdr:col>' + toCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + toRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>';
       drawingXml += '<xdr:pic>';
