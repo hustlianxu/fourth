@@ -386,8 +386,7 @@ Page({
     });
   },
 
-  // 将临时照片持久化到用户目录，防止被微信回收
-  _persistOriginalPhoto(tempPath) {
+  _persistPhoto(tempPath, prefix) {
     return new Promise((resolve) => {
       const fs = wx.getFileSystemManager();
       fs.saveFile({
@@ -398,7 +397,7 @@ Page({
         },
         fail: (err) => {
           console.warn('[Camera] saveFile 失败，尝试 copyFile:', err);
-          const dest = wx.env.USER_DATA_PATH + '/photo_' + Date.now() + '.jpg';
+          const dest = wx.env.USER_DATA_PATH + '/' + (prefix || 'photo') + '_' + Date.now() + '.jpg';
           fs.copyFile({
             srcPath: tempPath,
             destPath: dest,
@@ -414,6 +413,14 @@ Page({
         }
       });
     });
+  },
+
+  _persistOriginalPhoto(tempPath) {
+    return this._persistPhoto(tempPath, 'orig');
+  },
+
+  _persistWatermarkPhoto(tempPath) {
+    return this._persistPhoto(tempPath, 'wm');
   },
 
   // 自动保存到系统相册（开关开启时，原图+水印图都存一份）
@@ -475,12 +482,14 @@ Page({
       });
       console.log('[Camera] 水印渲染完成:', outPath);
 
-      // 2. 持久化原图（供详情页重新渲染水印使用）
+      // 2. 持久化原图和水印图（防止临时文件被回收，Mac 开发者工具上尤其明显）
       const persistentPath = await this._persistOriginalPhoto(photo);
       console.log('[Camera] 原图持久化:', persistentPath);
+      const persistentWmPath = await this._persistWatermarkPhoto(outPath);
+      console.log('[Camera] 水印图持久化:', persistentWmPath);
 
       // 2.5 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
-      await this._autoSaveToAlbum(photo, outPath);
+      await this._autoSaveToAlbum(persistentPath, persistentWmPath);
 
       // 3. 入库
       const record = {
@@ -492,7 +501,7 @@ Page({
         watermarkOpacity: 0.85,
         watermarkWidthRatio: 0.42,
         values: this.data.values,
-        imagePath: outPath,
+        imagePath: persistentWmPath,
         originalPath: persistentPath,
         width: imgW,
         height: imgH,

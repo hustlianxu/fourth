@@ -388,7 +388,33 @@ Page({
       maxEdge: 4096
     });
 
-    return outPath;
+    // 持久化水印图，防止临时文件被回收（Mac 开发者工具上尤其明显）
+    const persistentWmPath = await this._persistWmPhoto(outPath);
+    console.log('[Detail] 水印图重渲并持久化:', persistentWmPath);
+    return persistentWmPath;
+  },
+
+  _persistWmPhoto(tempPath) {
+    return new Promise((resolve) => {
+      const fs = wx.getFileSystemManager();
+      fs.saveFile({
+        tempFilePath: tempPath,
+        success: (res) => { resolve(res.savedFilePath); },
+        fail: (err) => {
+          console.warn('[Detail] saveFile 失败，尝试 copyFile:', err);
+          const dest = wx.env.USER_DATA_PATH + '/wm_' + Date.now() + '.jpg';
+          fs.copyFile({
+            srcPath: tempPath,
+            destPath: dest,
+            success: () => { resolve(dest); },
+            fail: (err2) => {
+              console.error('[Detail] 持久化失败，使用临时路径:', err2);
+              resolve(tempPath);
+            }
+          });
+        }
+      });
+    });
   },
 
   onFieldInput(e) {

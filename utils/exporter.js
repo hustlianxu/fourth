@@ -55,33 +55,117 @@ function readFileAsBase64(filePath) {
   });
 }
 
+function _isArrayBuffer(obj) {
+  if (obj instanceof ArrayBuffer) return true;
+  if (obj && typeof obj === 'object' &&
+      Object.prototype.toString.call(obj) === '[object ArrayBuffer]') return true;
+  return false;
+}
+
+function _toUint8Array(data) {
+  if (!data) return null;
+  if (data instanceof Uint8Array) return data;
+  if (_isArrayBuffer(data)) return new Uint8Array(data);
+  if (typeof data === 'object' && _isArrayBuffer(data.buffer)) {
+    return new Uint8Array(data.buffer, data.byteOffset || 0, data.byteLength != null ? data.byteLength : data.buffer.byteLength);
+  }
+  if (typeof data === 'string') {
+    var len = data.length;
+    var arr = new Uint8Array(len);
+    for (var i = 0; i < len; i++) arr[i] = data.charCodeAt(i) & 0xff;
+    return arr;
+  }
+  return null;
+}
+
 /**
  * 异步读取图片文件原始字节（用于 xlsx 嵌入，不压缩）
- * 使用异步 readFile（对 wxfile://tmp_* 临时文件可靠），
- * 而非同步 readFileSync（部分平台对临时路径会失败）
+ * 使用异步 readFile，兼容跨 realm 的 ArrayBuffer（Mac 开发者工具常见）。
+ * 失败时回退到 readFileSync（base64→字节），进一步提升兼容性。
  */
 function readImageBytes(filePath) {
   return new Promise(function (resolve) {
     if (!filePath) { resolve(null); return; }
-    wx.getFileSystemManager().readFile({
+    var fs = wx.getFileSystemManager();
+    fs.readFile({
       filePath: filePath,
-      // 不指定 encoding → 返回 ArrayBuffer
       success: function (res) {
-        if (res && res.data instanceof ArrayBuffer) {
-          resolve(new Uint8Array(res.data));
-        } else if (res && res.data && res.data.buffer instanceof ArrayBuffer) {
-          resolve(new Uint8Array(res.data.buffer));
-        } else {
-          console.warn('[Exporter] 图片字节格式异常:', filePath, typeof res.data);
-          resolve(null);
+        var u8 = _toUint8Array(res && res.data);
+        if (u8 && u8.length > 0) {
+          resolve(u8);
+          return;
         }
+        // 异步读返回格式异常 → 回退同步读 base64
+        try {
+          var b64 = fs.readFileSync(filePath, 'base64');
+          if (b64 && typeof b64 === 'string' && b64.length > 0) {
+            var decoded = _base64ToUint8Array(b64);
+            if (decoded && decoded.length > 0) {
+              resolve(decoded);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[Exporter] 同步回退读取失败:', filePath, e);
+        }
+        console.warn('[Exporter] 图片字节格式异常:', filePath, typeof (res && res.data));
+        resolve(null);
       },
       fail: function (err) {
-        console.warn('[Exporter] 读取图片字节失败:', filePath, err);
+        console.warn('[Exporter] 读取图片字节失败，尝试同步回退:', filePath, err && err.errMsg);
+        try {
+          var b64_1 = fs.readFileSync(filePath, 'base64');
+          if (b64_1 && typeof b64_1 === 'string' && b64_1.length > 0) {
+            var decoded_1 = _base64ToUint8Array(b64_1);
+            if (decoded_1 && decoded_1.length > 0) {
+              resolve(decoded_1);
+              return;
+            }
+          }
+        } catch (e2) {
+          console.warn('[Exporter] 同步回退也失败:', filePath, e2);
+        }
         resolve(null);
       }
     });
   });
+}
+
+function _base64ToUint8Array(b64) {
+  if (typeof wx !== 'undefined' && wx.base64ToArrayBuffer) {
+    try {
+      var ab = wx.base64ToArrayBuffer(b64);
+      if (ab) return new Uint8Array(ab);
+    } catch (e) {}
+  }
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var str = String(b64).replace(/\s+/g, '');
+  var cleanStr = str.replace(/=+$/, '');
+  var len = cleanStr.length;
+  var byteLen = Math.floor(len * 3 / 4);
+  var bytes = new Uint8Array(byteLen);
+  var byteIdx = 0;
+  for (var i = 0; i < len; i += 4) {
+    var c1 = chars.indexOf(cleanStr.charAt(i));
+    var c2 = chars.indexOf(cleanStr.charAt(i + 1));
+    var c3 = i + 2 < len ? chars.indexOf(cleanStr.charAt(i + 2)) : -1;
+    var c4 = i + 3 < len ? chars.indexOf(cleanStr.charAt(i + 3)) : -1;
+    if (c1 < 0 || c2 < 0) break;
+    var b1 = (c1 << 2) | (c2 >> 4);
+    bytes[byteIdx++] = b1 & 0xff;
+    if (c3 >= 0) {
+      var b2 = ((c2 & 15) << 4) | (c3 >> 2);
+      bytes[byteIdx++] = b2 & 0xff;
+    }
+    if (c4 >= 0) {
+      var b3 = ((c3 & 3) << 6) | c4;
+      bytes[byteIdx++] = b3 & 0xff;
+    }
+  }
+  if (byteIdx !== byteLen) {
+    return bytes.subarray(0, byteIdx);
+  }
+  return bytes;
 }
 
 /**
