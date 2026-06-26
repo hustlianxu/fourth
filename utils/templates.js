@@ -8,7 +8,7 @@ const TEMPLATES = [
     id: 'handwrite',
     name: '手写·双语',
     description: 'Formato anotación · 货号 + 西语描述 + 中文描述 + 单价 + 装箱数 + 件数 + 体积 + 日期',
-    position: 'bottom-right',
+    position: 'bottom-center',
     style: {
       fontSize: 22,
       color: '#ffffff',
@@ -60,7 +60,7 @@ const TEMPLATES = [
     id: 'handwriteSimple',
     name: '手写·精简',
     description: 'Formato corto · 货号 + 西语描述 + 单价 + 装箱数 + 体积',
-    position: 'bottom-right',
+    position: 'bottom-center',
     style: {
       fontSize: 24,
       color: '#ffffff',
