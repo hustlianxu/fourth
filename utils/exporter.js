@@ -341,6 +341,11 @@ function preTranslateRecords(records, onProgress) {
       if (translated) {
         // 翻译成功：译文填到目标字段
         rec.values[t.fillTo] = r.result;
+        // 若指定了 moveOriginalTo（如 desEs=中文 → 译为西语，原文需移到 desZh），
+        // 必须把原文写到目标列，否则第4列为空
+        if (t.moveOriginalTo) {
+          rec.values[t.moveOriginalTo] = t.original;
+        }
       } else if (t.moveOriginalTo) {
         // 翻译失败但有 moveOriginalTo：清空 fillTo（避免原文残留），原文移到 moveOriginalTo
         rec.values[t.fillTo] = '';
