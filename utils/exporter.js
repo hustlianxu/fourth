@@ -334,12 +334,19 @@ function preTranslateRecords(records, onProgress) {
       var rec = records[t.recordIdx];
       console.log('[Exporter] ' + t.from.toUpperCase() + '→' + t.to.toUpperCase() + ' 行' + (t.recordIdx + 1),
         r.debug, '原文:', t.text, '译文:', r.result);
-      if (r.result) {
+      // 判断是否真正翻译成功（本地全命中 source=local_all，或 API 成功 source=api_*）
+      // 本地降级 source=local_no_api / local_api_fail 时 r.result 是原文，不算成功
+      var src = r.debug && r.debug.source;
+      var translated = r.result && src && src !== 'local_no_api' && src !== 'local_api_fail';
+      if (translated) {
+        // 翻译成功：译文填到目标字段
         rec.values[t.fillTo] = r.result;
-        if (t.moveOriginalTo) {
-          rec.values[t.moveOriginalTo] = t.original;
-        }
+      } else if (t.moveOriginalTo) {
+        // 翻译失败但有 moveOriginalTo：清空 fillTo（避免原文残留），原文移到 moveOriginalTo
+        rec.values[t.fillTo] = '';
+        rec.values[t.moveOriginalTo] = t.original;
       }
+      // 翻译失败且无 moveOriginalTo：原文留原字段，目标字段保持空
     });
   });
 }
