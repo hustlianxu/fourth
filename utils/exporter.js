@@ -1,8 +1,11 @@
 // utils/exporter.js
-// 导出记录为 Excel（HTML 格式，VML 嵌入原图，行高按图片比例自适应，列宽自适应内容）
+// 导出记录为 Excel：
+//   主路径 → 真实 .xlsx（OOXML，图片原始字节嵌入不压缩）
+//   回退路径 → 伪 .xls（HTML+VML，base64 图片）
 // 导出时自动翻译：desEs 有值 desZh 空 → 译为中文；desZh 有值 desEs 空 → 译为西语
 
 var translator = require('./translator.js');
+var xlsxWriter = require('./xlsx-writer.js');
 
 var COLUMNS = [
   { key: 'imagePath', header: 'FOTO', isImage: true },
@@ -49,6 +52,36 @@ function readFileAsBase64(filePath) {
         resolve(null);
       }
     });
+  });
+}
+
+/**
+ * 同步读取图片文件原始字节（用于 xlsx 嵌入，不压缩）
+ */
+function readImageBytesSync(filePath) {
+  try {
+    var res = wx.getFileSystemManager().readFileSync(filePath);
+    if (res && res instanceof ArrayBuffer) return new Uint8Array(res);
+    if (res && res.data instanceof ArrayBuffer) return new Uint8Array(res.data);
+    return null;
+  } catch (e) {
+    console.warn('[Exporter] 读取图片字节失败:', filePath, e);
+    return null;
+  }
+}
+
+/**
+ * 扁平化记录：把 rec.values[key] 提到 rec 顶层，便于 xlsx-writer 统一访问
+ */
+function flattenRecords(records) {
+  return records.map(function (rec) {
+    var flat = { imagePath: rec.imagePath, width: rec.width, height: rec.height };
+    COLUMNS.forEach(function (col) {
+      if (!col.isImage) {
+        flat[col.key] = (rec.values && rec.values[col.key] != null) ? rec.values[col.key] : '';
+      }
+    });
+    return flat;
   });
 }
 
@@ -109,27 +142,7 @@ function buildColGroup(colWidths) {
 }
 
 async function buildHtmlTable(records, onProgress) {
-  // 翻译预处理：自动填充空缺的描述列
-  // desEs 有值 desZh 空 → 译为中文填第4列
-  // desZh 有值 desEs 空 → 译为西语填第3列
-  for (var i = 0; i < records.length; i++) {
-    var rec = records[i];
-    if (!rec.values) rec.values = {};
-    var desEs = rec.values.desEs || '';
-    var desZh = rec.values.desZh || '';
-    if (desEs.trim() && !desZh.trim()) {
-      if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
-      var r1 = await translator.translate(desEs, 'es', 'zh', true);
-      console.log('[Exporter] ES→ZH 行' + (i + 1), r1.debug, '原文:', desEs, '译文:', r1.result);
-      if (r1.result) rec.values.desZh = r1.result;
-    } else if (desZh.trim() && !desEs.trim()) {
-      if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
-      var r2 = await translator.translate(desZh, 'zh', 'es', true);
-      console.log('[Exporter] ZH→ES 行' + (i + 1), r2.debug, '原文:', desZh, '译文:', r2.result);
-      if (r2.result) rec.values.desEs = r2.result;
-    }
-  }
-
+  // 翻译已在前置 preTranslateRecords 阶段完成，这里只负责生成 HTML
   var colWidths = calcColumnWidths(records);
 
   var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
@@ -198,12 +211,111 @@ async function buildHtmlTable(records, onProgress) {
   return html;
 }
 
+/**
+ * 导出主入口：先尝试真实 .xlsx，失败回退伪 .xls
+ */
 function exportToExcel(records, customFileName, onProgress) {
   if (!records || records.length === 0) throw new Error('没有选中任何记录');
 
   console.log('[Exporter] 导出记录数:', records.length, '自定义文件名:', customFileName || '(无)');
 
-  return buildHtmlTable(records, onProgress).then(function (html) {
+  // 1. 翻译预处理（两路径共用）
+  return preTranslateRecords(records, onProgress).then(function () {
+    // 2. 主路径：真实 xlsx
+    return exportToXlsx(records, customFileName).then(
+      function (path) { return path; },
+      function (err) {
+        console.warn('[Exporter] xlsx 生成失败，回退伪 xls:', err && err.message);
+        if (onProgress) onProgress('正在回退生成兼容 Excel...');
+        return exportToLegacyXls(records, customFileName);
+      }
+    );
+  });
+}
+
+/**
+ * 翻译预处理：自动填充空缺的描述列（供 xlsx / 伪 xls 两条路径共用）
+ */
+function preTranslateRecords(records, onProgress) {
+  var tasks = [];
+  var _async = translator;
+  // 串行处理每条记录的翻译
+  var chain = Promise.resolve();
+  records.forEach(function (rec, i) {
+    chain = chain.then(function () {
+      if (!rec.values) rec.values = {};
+      var desEs = rec.values.desEs || '';
+      var desZh = rec.values.desZh || '';
+      if (desEs.trim() && !desZh.trim()) {
+        if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ES→ZH)');
+        return translator.translate(desEs, 'es', 'zh', true).then(function (r1) {
+          console.log('[Exporter] ES→ZH 行' + (i + 1), r1.debug, '原文:', desEs, '译文:', r1.result);
+          if (r1.result) rec.values.desZh = r1.result;
+        });
+      } else if (desZh.trim() && !desEs.trim()) {
+        if (onProgress) onProgress('翻译中 ' + (i + 1) + '/' + records.length + ' (ZH→ES)');
+        return translator.translate(desZh, 'zh', 'es', true).then(function (r2) {
+          console.log('[Exporter] ZH→ES 行' + (i + 1), r2.debug, '原文:', desZh, '译文:', r2.result);
+          if (r2.result) rec.values.desEs = r2.result;
+        });
+      }
+      return null;
+    });
+  });
+  return chain;
+}
+
+/**
+ * 主路径：真实 .xlsx（OOXML，图片原始字节不压缩）
+ */
+function exportToXlsx(records, customFileName) {
+  return new Promise(function (resolve, reject) {
+    try {
+      var flatRecords = flattenRecords(records);
+      var colWidths = calcColumnWidths(records);
+      var bytes = xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
+        getImageBytes: readImageBytesSync,
+        calcRowHeight: calcRowHeight,
+        calcImgDisplayH: calcImgDisplayH,
+        calcColumnWidths: function () { return colWidths; },
+        imgColW: IMG_CELL_W
+      });
+
+      var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
+      var fileName = baseName + '.xlsx';
+      var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
+
+      wx.getFileSystemManager().writeFile({
+        filePath: filePath,
+        data: bytes.buffer,
+        encoding: 'binary',
+        success: function () {
+          console.log('[Exporter] xlsx 写入完成:', filePath, '大小:', bytes.length, 'bytes');
+          wx.openDocument({
+            filePath: filePath, fileType: 'xlsx', showMenu: true,
+            success: function () { resolve(filePath); },
+            fail: function (err) {
+              wx.shareFileMessage({
+                filePath: filePath, fileName: baseName + '.xlsx',
+                success: function () { resolve(filePath); },
+                fail: function () { reject(new Error('打开 xlsx 文件失败')); }
+              });
+            }
+          });
+        },
+        fail: function (err) { reject(new Error('写入 xlsx 失败: ' + (err && err.errMsg))); }
+      });
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}
+
+/**
+ * 回退路径：伪 .xls（HTML + VML，base64 图片）
+ */
+function exportToLegacyXls(records, customFileName) {
+  return buildHtmlTable(records).then(function (html) {
     var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
     var fileName = baseName + '.xls';
     var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
@@ -212,7 +324,7 @@ function exportToExcel(records, customFileName, onProgress) {
       wx.getFileSystemManager().writeFile({
         filePath: filePath, data: html, encoding: 'utf8',
         success: function () {
-          console.log('[Exporter] 写入完成:', filePath);
+          console.log('[Exporter] 伪 xls 写入完成:', filePath);
           wx.openDocument({
             filePath: filePath, fileType: 'xls', showMenu: true,
             success: function () { resolve(filePath); },
@@ -231,4 +343,9 @@ function exportToExcel(records, customFileName, onProgress) {
   });
 }
 
-module.exports = { exportToExcel: exportToExcel, sanitizeFileName: sanitizeFileName, COLUMNS: COLUMNS, buildHtmlTable: buildHtmlTable };
+module.exports = {
+  exportToExcel: exportToExcel,
+  sanitizeFileName: sanitizeFileName,
+  COLUMNS: COLUMNS,
+  buildHtmlTable: buildHtmlTable
+};

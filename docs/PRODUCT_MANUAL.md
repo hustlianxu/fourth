@@ -210,7 +210,7 @@
 
 | key | header | 说明 |
 |---|---|---|
-| imagePath | FOTO | 图片列（VML + img 双写，base64 内嵌） |
+| imagePath | FOTO | 图片列（原始字节嵌入，不压缩） |
 | modelo | CODIGO | 货号 |
 | desEs | DETALLADOS | 西语描述 |
 | desZh | 描述 | 中文描述 |
@@ -225,20 +225,31 @@
 导出前自动检测 desEs / desZh 缺哪列：
 - desEs 有值、desZh 空 → 译为中文填第 4 列。
 - desZh 有值、desEs 空 → 译为西语填第 3 列。
+- 翻译在前置阶段 `preTranslateRecords` 完成，xlsx / 伪 xls 两条路径共用。
 - 调 `translator.translate(..., true)` 带 debug，console.log 输出诊断。
 
-### 7.3 导出格式
+### 7.3 导出格式（双路径 + 自动回退）
 
-- 伪 `.xls`（实为 HTML + VML），`wx.getFileSystemManager().writeFile` 写到 `USER_DATA_PATH`。
-- `wx.openDocument` 打开，失败回退 `wx.shareFileMessage` 分享。
-- 列宽自适应（中文字符约 9px，最小 60px，FOTO 列固定 220px）。
-- 行高按图片宽高比自适应。
-- 表头蓝底白字 `#4472C4`，单元格文本格式防科学计数。
+**主路径：真实 .xlsx（OOXML）**
+- 由 `utils/xlsx-writer.js` + `utils/zip.js` 生成。
+- 图片以**原始字节**嵌入 `xl/media/imageN.jpeg`（STORE 模式不压缩，保持原画质）。
+- 单元格使用文本格式 `numFmtId=164`（防科学计数法）。
+- 表头蓝底白字 `#4472C4`，加粗。
+- 列宽 / 行高自适应（px → Excel 列宽单位 / 磅换算）。
+- 图片通过 drawing 层 `oneCellAnchor` 锚定到单元格。
+- `wx.openDocument({fileType:'xlsx'})` 打开，失败回退 `wx.shareFileMessage`。
+
+**回退路径：伪 .xls（HTML + VML）**
+- 仅在 xlsx 生成失败时触发（如 zip 构建异常、写入失败）。
+- 图片以 base64 内嵌（VML + `<img>` 双写）。
+- `wx.openDocument({fileType:'xls'})` 打开，失败回退 `wx.shareFileMessage`。
+- console.warn 输出回退原因。
 
 ### 7.4 文件名
 
 - `sanitizeFileName`：移除 `/\:*?"<>|`、空白转下划线、截断 50 字符。
 - 预填文件夹名或「水印照片导出」。
+- 主路径后缀 `.xlsx`，回退路径后缀 `.xls`。
 
 ---
 
@@ -370,7 +381,7 @@ API 失败 → 降级用本地结果
 ## 十二、已知限制
 
 1. **OCR 核验未启用**：详情页「识别与核验」卡片始终显示 mock 提示，需部署腾讯云 / 百度 OCR 云函数才能启用。
-2. **导出是伪 .xls**：实为 HTML + VML，依赖 Excel/WPS 兼容性打开，移动端可能只能通过 `shareFileMessage` 分享。
+2. **导出 xlsx 失败会回退伪 xls**：主路径生成真实 .xlsx，若 zip 构建或写入异常会自动回退到 HTML+VML 的伪 .xls（仍可打开，但可能提示格式警告）。
 3. **复制记录可能共享图片文件**：`copyFile` 失败时降级用原路径，多记录共享同一图片文件（删除其一不影响另一条，因 `storage.remove` 只删记录不删文件）。
 4. **本地存储会随清理小程序丢失**：建议重要照片另存相册。
 5. **provider 预设 model 名需自行核对**：如 `deepseek-v4-flash` / `MiniMax-M3` / `mimo-v2.5-pro` / `glm-4-flash`，以各平台最新文档为准。
@@ -382,4 +393,5 @@ API 失败 → 降级用本地结果
 
 | 日期 | 版本 | 变更 |
 |---|---|---|
+| 2026-06-25 | v1.1 | 导出改为真实 .xlsx（OOXML），图片原始字节不压缩，失败回退伪 .xls |
 | 2026-06-25 | v1.0 | 首版产品手册 |
