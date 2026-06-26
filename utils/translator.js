@@ -437,108 +437,138 @@ function translateBatch(items, withDebug) {
     }));
   }
 
-  // 构造单次合并请求：每条用 "[N](源→目) 原文" 标注，混合方向也能一次调用
-  // 避免特殊分隔符冲突：用编号+方向标注+换行结构，LLM 按 [N] 编号回译即可
-  var whitelistStr = getMergedWhitelist().join(', ');
-  var lines = apiItems.map(function (a, i) {
-    var fromName = a.from === 'zh' ? '中' : '西';
-    var toName = a.to === 'zh' ? '中' : '西';
-    return '[' + (i + 1) + '](' + fromName + '→' + toName + ') ' + a.text;
-  });
-  var merged = lines.join('\n');
+  // 单组批量翻译（同方向）：prompt 里只说明一次方向，每条只用 [编号] 原文，
+  // 不在每条上标注 (中→西)/(西→中)，避免 LLM 把方向标注回带污染译文
+  function _callGroup(groupItems, from, to) {
+    var whitelistStr = getMergedWhitelist().join(', ');
+    var sourceName = from === 'zh' ? '中文' : '西班牙语';
+    var targetName = to === 'zh' ? '中文' : '西班牙语';
+    var lines = groupItems.map(function (a, i) {
+      return '[' + (i + 1) + '] ' + a.text;
+    });
+    var merged = lines.join('\n');
 
-  var batchPrompt =
-    '请翻译以下多条文本，每条前已用 [编号](源语言→目标语言) 标注方向（中=中文，西=西班牙语）。\n' +
-    '规则：\n' +
-    '1. 数字、货号、通用符号（× · + / , . 等）保持不变；\n' +
-    '2. 以下词汇保持原文不翻译：' + whitelistStr + '\n' +
-    '3. 每条译文独占一行，以相同 [编号] 开头，格式：[编号]译文，不要解释、引号或多余内容；\n' +
-    '4. 严格按编号顺序输出，数量必须与输入一致。\n\n' +
-    '待翻译：\n' + merged;
+    var batchPrompt =
+      '请将以下多条文本从' + sourceName + '翻译为' + targetName + '。\n' +
+      '规则：\n' +
+      '1. 数字、货号、通用符号（× · + / , . 等）保持不变；\n' +
+      '2. 以下词汇保持原文不翻译：' + whitelistStr + '\n' +
+      '3. 每条译文独占一行，以相同 [编号] 开头，格式：[编号]译文，不要解释、引号或多余内容；\n' +
+      '4. 严格按编号顺序输出，数量必须与输入一致。\n\n' +
+      '待翻译：\n' + merged;
 
-  // 自定义 prompt（如有）替换基础部分，但保留批量结构说明
-  var custom = getCustomPrompt();
-  if (custom && custom.trim()) {
-    var sourceNameMixed = '混合';
-    var targetNameMixed = '按标注';
-    batchPrompt = custom
-      .replace(/\{source\}/g, sourceNameMixed)
-      .replace(/\{target\}/g, targetNameMixed)
-      .replace(/\{whitelist\}/g, whitelistStr)
-      .replace(/\{text\}/g, merged);
-    batchPrompt += '\n\n[批量模式：每条以 [编号](源→目) 开头，请按 [编号]译文 格式逐行输出，严格对应]';
+    // 自定义 prompt（如有）替换基础部分，但保留批量结构说明
+    var custom = getCustomPrompt();
+    if (custom && custom.trim()) {
+      batchPrompt = custom
+        .replace(/\{source\}/g, sourceName)
+        .replace(/\{target\}/g, targetName)
+        .replace(/\{whitelist\}/g, whitelistStr)
+        .replace(/\{text\}/g, merged);
+      batchPrompt += '\n\n[批量模式：每条以 [编号] 开头，请按 [编号]译文 格式逐行输出，严格对应]';
+    }
+
+    var model = cfg.model || 'deepseek-chat';
+    var t0 = Date.now();
+    return new Promise(function (resolve) {
+      wx.request({
+        url: cfg.baseURL.replace(/\/$/, '') + '/chat/completions',
+        method: 'POST',
+        header: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + cfg.apiKey
+        },
+        data: {
+          model: model,
+          messages: [{ role: 'user', content: batchPrompt }],
+          temperature: 0.3,
+          max_tokens: 4096
+        },
+        timeout: 60000,
+        success: function (res) {
+          var elapsed = Date.now() - t0;
+          if (res.statusCode === 200 && res.data && res.data.choices && res.data.choices[0]) {
+            var content = res.data.choices[0].message.content;
+            content = String(content || '').replace(/^["'「『]+|["'」』]+$/g, '').trim();
+            // 按 [编号] 切分译文，用正则匹配每行开头的 [N]
+            var resultMap2 = {};
+            var lineRegex = /\[(\d+)\]\s*([^\n]*)/g;
+            var m;
+            while ((m = lineRegex.exec(content)) !== null) {
+              var num = parseInt(m[1], 10);
+              var trans = m[2].trim();
+              if (num >= 1 && num <= groupItems.length) {
+                resultMap2[num] = trans;
+              }
+            }
+            // 兜底：若正则未匹配到任何编号行，尝试按换行直接切分（LLM 可能省略编号）
+            var fallbackParts = content.split(/\n+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+            var results = groupItems.map(function (a, i) {
+              var num = i + 1;
+              if (resultMap2[num] != null) return resultMap2[num];
+              if (fallbackParts.length === groupItems.length) return fallbackParts[i];
+              return null;
+            });
+            resolve({ results: results, elapsed: elapsed, source: 'api_batch' });
+          } else {
+            console.warn('[Translator] 批量 API 返回异常:', res.statusCode, res.data);
+            resolve({ results: groupItems.map(function () { return null; }), elapsed: elapsed, source: 'api_fail' });
+          }
+        },
+        fail: function (err) {
+          var elapsed = Date.now() - t0;
+          console.warn('[Translator] 批量 API 调用失败:', err);
+          resolve({ results: groupItems.map(function () { return null; }), elapsed: elapsed, source: 'api_fail' });
+        }
+      });
+    }).then(function (gr) {
+      // 条数校验：若本组切分有缺失（原文含 [数字] 等导致 LLM 输出错乱），
+      // 自动回退逐条翻译，保证结果正确（牺牲请求数换稳健性）
+      var hasNull = gr.results.some(function (r) { return r == null || r === ''; });
+      if (hasNull && gr.source !== 'api_fail') {
+        console.warn('[Translator] 组(' + from + '→' + to + ')批量结果有缺失，回退逐条翻译');
+        return Promise.all(groupItems.map(function (a) {
+          return translate(a.text, from, to, true).then(function (r) { return r.result; });
+        })).then(function (oneByOneResults) {
+          gr.results = oneByOneResults;
+          gr.source = 'api_batch_fallback';
+          return gr;
+        });
+      }
+      return gr;
+    });
   }
 
-  var model = cfg.model || 'deepseek-chat';
-  var t0 = Date.now();
-  return new Promise(function (resolve) {
-    wx.request({
-      url: cfg.baseURL.replace(/\/$/, '') + '/chat/completions',
-      method: 'POST',
-      header: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + cfg.apiKey
-      },
-      data: {
-        model: model,
-        messages: [{ role: 'user', content: batchPrompt }],
-        temperature: 0.3,
-        max_tokens: 4096
-      },
-      timeout: 60000,
-      success: function (res) {
-        var elapsed = Date.now() - t0;
-        if (res.statusCode === 200 && res.data && res.data.choices && res.data.choices[0]) {
-          var content = res.data.choices[0].message.content;
-          content = String(content || '').replace(/^["'「『]+|["'」』]+$/g, '').trim();
-          // 按 [编号] 切分译文，用正则匹配每行开头的 [N]
-          var resultMap2 = {};
-          var lineRegex = /\[(\d+)\]\s*([^\n]*)/g;
-          var m;
-          while ((m = lineRegex.exec(content)) !== null) {
-            var num = parseInt(m[1], 10);
-            var trans = m[2].trim();
-            if (num >= 1 && num <= apiItems.length) {
-              resultMap2[num] = trans;
-            }
-          }
-          // 兜底：若正则未匹配到任何编号行，尝试按换行直接切分（LLM 可能省略编号）
-          var fallbackParts = content.split(/\n+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
-          var apiResults = apiItems.map(function (a, i) {
-            var num = i + 1;
-            if (resultMap2[num] != null) return resultMap2[num];
-            if (fallbackParts.length === apiItems.length) return fallbackParts[i];
-            return null;
-          });
-          resolve({ results: apiResults, elapsed: elapsed, source: 'api_batch' });
-        } else {
-          console.warn('[Translator] 批量 API 返回异常:', res.statusCode, res.data);
-          resolve({ results: apiItems.map(function () { return null; }), elapsed: elapsed, source: 'api_fail' });
-        }
-      },
-      fail: function (err) {
-        var elapsed = Date.now() - t0;
-        console.warn('[Translator] 批量 API 调用失败:', err);
-        resolve({ results: apiItems.map(function () { return null; }), elapsed: elapsed, source: 'api_fail' });
-      }
+  // 按 (from, to) 分组：同方向归一组，每组单次 API 调用
+  // 同方向场景（导出最常见）仍为 1 次请求；混合方向最多 2 次（中→西 + 西→中）
+  var groupMap = {};
+  apiItems.forEach(function (a, apiIdx) {
+    var key = a.from + '|' + a.to;
+    if (!groupMap[key]) groupMap[key] = { from: a.from, to: a.to, items: [], apiIdxList: [] };
+    groupMap[key].items.push(a);
+    groupMap[key].apiIdxList.push(apiIdx);
+  });
+  var groupKeys = Object.keys(groupMap);
+
+  return Promise.all(groupKeys.map(function (gk) {
+    var g = groupMap[gk];
+    return _callGroup(g.items, g.from, g.to).then(function (gr) {
+      return { apiIdxList: g.apiIdxList, results: gr.results, source: gr.source, elapsed: gr.elapsed };
     });
-  }).then(function (gr) {
-    // 条数校验：若批量切分有缺失（原文含 [数字] 等导致 LLM 输出错乱），
-    // 自动回退逐条翻译，保证结果正确（牺牲请求数换稳健性）
-    var hasNull = gr.results.some(function (r) { return r == null || r === ''; });
-    if (hasNull && gr.source !== 'api_fail') {
-      console.warn('[Translator] 批量结果有缺失（' + gr.results.filter(function(r){return r==null||r==='';}).length +
-        '/' + apiItems.length + '），回退逐条翻译');
-      return Promise.all(apiItems.map(function (a) {
-        return translate(a.text, a.from, a.to, true).then(function (r) { return r.result; });
-      })).then(function (oneByOneResults) {
-        gr.results = oneByOneResults;
-        gr.source = 'api_batch_fallback';
-        return gr;
+  })).then(function (allGroups) {
+    // 合并各组结果到 apiResults（按 apiItems 顺序）
+    var apiResults = apiItems.map(function () { return null; });
+    var mergedSource = 'api_batch';
+    var maxElapsed = 0;
+    allGroups.forEach(function (ag) {
+      ag.apiIdxList.forEach(function (apiIdx, i) {
+        apiResults[apiIdx] = ag.results[i];
       });
-    }
-    return gr;
-  }).then(function (gr) {
+      if (ag.elapsed > maxElapsed) maxElapsed = ag.elapsed;
+      if (ag.source === 'api_fail') mergedSource = 'api_fail';
+      else if (ag.source === 'api_batch_fallback' && mergedSource !== 'api_fail') mergedSource = 'api_batch_fallback';
+    });
+
     // 组装最终结果（与 items 同序）
     return items.map(function (item, idx) {
       var lr = localResults[idx];
@@ -552,15 +582,15 @@ function translateBatch(items, withDebug) {
       for (var k = 0; k < apiItems.length; k++) {
         if (apiItems[k].origIdx === idx) { posInApi = k; break; }
       }
-      var apiResult = gr.results[posInApi];
+      var apiResult = apiResults[posInApi];
       if (apiResult) {
         return withDebug
-          ? { result: apiResult, debug: { source: gr.source, provider: cfg.provider, elapsed: gr.elapsed, batchPos: posInApi, batchSize: apiItems.length } }
+          ? { result: apiResult, debug: { source: mergedSource, provider: cfg.provider, elapsed: maxElapsed, batchPos: posInApi, batchSize: apiItems.length } }
           : apiResult;
       }
       // API 失败 → 本地结果降级
       return withDebug
-        ? { result: lr.localJoined, debug: { source: 'local_api_fail', reason: 'API 失败或返回空', elapsed: gr.elapsed } }
+        ? { result: lr.localJoined, debug: { source: 'local_api_fail', reason: 'API 失败或返回空', elapsed: maxElapsed } }
         : lr.localJoined;
     });
   });
