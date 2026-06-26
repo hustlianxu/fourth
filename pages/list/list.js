@@ -941,6 +941,8 @@ Page({
 
   async _doExport(selected, customFileName, format) {
     wx.showLoading({ title: '正在生成...', mask: true });
+    // 保持屏幕常亮，防止息屏导致翻译中断（切到后台仍会被微信挂起，属平台限制）
+    wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: true });
 
     try {
       const onProgress = function (msg) {
@@ -959,6 +961,7 @@ Page({
       }
 
       wx.hideLoading();
+      wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
       wx.showToast({ title: '导出完成', icon: 'success' });
 
       // 退出导出模式
@@ -973,6 +976,7 @@ Page({
       });
     } catch (e) {
       wx.hideLoading();
+      wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
       console.error('[List] 导出失败:', e);
       wx.showToast({ title: '导出失败: ' + (e.message || '').slice(0, 15), icon: 'none' });
     }

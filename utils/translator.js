@@ -376,10 +376,178 @@ function translate(text, from, to, withDebug) {
   });
 }
 
+// ============ 批量翻译（合并多条为单次 API 调用） ============
+
+/**
+ * 批量翻译：把多条文本合并为单次 API 调用，大幅减少请求次数与总耗时
+ * @param {Array<{text:string, from:string, to:string}>} items 待翻译项
+ * @param {boolean} withDebug 是否返回诊断信息
+ * @returns {Promise<Array<string|{result:string, debug:object}>>} 与 items 同序的结果数组
+ *
+ * 策略：
+ *   1. 对每条先做本地匹配，收集需调 API 的项（按 from/to 分组）
+ *   2. 相同 (from,to) 的项合并为一次 API 调用，用分隔符分隔，要求 LLM 按行返回
+ *   3. 本地全命中的项直接返回
+ *   4. 未配置 API 或 API 失败 → 用本地结果降级
+ */
+function translateBatch(items, withDebug) {
+  if (!items || items.length === 0) return Promise.resolve([]);
+
+  var index = buildIndex();
+
+  // 第一遍：每条做本地匹配
+  var localResults = items.map(function (item) {
+    var text = item.text || '';
+    var from = item.from;
+    var to = item.to;
+    if (!text || !text.trim()) {
+      return { segs: [], localJoined: '', miss: [], needApi: false, from: from, to: to };
+    }
+    var segs = splitText(text).map(function (seg) {
+      var r = localTranslateSegment(seg, from, to, index);
+      return { seg: seg, translated: r.translated, result: r.result };
+    });
+    var miss = segs.filter(function (s) {
+      if (s.translated) return false;
+      if (/^[\s·×+\-\/,，.。:;：；]*$/.test(s.seg)) return false;
+      return true;
+    });
+    var localJoined = segs.map(function (i) { return i.result; }).join('');
+    return { segs: segs, localJoined: localJoined, miss: miss, needApi: miss.length > 0, from: from, to: to };
+  });
+
+  // 收集需调 API 的项索引（按 from→to 分组）
+  var groups = {};  // key: "from|to" → [index]
+  localResults.forEach(function (lr, idx) {
+    if (lr.needApi) {
+      var key = lr.from + '|' + lr.to;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(idx);
+    }
+  });
+
+  var cfg = getConfig();
+  var noApi = !cfg || !cfg.apiKey || !cfg.baseURL;
+
+  // 每组构造一次批量 API 调用
+  var groupPromises = Object.keys(groups).map(function (key) {
+    var idxs = groups[key];
+    var keyParts = key.split('|');
+    var from = keyParts[0];
+    var to = keyParts[1];
+
+    // 未配置 API → 全部用本地结果
+    if (noApi) {
+      return Promise.resolve({ key: key, results: idxs.map(function () { return null; }) });
+    }
+
+    // 合并所有待翻译文本，用 "|||WATERMARK|||" 分隔（要求 LLM 按行返回）
+    var texts = idxs.map(function (i) { return items[i].text; });
+    var merged = texts.join('\n|||WATERMARK|||\n');
+
+    // 构造批量 prompt
+    var targetName = to === 'zh' ? '中文' : '西班牙语';
+    var sourceName = from === 'zh' ? '中文' : '西班牙语';
+    var whitelistStr = getMergedWhitelist().join(', ');
+    var batchPrompt =
+      '请将以下多条文本从' + sourceName + '翻译为' + targetName + '。\n' +
+      '规则：\n' +
+      '1. 数字、货号、通用符号（× · + / , . 等）保持不变；\n' +
+      '2. 以下词汇保持原文不翻译：' + whitelistStr + '\n' +
+      '3. 直接返回翻译结果，每条文本的译文占一行，不要解释，不要加引号，不要添加任何多余内容；\n' +
+      '4. 输入的多条文本用 "|||WATERMARK|||" 分隔，输出也请用相同的分隔符分隔对应译文。\n\n' +
+      '原文：\n' + merged;
+
+    // 用自定义 prompt（如有）替换，保留占位符逻辑
+    var custom = getCustomPrompt();
+    if (custom && custom.trim()) {
+      batchPrompt = custom
+        .replace(/\{source\}/g, sourceName)
+        .replace(/\{target\}/g, targetName)
+        .replace(/\{whitelist\}/g, whitelistStr)
+        .replace(/\{text\}/g, merged);
+      // 自定义 prompt 没有分隔符约定，追加批量说明
+      if (batchPrompt.indexOf('|||WATERMARK|||') < 0) {
+        batchPrompt += '\n\n[批量模式：输入多行用 |||WATERMARK||| 分隔，输出也请用相同分隔符分隔]';
+      }
+    }
+
+    var model = cfg.model || 'deepseek-chat';
+    var t0 = Date.now();
+    return new Promise(function (resolve) {
+      wx.request({
+        url: cfg.baseURL.replace(/\/$/, '') + '/chat/completions',
+        method: 'POST',
+        header: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + cfg.apiKey
+        },
+        data: {
+          model: model,
+          messages: [{ role: 'user', content: batchPrompt }],
+          temperature: 0.3,
+          max_tokens: 4096
+        },
+        timeout: 60000,
+        success: function (res) {
+          var elapsed = Date.now() - t0;
+          if (res.statusCode === 200 && res.data && res.data.choices && res.data.choices[0]) {
+            var content = res.data.choices[0].message.content;
+            content = String(content || '').replace(/^["'「『]+|["'」』]+$/g, '').trim();
+            // 按分隔符切分回多条
+            var splitParts = content.split(/\|\|\|WATERMARK\|\|\|/).map(function (s) { return s.trim(); });
+            resolve({ key: key, results: splitParts, elapsed: elapsed, source: 'api_batch' });
+          } else {
+            console.warn('[Translator] 批量 API 返回异常:', res.statusCode, res.data);
+            resolve({ key: key, results: idxs.map(function () { return null; }), elapsed: elapsed, source: 'api_fail' });
+          }
+        },
+        fail: function (err) {
+          var elapsed = Date.now() - t0;
+          console.warn('[Translator] 批量 API 调用失败:', err);
+          resolve({ key: key, results: idxs.map(function () { return null; }), elapsed: elapsed, source: 'api_fail' });
+        }
+      });
+    });
+  });
+
+  return Promise.all(groupPromises).then(function (groupResults) {
+    // 按 key 索引结果
+    var resultMap = {};
+    groupResults.forEach(function (gr) { resultMap[gr.key] = gr; });
+
+    // 组装最终结果（与 items 同序）
+    return items.map(function (item, idx) {
+      var lr = localResults[idx];
+      // 本地全命中
+      if (!lr.needApi) {
+        return withDebug
+          ? { result: lr.localJoined, debug: { source: 'local_all', missCount: 0 } }
+          : lr.localJoined;
+      }
+      var key = item.from + '|' + item.to;
+      var gr = resultMap[key];
+      // 在该组中的位置
+      var posInGroup = groups[key].indexOf(idx);
+      var apiResult = gr && gr.results && gr.results[posInGroup];
+      if (apiResult) {
+        return withDebug
+          ? { result: apiResult, debug: { source: gr.source || 'api_batch', provider: cfg.provider, elapsed: gr.elapsed, batchPos: posInGroup, batchSize: groups[key].length } }
+          : apiResult;
+      }
+      // API 失败 → 本地结果降级
+      return withDebug
+        ? { result: lr.localJoined, debug: { source: 'local_api_fail', reason: 'API 失败或返回空', elapsed: gr && gr.elapsed } }
+        : lr.localJoined;
+    });
+  });
+}
+
 // ============ 模块导出 ============
 
 module.exports = {
   translate: translate,
+  translateBatch: translateBatch,
   getUserDict: getUserDict,
   setUserDict: setUserDict,
   getUserWhitelist: getUserWhitelist,
