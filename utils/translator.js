@@ -427,14 +427,14 @@ function translateBatch(items, withDebug) {
     }
   });
 
-  // 未配置 API 或无待翻译项 → 直接用本地结果
+  // 未配置 API 或无待翻译项 → 直接用本地结果（用 Promise.resolve 包裹保持返回 Promise）
   if (noApi || apiItems.length === 0) {
-    return items.map(function (item, idx) {
+    return Promise.resolve(items.map(function (item, idx) {
       var lr = localResults[idx];
       return withDebug
         ? { result: lr.localJoined, debug: { source: noApi ? 'local_no_api' : 'local_all', missCount: lr.miss.length } }
         : lr.localJoined;
-    });
+    }));
   }
 
   // 构造单次合并请求：每条用 "[N](源→目) 原文" 标注，混合方向也能一次调用
