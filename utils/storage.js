@@ -4,6 +4,7 @@
 const KEY_PHOTOS = 'watermark_photos';
 const KEY_TEMPLATES = 'watermark_custom_tpls';
 const KEY_FOLDERS = 'watermark_folders';
+const KEY_AUTO_ALBUM = 'watermark_auto_save_album';  // 是否拍照后自动保存到系统相册
 
 // ===== 内部辅助 =====
 
@@ -160,6 +161,20 @@ function genId() {
   return 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 }
 
+// ===== 自动保存相册配置 =====
+
+function getAutoSaveAlbum() {
+  try {
+    return wx.getStorageSync(KEY_AUTO_ALBUM) === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function setAutoSaveAlbum(enabled) {
+  wx.setStorageSync(KEY_AUTO_ALBUM, !!enabled);
+}
+
 module.exports = {
   getAll,
   getById,
@@ -180,5 +195,8 @@ module.exports = {
   // 自定义模板
   getCustomTemplates,
   saveCustomTemplate,
-  deleteCustomTemplate
+  deleteCustomTemplate,
+  // 自动保存相册
+  getAutoSaveAlbum,
+  setAutoSaveAlbum
 };

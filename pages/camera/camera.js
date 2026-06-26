@@ -416,6 +416,44 @@ Page({
     });
   },
 
+  // 自动保存到系统相册（开关开启时，原图+水印图都存一份）
+  // 平台限制：wx.saveImageToPhotosAlbum 需用户授权 scope.writePhotosAlbum
+  _autoSaveToAlbum(originalPath, watermarkedPath) {
+    if (!storage.getAutoSaveAlbum()) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      let saved = 0;
+      const total = 2;
+      const checkDone = () => {
+        saved++;
+        if (saved >= total) {
+          console.log('[Camera] 自动保存相册完成');
+          resolve(true);
+        }
+      };
+      // 保存原图
+      wx.saveImageToPhotosAlbum({
+        filePath: originalPath,
+        success: () => { console.log('[Camera] 原图已存相册'); checkDone(); },
+        fail: (err) => {
+          console.warn('[Camera] 原图存相册失败:', err && err.errMsg);
+          checkDone();
+        }
+      });
+      // 保存水印图
+      wx.saveImageToPhotosAlbum({
+        filePath: watermarkedPath,
+        success: () => { console.log('[Camera] 水印图已存相册'); checkDone(); },
+        fail: (err) => {
+          console.warn('[Camera] 水印图存相册失败:', err && err.errMsg);
+          checkDone();
+        }
+      });
+    }).catch((e) => {
+      console.warn('[Camera] 自动保存相册异常:', e);
+      return false;
+    });
+  },
+
   // 一步保存：渲染水印 → 持久化原图 → 入库 → 跳转详情页
   async _saveAndGoDetail(photo, photoInfo) {
     wx.showLoading({ title: '保存中...', mask: true });
@@ -440,6 +478,9 @@ Page({
       // 2. 持久化原图（供详情页重新渲染水印使用）
       const persistentPath = await this._persistOriginalPhoto(photo);
       console.log('[Camera] 原图持久化:', persistentPath);
+
+      // 2.5 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
+      await this._autoSaveToAlbum(photo, outPath);
 
       // 3. 入库
       const record = {

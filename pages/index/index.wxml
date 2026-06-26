@@ -41,5 +41,13 @@
     </view>
   </view>
 
+  <view class="card setting-row">
+    <view class="setting-info">
+      <view class="setting-title">自动保存到相册</view>
+      <view class="setting-desc">拍照后自动将原图和水印图存入系统相册，防止小程序数据丢失</view>
+    </view>
+    <switch checked="{{autoSaveAlbum}}" bindchange="onToggleAutoAlbum" color="#07c160"/>
+  </view>
+
   <view class="footer" bindtap="goAbout">使用说明</view>
 </view>

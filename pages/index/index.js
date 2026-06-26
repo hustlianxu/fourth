@@ -6,11 +6,24 @@ Page({
   data: {
     templates: [],
     selectedId: 'minimal',
-    total: 0
+    total: 0,
+    autoSaveAlbum: false
   },
 
   onLoad() {
     this.loadTemplates();
+    this.setData({ autoSaveAlbum: storage.getAutoSaveAlbum() });
+  },
+
+  onToggleAutoAlbum(e) {
+    const enabled = e.detail.value;
+    storage.setAutoSaveAlbum(enabled);
+    this.setData({ autoSaveAlbum: enabled });
+    if (enabled) {
+      wx.showToast({ title: '已开启自动保存相册', icon: 'success' });
+    } else {
+      wx.showToast({ title: '已关闭', icon: 'none' });
+    }
   },
 
   loadTemplates() {
@@ -55,7 +68,7 @@ Page({
 
   onShow() {
     const list = storage.getAll();
-    this.setData({ total: list.length });
+    this.setData({ total: list.length, autoSaveAlbum: storage.getAutoSaveAlbum() });
     this.loadTemplates();
   }
 });

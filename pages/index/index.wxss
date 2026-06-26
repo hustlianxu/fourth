@@ -98,6 +98,31 @@
   margin-top: 48rpx;
 }
 
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 24rpx;
+}
+
+.setting-info {
+  flex: 1;
+}
+
+.setting-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.setting-desc {
+  font-size: 24rpx;
+  color: #888;
+  margin-top: 6rpx;
+  line-height: 1.5;
+}
+
 /* ===== 暗黑模式 ===== */
 @media (prefers-color-scheme: dark) {
   .hero {
@@ -140,5 +165,13 @@
 
   .footer {
     color: rgb(99, 99, 99);
+  }
+
+  .setting-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .setting-desc {
+    color: rgb(149, 149, 149);
   }
 }
