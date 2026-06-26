@@ -27,7 +27,8 @@ Page({
     ocrResult: null,
     verifyIssues: [],
     // 浮层菜单
-    showActionMenu: false
+    showActionMenu: false,
+    autoSaveEditAlbum: false
   },
 
   recordId: '',
@@ -48,6 +49,7 @@ Page({
     this.recordId = options.id;
     const windowInfo = wx.getWindowInfo();
     this.screenWidth = windowInfo.windowWidth;
+    this.setData({ autoSaveEditAlbum: storage.getAutoSaveEditAlbum() });
   },
 
   onReady() {},
@@ -329,7 +331,17 @@ Page({
         storage.update(this.recordId, patch);
 
         wx.hideLoading();
-        wx.showToast({ title: '已更新', icon: 'success' });
+
+        // 若开启"自动保存修改到相册"，则把修改后的水印图存入系统相册，防止小程序数据丢失
+        if (this.data.autoSaveEditAlbum) {
+          wx.saveImageToPhotosAlbum({
+            filePath: newImagePath,
+            success: () => wx.showToast({ title: '已更新并保存到相册', icon: 'success' }),
+            fail: () => wx.showToast({ title: '已更新（相册保存失败）', icon: 'none' })
+          });
+        } else {
+          wx.showToast({ title: '已更新', icon: 'success' });
+        }
 
         this.load();
         this.setData({ editing: false, editValues: {}, showWmOverlay: false, displayPhoto: newImagePath });
@@ -461,6 +473,12 @@ Page({
         }
       }
     });
+  },
+
+  onToggleAutoSaveEdit(e) {
+    const v = e.detail.value;
+    storage.setAutoSaveEditAlbum(v);
+    this.setData({ autoSaveEditAlbum: v });
   },
 
   onShareAppMessage() {

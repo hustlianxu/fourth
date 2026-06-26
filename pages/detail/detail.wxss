@@ -219,6 +219,32 @@
   margin-top: 8rpx;
 }
 
+/* 自动保存到相册开关卡片 */
+.auto-save-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 16rpx;
+}
+
+.auto-save-info {
+  flex: 1;
+}
+
+.auto-save-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.auto-save-desc {
+  font-size: 24rpx;
+  color: #888;
+  margin-top: 6rpx;
+  line-height: 1.5;
+}
+
 /* ===== 暗黑模式 ===== */
 @media (prefers-color-scheme: dark) {
   .action-fab {
@@ -283,5 +309,13 @@
 
   .issue {
     color: rgb(250, 173, 20);
+  }
+
+  .auto-save-title {
+    color: rgb(231, 231, 231);
+  }
+
+  .auto-save-desc {
+    color: rgb(149, 149, 149);
   }
 }

@@ -101,4 +101,12 @@
     <view class="btn secondary" bindtap="onSaveAlbum" style="flex:1;margin-right:16rpx;">保存到相册</view>
     <view class="btn" bindtap="onEditToggle" style="flex:1;">{{editing ? '保存修改' : '编辑字段'}}</view>
   </view>
+
+  <view class="card auto-save-card">
+    <view class="auto-save-info">
+      <view class="auto-save-title">自动保存修改到相册</view>
+      <view class="auto-save-desc">开启后，点击“保存修改”会自动将修改后的水印照片存入系统相册，防止小程序数据丢失</view>
+    </view>
+    <switch checked="{{autoSaveEditAlbum}}" bindchange="onToggleAutoSaveEdit" color="#07c160"/>
+  </view>
 </view>
