@@ -117,7 +117,7 @@
         <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
         <view class="record-body">
           <view class="record-title">{{item.customName || item.templateName}}</view>
-          <view class="record-time">{{item.timeText}}</view>
+          <view class="record-time">{{item.timeText}}<text wx:if="{{item.sizeText}}" class="record-meta">{{item.sizeText}}</text></view>
           <view class="record-summary">{{item.summary}}</view>
         </view>
       </view>

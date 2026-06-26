@@ -217,8 +217,14 @@ Page({
     }
     const list = raw.map((item) => {
       const date = new Date(item.createdAt);
+      // 分辨率暗文：宽×高 + 文件大小（KB），异步填充 sizeText
+      const resolutionText = (item.width && item.height)
+        ? (item.width + '×' + item.height)
+        : '';
       return Object.assign({}, item, {
         timeText: templates.formatDateTime(date),
+        metaText: resolutionText ? '· ' + resolutionText : '',
+        sizeText: '',  // 异步填充
         summary: this._buildSummary(item),
         _checked: !!prevCheckedMap[item.id],
         _swipeX: 0,
@@ -227,6 +233,8 @@ Page({
         _swipeActionsW: 0
       });
     });
+    // 异步读取每条记录的图片文件大小，回填 sizeText（暗文）
+    this._fillImageSizes(list);
     // 按创建时间倒序
     list.sort((a, b) => b.createdAt - a.createdAt);
 
@@ -287,6 +295,31 @@ Page({
     return Object.keys(item.values).slice(0, 3).map((k) => {
       return k + ': ' + (item.values[k] || '');
     }).join(' · ');
+  },
+
+  // 异步读取每条记录图片的文件大小，回填 sizeText（与分辨率一起作为暗文显示）
+  _fillImageSizes(list) {
+    const fs = wx.getFileSystemManager();
+    const that = this;
+    list.forEach((item, idx) => {
+      if (!item.imagePath) return;
+      fs.getFileInfo({
+        filePath: item.imagePath,
+        success: function (res) {
+          const size = res.size || 0;
+          const kb = size > 1024 ? (size / 1024).toFixed(0) + 'KB' : size + 'B';
+          const sizeText = item.metaText ? (item.metaText + ' · ' + kb) : ('· ' + kb);
+          // 路径式 setData，避免重建数组导致滑动抖动
+          that.setData({ ['list[' + idx + '].sizeText']: sizeText });
+        },
+        fail: function () {
+          // 读取失败则只显示分辨率
+          if (item.metaText) {
+            that.setData({ ['list[' + idx + '].sizeText']: item.metaText });
+          }
+        }
+      });
+    });
   },
 
   // ===== 页面导航 =====

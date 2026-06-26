@@ -235,22 +235,26 @@ function buildXlsx(records, columns, helpers) {
       var rec = records[ie.recordIdx];
       var imgH = calcImgDisplayH(rec);
       var rowIdx = ie.recordIdx + 2; // 数据行从 2 开始
-      // 锚定到单元格 A{rowIdx}，从 (0,0) 偏移开始
+      // twoCellAnchor：图片锚定到「图片单元格」范围内
+      //   from = A{rowIdx} 单元格左上角（col=IMG_COL, row=rowIdx-1, 偏移0）
+      //   to   = B{rowIdx+1} 单元格左上角（col=IMG_COL+1, row=rowIdx, 偏移0）
+      //   即图片完整填充该图片列单元格，视觉上"内嵌"在单元格里
+      //   editAs="oneCell"：随单元格移动但不随行列缩放变形
       var fromCol = IMG_COL;
-      var fromRow = rowIdx - 1; // from 是行的上边界，0-based
-      var toCol = IMG_COL;
-      var toRow = rowIdx; // 到下一行的上边界
+      var fromRow = rowIdx - 1; // 0-based 行索引
+      var toCol = IMG_COL + 1;
+      var toRow = rowIdx;       // 下一行的起点
 
-      drawingXml += '<xdr:oneCellAnchor>';
+      drawingXml += '<xdr:twoCellAnchor editAs="oneCell">';
       drawingXml += '<xdr:from><xdr:col>' + fromCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + fromRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>';
-      drawingXml += '<xdr:ext cx="' + (imgColW * EMU_PER_PX) + '" cy="' + (imgH * EMU_PER_PX) + '"/>';
+      drawingXml += '<xdr:to><xdr:col>' + toCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + toRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>';
       drawingXml += '<xdr:pic>';
       drawingXml += '<xdr:nvPicPr><xdr:cNvPr id="' + (i + 1) + '" name="图片' + (i + 1) + '"/><xdr:cNvPicPr/></xdr:nvPicPr>';
       drawingXml += '<xdr:blipFill><a:blip r:embed="' + ie.rId + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>';
       drawingXml += '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + (imgColW * EMU_PER_PX) + '" cy="' + (imgH * EMU_PER_PX) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>';
       drawingXml += '</xdr:pic>';
       drawingXml += '<xdr:clientData/>';
-      drawingXml += '</xdr:oneCellAnchor>';
+      drawingXml += '</xdr:twoCellAnchor>';
     }
 
     drawingXml += '</xdr:wsDr>';

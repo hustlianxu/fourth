@@ -183,6 +183,13 @@
   margin-top: 4rpx;
 }
 
+/* 时间后的分辨率+大小暗文（更浅、更小） */
+.record-meta {
+  color: #bbb;
+  font-size: 20rpx;
+  margin-left: 8rpx;
+}
+
 .record-summary {
   color: #444;
   font-size: 24rpx;
@@ -610,6 +617,10 @@
 
   .record-time {
     color: rgb(115, 115, 115);
+  }
+
+  .record-meta {
+    color: rgb(90, 90, 90);
   }
 
   .record-summary {
