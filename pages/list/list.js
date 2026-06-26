@@ -924,13 +924,39 @@ Page({
     if (selected.length === 0) return;
 
     const customFileName = this.data.exportFileName.trim() || null;
+    const that = this;
 
+    // 选择导出格式：xlsx（真实 OOXML，图片原始字节不压缩）/ xls（伪 xls，HTML+VML，base64 图片）
+    wx.showActionSheet({
+      itemList: ['xlsx（推荐·图片不压缩）', 'xls（伪 xls·兼容老版本）'],
+      success: function (res) {
+        if (res.tapIndex === 0) {
+          that._doExport(selected, customFileName, 'xlsx');
+        } else if (res.tapIndex === 1) {
+          that._doExport(selected, customFileName, 'xls');
+        }
+      }
+    });
+  },
+
+  async _doExport(selected, customFileName, format) {
     wx.showLoading({ title: '正在生成...', mask: true });
 
     try {
-      await exporter.exportToExcel(selected, customFileName, function (msg) {
+      const onProgress = function (msg) {
         wx.showLoading({ title: msg, mask: true });
-      });
+      };
+
+      if (format === 'xlsx') {
+        // 真实 xlsx（图片原始字节嵌入不压缩，失败不回退以暴露问题）
+        await exporter.exportToXlsx(selected, customFileName, onProgress);
+      } else if (format === 'xls') {
+        // 伪 xls（HTML + VML，base64 图片）
+        await exporter.exportToLegacyXls(selected, customFileName, onProgress);
+      } else {
+        // 自动模式：先 xlsx 失败回退伪 xls
+        await exporter.exportToExcel(selected, customFileName, onProgress);
+      }
 
       wx.hideLoading();
       wx.showToast({ title: '导出完成', icon: 'success' });

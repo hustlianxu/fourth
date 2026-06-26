@@ -400,6 +400,8 @@ function exportToLegacyXls(records, customFileName) {
 
 module.exports = {
   exportToExcel: exportToExcel,
+  exportToXlsx: exportToXlsx,
+  exportToLegacyXls: exportToLegacyXls,
   sanitizeFileName: sanitizeFileName,
   COLUMNS: COLUMNS,
   buildHtmlTable: buildHtmlTable
