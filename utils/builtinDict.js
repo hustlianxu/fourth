@@ -142,7 +142,7 @@ var BUILTIN_DICT = [
   { zh: '爆款', es: 'éxito de ventas' },
   { zh: '现货', es: 'en stock' },
   { zh: '缺货', es: 'agotado' },
-  { zh: '预售', es: 'preventaa' },
+  { zh: '预售', es: 'preventa' },
   { zh: '定制', es: 'personalizado' },
   { zh: '样品', es: 'muestra' },
   { zh: '免运费', es: 'envío gratis' },

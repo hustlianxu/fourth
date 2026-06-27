@@ -221,14 +221,15 @@ Page({
       newX = Math.max(0, Math.min(newX, this.viewportW - (this._wmEstW || 120) * s));
       if (this.data.wmPosStyle.indexOf('bottom') >= 0) {
         let newB = this.wmStartY - dy;
-        newB = Math.max(0, Math.min(newB, this.viewportH - 40));
+        // 下边界用预览层实际高度（乘缩放），避免水印整体被拖出取景框底部
+        newB = Math.max(0, Math.min(newB, this.viewportH - (this._wmEstH || 40) * s));
         this.setData({
           wmX: Math.round(newX), wmBottom: Math.round(newB),
           wmPosStyle: 'left: ' + Math.round(newX) + 'px; bottom: ' + Math.round(newB) + 'px;'
         });
       } else {
         let newY = this.wmStartY + dy;
-        newY = Math.max(-this.viewportH * 0.3, Math.min(newY, this.viewportH - 40));
+        newY = Math.max(-this.viewportH * 0.3, Math.min(newY, this.viewportH - (this._wmEstH || 40) * s));
         this.setData({
           wmX: Math.round(newX), wmY: Math.round(newY),
           wmPosStyle: 'left: ' + Math.round(newX) + 'px; top: ' + Math.round(newY) + 'px;'
