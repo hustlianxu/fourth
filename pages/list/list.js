@@ -301,22 +301,36 @@ Page({
   _fillImageSizes(list) {
     const fs = wx.getFileSystemManager();
     const that = this;
+    // 每次加载自增 token，异步回调比对 token，防止列表重建后旧回调写错位置
+    this._fillToken = (this._fillToken || 0) + 1;
+    const token = this._fillToken;
+    // 收集结果一次性 setData，避免每条记录单独 setData 造成 N 次跨层通信
+    const pending = {};
+    let pendingCount = 0;
+    const flush = function () {
+      if (pendingCount > 0 && token === that._fillToken) {
+        that.setData(pending);
+      }
+    };
     list.forEach((item, idx) => {
       if (!item.imagePath) return;
+      pendingCount++;
       fs.getFileInfo({
         filePath: item.imagePath,
         success: function (res) {
+          if (token !== that._fillToken) return; // 列表已重建，丢弃旧回调
           const size = res.size || 0;
           const kb = size > 1024 ? (size / 1024).toFixed(0) + 'KB' : size + 'B';
           const sizeText = item.metaText ? (item.metaText + ' · ' + kb) : ('· ' + kb);
-          // 路径式 setData，避免重建数组导致滑动抖动
-          that.setData({ ['list[' + idx + '].sizeText']: sizeText });
+          pending['list[' + idx + '].sizeText'] = sizeText;
+          if (--pendingCount === 0) flush();
         },
         fail: function () {
-          // 读取失败则只显示分辨率
+          if (token !== that._fillToken) return;
           if (item.metaText) {
-            that.setData({ ['list[' + idx + '].sizeText']: item.metaText });
+            pending['list[' + idx + '].sizeText'] = item.metaText;
           }
+          if (--pendingCount === 0) flush();
         }
       });
     });

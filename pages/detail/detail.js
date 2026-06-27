@@ -441,7 +441,12 @@ Page({
     }));
     this.setData({ editValues, displayFields });
     // 字段变化可能导致水印行数变化，高度随之变化，延迟测量
-    setTimeout(() => this._measureWmHeight(), 50);
+    // 连续输入会堆叠 setTimeout + SelectorQuery，做 150ms 防抖只保留最后一次
+    if (this._measureTimer) clearTimeout(this._measureTimer);
+    this._measureTimer = setTimeout(() => {
+      this._measureTimer = null;
+      this._measureWmHeight();
+    }, 150);
   },
 
   onScaleChange(e) {

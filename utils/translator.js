@@ -40,6 +40,7 @@ function getUserDict() {
 
 function setUserDict(dict) {
   wx.setStorageSync(STORAGE_DICT_KEY, dict || []);
+  invalidateDictCache();
 }
 
 // 用户自定义白名单（与内置白名单合并使用）
@@ -52,11 +53,30 @@ function getUserWhitelist() {
 
 function setUserWhitelist(list) {
   wx.setStorageSync(STORAGE_WHITELIST_KEY, list || []);
+  invalidateDictCache();
 }
+
+// 合并后的白名单（内置 + 用户自定义），缓存避免每次翻译重复 concat + 线性扫描
+var _mergedWhitelistCache = null;
+var _mergedWhitelistLowerSet = null;
 
 // 合并后的白名单（内置 + 用户自定义）
 function getMergedWhitelist() {
-  return builtin.WHITELIST.concat(getUserWhitelist());
+  if (_mergedWhitelistCache) return _mergedWhitelistCache;
+  _mergedWhitelistCache = builtin.WHITELIST.concat(getUserWhitelist());
+  // 预构建小写 Set，isWhitelist 用 O(1) 查询替代 O(W) 线性扫描
+  _mergedWhitelistLowerSet = {};
+  for (var i = 0; i < _mergedWhitelistCache.length; i++) {
+    _mergedWhitelistLowerSet[String(_mergedWhitelistCache[i]).toLowerCase()] = true;
+  }
+  return _mergedWhitelistCache;
+}
+
+// 词典/白名单变更时失效缓存（供 setUserDict / setUserWhitelist 调用）
+function invalidateDictCache() {
+  _mergedWhitelistCache = null;
+  _mergedWhitelistLowerSet = null;
+  _indexCache = null;
 }
 
 // 获取当前配置：{ provider, baseURL, model, apiKey }
@@ -172,8 +192,12 @@ function detectLang(text) {
   return 'unknown';
 }
 
-// 构建双向查询索引（每次调用时合并内置+用户词）
+// 词典索引缓存：translate/translateBatch 多次调用时避免重复 concat + 双排序
+var _indexCache = null;
+
+// 构建双向查询索引（合并内置+用户词，结果缓存，setUserDict 时失效）
 function buildIndex() {
+  if (_indexCache) return _indexCache;
   var all = builtin.BUILTIN_DICT.concat(getUserDict());
   // 按源词长度降序排序，便于先长后短匹配
   var esToZh = all.slice().sort(function (a, b) {
@@ -182,7 +206,8 @@ function buildIndex() {
   var zhToEs = all.slice().sort(function (a, b) {
     return b.zh.length - a.zh.length;
   });
-  return { esToZh: esToZh, zhToEs: zhToEs };
+  _indexCache = { esToZh: esToZh, zhToEs: zhToEs };
+  return _indexCache;
 }
 
 // 判断是否白名单（数字、单位、纯符号、内置+用户白名单）
@@ -194,12 +219,15 @@ function isWhitelist(token) {
   if (/^\d+(\.\d+)?[a-zA-Z²³¹º]+$/.test(token)) return true;
   // 货币符号 + 数字
   if (/^[¥$€]\d+/.test(token)) return true;
-  // 精确匹配白名单（内置 + 用户自定义）
-  var lower = token.toLowerCase();
+  // 精确匹配白名单（内置 + 用户自定义）：用预构建的小写 Set 做 O(1) 查询
+  // 同时保留原值精确匹配以支持大小写敏感的白名单词条
+  var lower = String(token).toLowerCase();
   var merged = getMergedWhitelist();
+  // 快速路径：小写命中
+  if (_mergedWhitelistLowerSet && _mergedWhitelistLowerSet[lower]) return true;
+  // 大小写敏感的精确匹配（如大小写有意义的缩写）
   for (var i = 0; i < merged.length; i++) {
-    var w = merged[i];
-    if (w === token || w.toLowerCase() === lower) return true;
+    if (merged[i] === token) return true;
   }
   return false;
 }
