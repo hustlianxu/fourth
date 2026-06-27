@@ -421,6 +421,7 @@ Page({
     // 持久化水印图，防止临时文件被回收（Mac 开发者工具上尤其明显）
     const persistentWmPath = await this._persistWmPhoto(outPath);
     console.log('[Detail] 水印图重渲并持久化:', persistentWmPath);
+    if (!persistentWmPath) throw new Error('水印图持久化失败');
     return persistentWmPath;
   },
 
@@ -438,8 +439,21 @@ Page({
             destPath: dest,
             success: () => { resolve(dest); },
             fail: (err2) => {
-              console.error('[Detail] 持久化失败，使用临时路径:', err2);
-              resolve(tempPath);
+              console.warn('[Detail] copyFile 失败，尝试 readFile+writeFile:', err2);
+              try {
+                const buf = fs.readFileSync(tempPath);
+                if (buf && (buf.byteLength || buf.length)) {
+                  const finalDest = wx.env.USER_DATA_PATH + '/wm_' + Date.now() + '.jpg';
+                  fs.writeFileSync(finalDest, buf);
+                  console.log('[Detail] readFile+writeFile 成功:', finalDest);
+                  resolve(finalDest);
+                  return;
+                }
+              } catch (e) {
+                console.error('[Detail] readFile+writeFile 也失败:', e);
+              }
+              console.error('[Detail] 全部持久化方式均失败，放弃保存文件');
+              resolve(null);
             }
           });
         }

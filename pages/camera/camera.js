@@ -418,8 +418,23 @@ Page({
               resolve(dest);
             },
             fail: (err2) => {
-              console.error('[Camera] 持久化失败，使用临时路径:', err2);
-              resolve(tempPath);
+              console.warn('[Camera] copyFile 失败，尝试 readFile+writeFile:', err2);
+              // 最终兜底：逐字节读取再写入，saveFile/copyFile 失败但 readFile 可能仍可读
+              try {
+                const buf = fs.readFileSync(tempPath);
+                if (buf && (buf.byteLength || buf.length)) {
+                  const finalDest = wx.env.USER_DATA_PATH + '/' + (prefix || 'photo') + '_' + Date.now() + '.jpg';
+                  fs.writeFileSync(finalDest, buf);
+                  console.log('[Camera] readFile+writeFile 成功:', finalDest);
+                  resolve(finalDest);
+                  return;
+                }
+              } catch (e) {
+                console.error('[Camera] readFile+writeFile 也失败:', e);
+              }
+              // 全部持久化方式均失败，不应保存临时路径（导出时会文件不存在）
+              console.error('[Camera] 全部持久化方式均失败，放弃保存文件');
+              resolve(null);
             }
           });
         }
@@ -497,8 +512,10 @@ Page({
       // 2. 持久化原图和水印图（防止临时文件被回收，Mac 开发者工具上尤其明显）
       const persistentPath = await this._persistOriginalPhoto(photo);
       console.log('[Camera] 原图持久化:', persistentPath);
+      if (!persistentPath) throw new Error('原图保存失败');
       const persistentWmPath = await this._persistWatermarkPhoto(outPath);
       console.log('[Camera] 水印图持久化:', persistentWmPath);
+      if (!persistentWmPath) throw new Error('水印图保存失败');
 
       // 2.5 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
       await this._autoSaveToAlbum(persistentPath, persistentWmPath);
