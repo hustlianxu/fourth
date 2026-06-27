@@ -420,8 +420,8 @@ function preTranslateRecords(records, onProgress) {
         r.debug, '原文:', t.text, '译文:', r.result);
       // 判断是否真正翻译成功（本地全命中 source=local_all，或 API 成功 source=api_*）
       // 本地降级 source=local_no_api / local_api_fail 时 r.result 是原文，不算成功
-      var src = r.debug && r.debug.source;
-      var translated = r.result && src && src !== 'local_no_api' && src !== 'local_api_fail';
+      var src = r && r.debug && r.debug.source;
+      var translated = r && r.result && src && src !== 'local_no_api' && src !== 'local_api_fail';
       if (translated) {
         // 翻译成功：译文填到目标字段
         rec.values[t.fillTo] = r.result;
@@ -437,6 +437,9 @@ function preTranslateRecords(records, onProgress) {
       }
       // 翻译失败且无 moveOriginalTo：原文留原字段，目标字段保持空
     });
+  }).catch(function (err) {
+    // 翻译整体失败时不应阻断导出：保留原文，继续后续 xlsx / xls 生成
+    console.error('[Exporter] 批量翻译异常，保留原文继续导出:', err);
   });
 }
 

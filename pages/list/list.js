@@ -930,12 +930,15 @@ Page({
     wx.showActionSheet({
       itemList: ['xlsx（推荐·图片不压缩）', 'xls（伪 xls·兼容老版本）'],
       success: function (res) {
-        if (res.tapIndex === 0) {
-          that._doExport(selected, customFileName, 'xlsx');
-        } else if (res.tapIndex === 1) {
-          that._doExport(selected, customFileName, 'xls');
-        }
-      }
+        const fmt = res.tapIndex === 0 ? 'xlsx' : 'xls';
+        // _doExport 为 async，未 catch 会变成 unhandled rejection，导出失败时用户无提示
+        that._doExport(selected, customFileName, fmt).catch(function (err) {
+          wx.hideLoading();
+          console.error('[List] 导出失败:', err);
+          wx.showToast({ title: '导出失败: ' + ((err && err.message) || '').slice(0, 20), icon: 'none', duration: 3000 });
+        });
+      },
+      fail: function () { /* 用户取消选择，无需处理 */ }
     });
   },
 

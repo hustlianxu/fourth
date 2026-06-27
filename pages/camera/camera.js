@@ -60,17 +60,22 @@ Page({
   onLoad(options) {
     const tplId = options.templateId || 'minimal';
     const tpl = templates.getTemplateById(tplId);
+    // 模板可能被删除或参数异常，做 null 防护，避免后续 getDefaultValues/validate 崩溃白屏
+    if (!tpl) {
+      wx.showToast({ title: '模板不存在', icon: 'none' });
+      setTimeout(() => wx.navigateBack(), 800);
+      return;
+    }
     const defaultVals = templates.getDefaultValues(tpl);
     const windowInfo = wx.getWindowInfo();
     this.viewportW = windowInfo.windowWidth;
-    this.viewportH = windowInfo.windowWidth * 0.72 / (windowInfo.windowWidth / windowInfo.windowHeight);
     // 取景框高度 = 72vh，换算为 px
     this.viewportH = windowInfo.windowHeight * 0.72;
     this.setData({
       template: tpl,
       templates: templates.TEMPLATES,
       values: defaultVals,
-      wPos: (tpl && tpl.position) || 'bottom-center'
+      wPos: tpl.position || 'bottom-center'
     });
     this._calcWmPreview();
     this._applyWmPosition();

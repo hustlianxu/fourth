@@ -29,7 +29,6 @@ Page({
   data: {
     templates: [],
     showModal: false,
-    showDeleteConfirm: false,
     hasModal: false,
     editingId: null,
     form: {
@@ -191,7 +190,8 @@ Page({
     const typeInfo = FIELD_TYPES[e.detail.value];
     const fields = [...this.data.form.fields];
     fields[idx].type = typeInfo.id;
-    if (typeInfo.id === 'select' && !fields[idx].options.length) {
+    // options 字段可能缺失（旧数据迁移等），做空数组防护避免 TypeError
+    if (typeInfo.id === 'select' && (!fields[idx].options || !fields[idx].options.length)) {
       fields[idx].options = ['选项1', '选项2', '选项3'];
     }
     this.setData({ 'form.fields': fields });
