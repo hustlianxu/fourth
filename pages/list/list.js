@@ -455,7 +455,7 @@ Page({
     const pending = {};
     let pendingCount = 0;
     const flush = function () {
-      if (pendingCount > 0 && token === that._fillToken) {
+      if (pendingCount === 0 && token === that._fillToken) {
         that.setData(pending);
       }
     };
