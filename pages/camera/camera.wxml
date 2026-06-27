@@ -71,8 +71,14 @@
 
   <!-- 底部按钮栏（始终可见） -->
   <view class="bottom-bar-fixed">
-    <view class="btn secondary" bindtap="onPickImage">相册</view>
-    <view class="btn" bindtap="onTakePhoto">拍照</view>
+    <view class="name-input-row">
+      <text class="name-label">名称</text>
+      <input class="name-input" placeholder="给照片起个名字（可选）" value="{{customName}}" bindinput="onNameInput" maxlength="50" />
+    </view>
+    <view class="btn-row">
+      <view class="btn secondary" bindtap="onPickImage">相册</view>
+      <view class="btn" bindtap="onTakePhoto">拍照</view>
+    </view>
   </view>
 
 </view>

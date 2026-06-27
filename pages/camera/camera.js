@@ -42,6 +42,8 @@ Page({
     // 行内编辑
     editingFieldKey: '',
     editValue: '',
+    // 名称输入
+    customName: '',
     // 拍照闪光动画
     flashAnim: false,
   },
@@ -276,6 +278,10 @@ Page({
   },
 
   // ===== 字段输入（原有 handlers，供 onGetLocation 等使用） =====
+
+  onNameInput(e) {
+    this.setData({ customName: e.detail.value.trim() });
+  },
 
   onFieldInput(e) {
     const key = e.currentTarget.dataset.key;
@@ -531,6 +537,7 @@ Page({
         watermarkOpacity: 0.85,
         watermarkWidthRatio: 0.42,
         values: this.data.values,
+        customName: this.data.customName || null,
         imagePath: persistentWmPath,
         originalPath: persistentPath,
         width: imgW,

@@ -795,6 +795,25 @@ Page({
     const id = this.data.renameRecordId;
 
     storage.update(id, { customName: newName || null });
+
+    // 同步开启时上传新名称到云端
+    if (cloud.isSyncEnabled()) {
+      var record = storage.getById(id);
+      if (record) {
+        cloud.getOpenid().then(function (oid) {
+          if (oid) {
+            return cloud.syncRecord(record, oid, false);
+          }
+        }).then(function (res) {
+          if (res && res.success) {
+            storage.update(id, { _syncStatus: 'synced' });
+          }
+        }).catch(function (err) {
+          console.warn('[List] 重命名同步失败:', err);
+        });
+      }
+    }
+
     this.setData({ showRenameModal: false, renameRecordId: '', renameInput: '' });
     this._loadList();
     wx.showToast({ title: newName ? '已重命名' : '已恢复默认名称', icon: 'success' });

@@ -193,10 +193,39 @@
   left: 0;
   right: 0;
   display: flex;
-  gap: 16rpx;
-  padding: 20rpx 24rpx;
-  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  flex-direction: column;
+  gap: 12rpx;
+  padding: 16rpx 24rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
   z-index: 60;
+  background: #fff;
+}
+
+.name-input-row {
+  display: flex;
+  align-items: center;
+  background: #f7f8fa;
+  border-radius: 8rpx;
+  padding: 0 16rpx;
+}
+
+.name-label {
+  font-size: 26rpx;
+  color: #666;
+  margin-right: 12rpx;
+  white-space: nowrap;
+}
+
+.name-input {
+  flex: 1;
+  font-size: 26rpx;
+  color: #222;
+  padding: 16rpx 0;
+}
+
+.btn-row {
+  display: flex;
+  gap: 16rpx;
 }
 
 /* ===== 底部按钮 ===== */
