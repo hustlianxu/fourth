@@ -468,7 +468,14 @@ Page({
         success: function (res) {
           if (token !== that._fillToken) return; // 列表已重建，丢弃旧回调
           const size = res.size || 0;
-          const kb = size > 1024 ? (size / 1024).toFixed(0) + 'KB' : size + 'B';
+          var kb;
+          if (size >= 1024 * 1024) {
+            kb = (size / (1024 * 1024)).toFixed(1) + 'MB';
+          } else if (size > 1024) {
+            kb = (size / 1024).toFixed(0) + 'KB';
+          } else {
+            kb = size + 'B';
+          }
           const sizeText = item.metaText ? (item.metaText + ' · ' + kb) : ('· ' + kb);
           pending['list[' + listIdx + '].sizeText'] = sizeText;
           if (--pendingCount === 0) flush();
