@@ -214,12 +214,15 @@ function buildXlsx(records, columns, helpers) {
 
   // ===== 7. xl/worksheets/_rels/sheet1.xml.rels（图片引用）=====
   if (imageEntries.length > 0) {
-    var sheetRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-    // drawing 引用
-    sheetRels += '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>';
-    sheetRels += '</Relationships>';
-    zip.addFile('xl/worksheets/_rels/sheet1.xml.rels', sheetRels);
+    // 用数组 push + join 替代字符串 += 拼接
+    var sheetRelsParts = [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
+      // drawing 引用
+      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>',
+      '</Relationships>'
+    ];
+    zip.addFile('xl/worksheets/_rels/sheet1.xml.rels', sheetRelsParts.join(''));
   }
 
   // ===== 8. xl/drawings/drawing1.xml（图片定位）=====
@@ -265,14 +268,17 @@ function buildXlsx(records, columns, helpers) {
     zip.addFile('xl/drawings/drawing1.xml', drawingParts.join(''));
 
     // ===== 9. xl/drawings/_rels/drawing1.xml.rels（图片文件引用）=====
-    var drawRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+    // 用数组 push + join 替代字符串 += 拼接
+    var drawRelsParts = [
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    ];
     for (var i = 0; i < imageEntries.length; i++) {
       var ie = imageEntries[i];
-      drawRels += '<Relationship Id="' + ie.rId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image' + ie.idx + '.' + ie.ext + '"/>';
+      drawRelsParts.push('<Relationship Id="' + ie.rId + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image' + ie.idx + '.' + ie.ext + '"/>');
     }
-    drawRels += '</Relationships>';
-    zip.addFile('xl/drawings/_rels/drawing1.xml.rels', drawRels);
+    drawRelsParts.push('</Relationships>');
+    zip.addFile('xl/drawings/_rels/drawing1.xml.rels', drawRelsParts.join(''));
 
     // ===== 10. xl/media/imageN.{ext}（原始字节，不压缩）=====
     for (var i = 0; i < imageEntries.length; i++) {

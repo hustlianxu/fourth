@@ -83,6 +83,9 @@ Page({
     this._swipeRecordId = id;
     this._swipeMoved = false;
     this._swipeDirection = '';
+    this._lastSwipeDx = null;
+    this._lastSwipeNewX = null;
+    this._lastSwipeMoveTs = 0;
     const record = this.data.list.find(r => r.id === id);
     this._swipeStartSwipeX = record ? record._swipeX : 0;
   },
@@ -91,10 +94,6 @@ Page({
   onRecordTouchMove(e) {
     if (this.data.exportMode) return;
     if (!this._swipeRecordId) return;
-    // 节流：两次 setData 间隔不小于 SWIPE_THROTTLE_MS，避免高频 setData 拖垮渲染
-    const now = Date.now();
-    if (this._lastSwipeMoveTs && now - this._lastSwipeMoveTs < SWIPE_THROTTLE_MS) return;
-    this._lastSwipeMoveTs = now;
     const dx = e.touches[0].clientX - this._swipeStartX;
     const dy = e.touches[0].clientY - this._swipeStartY;
     // 水平滑动为主才处理
@@ -112,8 +111,15 @@ Page({
 
     // 左滑：展开操作按钮（仅普通模式）
     if (this.data.batchMode) return;
+    // 始终缓存最新 dx，供 touchEnd 兜底重算（节流丢帧时 _swipeX 可能过期）
     let newX = this._swipeStartSwipeX - dx;
     newX = Math.max(0, Math.min(newX, SWIPE_ACTION_WIDTH));
+    this._lastSwipeDx = dx;
+    this._lastSwipeNewX = newX;
+    // 节流：两次 setData 间隔不小于 SWIPE_THROTTLE_MS，避免高频 setData 拖垮渲染
+    const now = Date.now();
+    if (this._lastSwipeMoveTs && now - this._lastSwipeMoveTs < SWIPE_THROTTLE_MS) return;
+    this._lastSwipeMoveTs = now;
     this._updateRecordSwipe(this._swipeRecordId, { _swipeX: newX, _swiping: true, _swipeAnim: false, _swipeActionsW: SWIPE_ACTION_WIDTH });
   },
 
@@ -150,7 +156,11 @@ Page({
     // 左滑：滑动超过一半则展开，否则收起（仅普通模式）
     if (this.data.batchMode) return;
     const threshold = SWIPE_ACTION_WIDTH / 2;
-    const finalX = record._swipeX >= threshold ? SWIPE_ACTION_WIDTH : 0;
+    // 节流丢帧时 record._swipeX 可能是过期值，用缓存的末次位移兜底重算
+    const lastNewX = (typeof this._lastSwipeNewX === 'number') ? this._lastSwipeNewX : record._swipeX;
+    const finalX = lastNewX >= threshold ? SWIPE_ACTION_WIDTH : 0;
+    this._lastSwipeDx = null;
+    this._lastSwipeNewX = null;
     this._updateRecordSwipe(record.id, { _swipeX: finalX, _swiping: false, _swipeAnim: true, _swipeActionsW: finalX });
   },
 
@@ -257,6 +267,8 @@ Page({
     // 保留全量记录到 _allRecords，分页渲染前 PAGE_SIZE 条
     this._allRecords = all;
     this._renderedCount = 0;
+    // 列表整体重建：自增 token 使在途回调失效，分页追加时不应自增
+    this._fillToken = (this._fillToken || 0) + 1;
     this._renderMore(true);
   },
 
@@ -270,8 +282,13 @@ Page({
     }
     const target = Math.min(this._renderedCount + PAGE_SIZE, total);
     if (target <= this._renderedCount) {
-      // 无新数据可加载
-      this.setData({ hasMore: false, loadingMore: false });
+      // 无新数据可加载：reset 时需清空旧列表（切换到空文件夹/删除全部场景）
+      this.setData({
+        list: isReset ? [] : this.data.list,
+        selectedCount: 0,
+        hasMore: false,
+        loadingMore: false
+      });
       return;
     }
     const slice = this._allRecords.slice(this._renderedCount, target);
@@ -290,7 +307,8 @@ Page({
     } else {
       // 追加：保留已渲染 list，concat 新切片
       const newList = this.data.list.concat(slice);
-      const count = newList.filter(i => i._checked).length;
+      // selectedCount 始终基于全量记录，避免分页追加时选中计数掉到已渲染切片范围
+      const count = this._allRecords.filter(i => i._checked).length;
       this.setData({
         list: newList,
         selectedCount: count,
@@ -307,11 +325,20 @@ Page({
     if (this.data.loadingMore) return;
     this.setData({ loadingMore: true });
     // 延迟一帧，避免与 setData 抢主线程；分页数据已在内存中，开销很小
-    setTimeout(() => this._renderMore(false), 50);
+    // 记录 timer，供 onUnload / _loadList 清理，防止切换文件夹后旧回调追加错位
+    if (this._loadMoreTimer) clearTimeout(this._loadMoreTimer);
+    this._loadMoreTimer = setTimeout(() => {
+      this._loadMoreTimer = null;
+      this._renderMore(false);
+    }, 50);
   },
 
-  // 页面卸载：兜底关闭屏幕常亮（导出途中返回时防止 keepScreenOn 残留耗电）
+  // 页面卸载：清理触底加载定时器 + 兜底关闭屏幕常亮
   onUnload() {
+    if (this._loadMoreTimer) {
+      clearTimeout(this._loadMoreTimer);
+      this._loadMoreTimer = null;
+    }
     wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
   },
 
@@ -367,11 +394,10 @@ Page({
 
   // 异步读取每条记录图片的文件大小，回填 sizeText（与分辨率一起作为暗文显示）
   // startIdx 为 slice 在已渲染 list 中的起始下标（用于路径式 setData 定位）
+  // token 由 _loadList 自增，分页追加时复用同一 token，避免误杀上一页在途回调
   _fillImageSizes(list, startIdx) {
     const fs = wx.getFileSystemManager();
     const that = this;
-    // 每次加载自增 token，异步回调比对 token，防止列表重建后旧回调写错位置
-    this._fillToken = (this._fillToken || 0) + 1;
     const token = this._fillToken;
     const offset = startIdx || 0;
     // 收集结果一次性 setData，避免每条记录单独 setData 造成 N 次跨层通信
@@ -645,6 +671,7 @@ Page({
 
   onRecordLongPress(e) {
     if (this.data.exportMode) return;
+    if (this.data.batchMode) return;  // 批量模式下禁止长按操作，避免 _loadList 清掉分页外的选中态
     const id = e.currentTarget.dataset.id;
     const record = this.data.list.find(r => r.id === id);
     if (!record) return;
@@ -1034,7 +1061,8 @@ Page({
   },
 
   async onConfirmExport() {
-    const selected = this.data.list.filter(item => item._checked);
+    // 用 _allRecords 取选中项，避免分页下漏选（this.data.list 仅含已渲染切片）
+    const selected = (this._allRecords || this.data.list).filter(item => item._checked);
     if (selected.length === 0) return;
 
     const customFileName = this.data.exportFileName.trim() || null;

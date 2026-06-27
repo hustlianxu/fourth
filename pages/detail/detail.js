@@ -54,6 +54,14 @@ Page({
 
   onReady() {},
 
+  // 页面卸载：清理悬挂的测量定时器，防止对已销毁页面 setData
+  onUnload() {
+    if (this._measureTimer) {
+      clearTimeout(this._measureTimer);
+      this._measureTimer = null;
+    }
+  },
+
   // 浮层菜单
   onToggleActionMenu() {
     this.setData({ showActionMenu: !this.data.showActionMenu });
@@ -344,6 +352,11 @@ Page({
         }
 
         this.load();
+        // 退出编辑前清理悬挂的测量定时器
+        if (this._measureTimer) {
+          clearTimeout(this._measureTimer);
+          this._measureTimer = null;
+        }
         this.setData({ editing: false, editValues: {}, showWmOverlay: false, displayPhoto: newImagePath });
       } catch (e) {
         wx.hideLoading();
