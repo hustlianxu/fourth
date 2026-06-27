@@ -139,6 +139,8 @@
   flex-direction: column;
   overflow: hidden;
   max-height: calc(100vh - 120rpx);
+  box-sizing: border-box;
+  width: auto;
 }
 
 .modal-header {
@@ -166,6 +168,8 @@
   padding: 24rpx;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .modal-footer {
@@ -298,6 +302,7 @@
 /* 颜色选择器 */
 .color-picker {
   display: flex;
+  flex-wrap: wrap;
   gap: 16rpx;
 }
 
@@ -337,15 +342,21 @@
   display: flex;
   align-items: center;
   gap: 12rpx;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .field-input-wrap {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .field-input {
   width: 100%;
+  max-width: 100%;
   background: #f7f8fa;
   padding: 20rpx;
   border-radius: 10rpx;
