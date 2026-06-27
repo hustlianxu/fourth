@@ -435,20 +435,57 @@ Page({
     }
   },
 
+  // 检查文件是否存在（同步检测，不触发 10s 超时）
+  _fileExists(path) {
+    if (!path) return false;
+    try {
+      wx.getFileSystemManager().accessSync(path);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // 获取可用的源图路径，优先原图→水印图→云存储下载
+  async _getSourceImagePath(record) {
+    // 1. 原图存在且有效
+    if (record.originalPath && this._fileExists(record.originalPath)) {
+      return { path: record.originalPath, isOriginal: true };
+    }
+    // 2. 水印图存在且有效
+    if (record.imagePath && this._fileExists(record.imagePath)) {
+      return { path: record.imagePath, isOriginal: false };
+    }
+    // 3. 原图路径有值但文件被清 → 尝试从云存储下载
+    if (cloud.isSyncEnabled()) {
+      try {
+        var cloudRecord = await cloud.fetchCloudRecord(record.id);
+        if (cloudRecord && cloudRecord.imageFileID) {
+          var localPath = await cloud.downloadFile(cloudRecord.imageFileID);
+          if (localPath) {
+            console.log('[Detail] 从云存储下载图片成功:', localPath);
+            return { path: localPath, isOriginal: false, isCloud: true };
+          }
+        }
+      } catch (e) {
+        console.warn('[Detail] 云存储下载失败:', e);
+      }
+    }
+    throw new Error('源图文件已丢失（可能被系统清理），且云端无备份');
+  },
+
   async _rerenderWatermark() {
     const record = this.data.record;
     const tpl = templates.getTemplateById(record.templateId);
     if (!tpl) throw new Error('模板不存在');
 
-    // 优先用原图重渲，降级到已水印图
-    var imgPath = record.originalPath || record.imagePath;
-    var usedFallback = !record.originalPath;
-
-    console.log('[Detail] 重新渲染, imagePath:', imgPath, 'fallback:', usedFallback);
+    // 快速检测可用源图（不等待 10s canvas 超时）
+    var src = await this._getSourceImagePath(record);
+    console.log('[Detail] 重新渲染, 源图:', src.path, 'isOriginal:', src.isOriginal);
 
     try {
       const outPath = await watermark.renderWatermarkedImage({
-        imagePath: imgPath,
+        imagePath: src.path,
         template: tpl,
         values: this.data.editValues,
         imgW: record.width || 1080,
@@ -467,9 +504,9 @@ Page({
       return persistentWmPath;
 
     } catch (e) {
-      // 原图加载失败 + 有降级图且尚未尝试 → 用 imagePath 重试
-      if (!usedFallback && record.imagePath && record.imagePath !== record.originalPath) {
-        console.warn('[Detail] 原图加载失败，降级到已水印图重试:', e.message);
+      // 非原始图时尝试降级
+      if (src.isOriginal && record.imagePath && this._fileExists(record.imagePath)) {
+        console.warn('[Detail] 原图渲染失败，降级到已水印图:', e.message);
         const outPath = await watermark.renderWatermarkedImage({
           imagePath: record.imagePath,
           template: tpl,
@@ -488,7 +525,7 @@ Page({
         if (!persistentWmPath) throw new Error('水印图持久化失败');
         return persistentWmPath;
       }
-      throw e; // 已尝试过降级或无降级图，抛出原始错误
+      throw e;
     }
   },
 

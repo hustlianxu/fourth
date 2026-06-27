@@ -114,7 +114,7 @@ function syncRecord(record, openid, uploadImages) {
       if (res.data && res.data.length > 0) {
         // 已存在 → 更新（先存历史快照）
         var existing = res.data[0];
-        return _saveHistorySnapshot(existing).then(function () {
+        return _saveHistorySnapshot(existing, cloudData.values).then(function () {
           return _db().collection('records').doc(existing._id).update({ data: cloudData });
         }).then(function () {
           return { success: true, recordId: record.id, imageFileID: cloudData.imageFileID, action: 'updated' };
@@ -158,7 +158,7 @@ function _uploadRecordImages(record, openid, uploadImages) {
 /**
  * 保存历史快照到 records_history 集合
  */
-function _saveHistorySnapshot(record) {
+function _saveHistorySnapshot(record, newValues) {
   var snapshot = JSON.parse(JSON.stringify(record));
   delete snapshot._id;
   return _db().collection('records_history').add({
@@ -169,16 +169,32 @@ function _saveHistorySnapshot(record) {
       snapshot: snapshot,
       changedAt: Date.now(),
       changeType: 'update',
-      changeSummary: _buildChangeSummary(snapshot)
+      changeSummary: _buildChangeSummary(snapshot, newValues)
     }
   });
 }
 
-function _buildChangeSummary(snapshot) {
+function _buildChangeSummary(snapshot, newValues) {
   if (!snapshot || !snapshot.values) return '更新了记录';
-  var keys = Object.keys(snapshot.values).slice(0, 3);
-  if (keys.length === 0) return '更新了记录';
-  return '修改了 ' + keys.join('、') + (snapshot.values.length > 3 ? ' 等' : '');
+  if (!newValues) {
+    var keys = Object.keys(snapshot.values).slice(0, 3);
+    if (keys.length === 0) return '更新了记录';
+    return '修改了 ' + keys.join('、') + (Object.keys(snapshot.values).length > 3 ? ' 等' : '');
+  }
+  var oldVals = snapshot.values || {};
+  var changes = [];
+  var seen = {};
+  Object.keys(newValues).forEach(function (k) { seen[k] = true; });
+  Object.keys(oldVals).forEach(function (k) { seen[k] = true; });
+  Object.keys(seen).forEach(function (k) {
+    var oldVal = oldVals[k] != null ? String(oldVals[k]) : '';
+    var newVal = newValues[k] != null ? String(newValues[k]) : '';
+    if (oldVal !== newVal) {
+      changes.push(k + ': "' + (oldVal || '空') + '" → "' + (newVal || '空') + '"');
+    }
+  });
+  if (changes.length === 0) return '更新了记录（字段未变化）';
+  return changes.slice(0, 5).join('；') + (changes.length > 5 ? ' 等' + changes.length + '项变化' : '');
 }
 
 // ===== 从云端拉取变更 =====
@@ -376,10 +392,12 @@ function _doSyncFromCloud(openid) {
       localRecords.forEach(function (r) { localMap[r.id] = r; });
 
       var mergedCount = 0;
+      var downloadTasks = [];
+
       remoteRecords.forEach(function (r) {
         var localRec = localMap[r.recordId];
         if (!localRec) {
-          // 云端有、本地无 → 新增到本地
+          // 云端有、本地无 → 新增到本地（先创建记录，再异步下载图片）
           var newRecord = {
             id: r.recordId,
             templateId: r.templateId,
@@ -402,8 +420,15 @@ function _doSyncFromCloud(openid) {
           };
           storage.add(newRecord);
           mergedCount++;
+
+          // 异步下载水印图（不阻塞主同步流程）
+          if (r.imageFileID) {
+            var idx = downloadTasks.length;
+            downloadTasks.push(
+              _downloadAndUpdate(openid, r.recordId, r.imageFileID, r.originalFileID)
+            );
+          }
         } else if (r.updatedAt > (localRec.updatedAt || 0)) {
-          // 云端更新、本地旧 → 更新本地
           storage.update(r.recordId, {
             templateId: r.templateId,
             templateName: r.templateName,
@@ -417,6 +442,17 @@ function _doSyncFromCloud(openid) {
       });
 
       storage.setLastSyncTime(Date.now());
+
+      // 后台下载图片（不阻塞返回）
+      if (downloadTasks.length > 0) {
+        Promise.all(downloadTasks).then(function (results) {
+          var ok = results.filter(function (r) { return r; }).length;
+          console.log('[Cloud] 图片下载完成:', ok, '/', results.length);
+        }).catch(function (err) {
+          console.warn('[Cloud] 部分图片下载失败:', err);
+        });
+      }
+
       console.log('[Cloud] 同步完成，合并了', mergedCount, '条记录');
       return mergedCount;
     })
@@ -424,6 +460,33 @@ function _doSyncFromCloud(openid) {
       console.error('[Cloud] 从云端拉取失败:', err);
       return 0;
     });
+}
+
+/**
+ * 下载云端图片并更新本地记录
+ */
+function _downloadAndUpdate(openid, recordId, imageFileID, originalFileID) {
+  var storage = require('./storage.js');
+  return downloadFile(imageFileID).then(function (localPath) {
+    if (localPath) {
+      storage.update(recordId, { imagePath: localPath });
+
+      // 如果有原图 fileID 也一并下载
+      if (originalFileID) {
+        return downloadFile(originalFileID).then(function (origPath) {
+          if (origPath) {
+            storage.update(recordId, { originalPath: origPath });
+          }
+          return true;
+        });
+      }
+      return true;
+    }
+    return false;
+  }).catch(function (err) {
+    console.warn('[Cloud] 下载图片失败:', recordId, err.message);
+    return false;
+  });
 }
 
 // ===== 授权管理（云函数版） =====
@@ -521,6 +584,36 @@ function batchShareRecords(recordIds, targetOpenid, permission, recordsMap) {
   });
 }
 
+// ===== 从云端获取单条记录数据 =====
+
+/**
+ * 从云端获取指定记录的完整数据（含 imageFileID）
+ * @param {string} recordId
+ * @returns {Promise<Object|null>}
+ */
+function fetchCloudRecord(recordId) {
+  var openid = _getCachedOpenid();
+  if (!openid) {
+    return getOpenid().then(function (oid) {
+      if (!oid) return null;
+      _cacheOpenid(oid);
+      return _doFetchCloudRecord(recordId, oid);
+    });
+  }
+  return _doFetchCloudRecord(recordId, openid);
+}
+
+function _doFetchCloudRecord(recordId, openid) {
+  return _db().collection('records')
+    .where({ recordId: recordId, owner: openid })
+    .get()
+    .then(function (res) {
+      if (!res.data || res.data.length === 0) return null;
+      return res.data[0];
+    })
+    .catch(function () { return null; });
+}
+
 // ===== 时光机 =====
 
 /**
@@ -612,6 +705,7 @@ module.exports = {
   setSyncEnabled: setSyncEnabled,
   // 拉取
   syncFromCloud: syncFromCloud,
+  fetchCloudRecord: fetchCloudRecord,
   // 时光机
   getHistory: getHistory,
   restoreVersion: restoreVersion,
