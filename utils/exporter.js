@@ -169,30 +169,58 @@ function _base64ToUint8Array(b64) {
 }
 
 /**
- * 预读所有记录的图片字节（异步，并行）
+ * 预读所有记录的图片字节（异步，分批串行）
+ * 大数量导出时避免一次性并发读取 N 张图片导致内存/IO 峰值过高。
+ * 策略：每批 IMG_BATCH_SIZE 张，批内并行、批间串行，逐批填充 map。
+ * 最终仍返回完整 map，由 buildXlsx 生成单文件单 sheet，不分多次、不分多 sheet。
  * 返回 { map: {recordIdx: Uint8Array}, failures: [recordIdx], total: N }
  * 任一有 imagePath 的记录读不到字节 → 计入 failures
  */
-function preReadImageBytes(records) {
-  var tasks = records.map(function (rec, idx) {
-    if (!rec.imagePath) return Promise.resolve({ idx: idx, bytes: null, hasPath: false });
+var IMG_BATCH_SIZE = 50;   // 每批并发读取图片数，兼顾吞吐与内存峰值
+
+function preReadImageBytes(records, onProgress) {
+  var map = {};
+  var failures = [];   // 元素: { idx, name }，name 便于定位失败记录
+  var total = records.length;
+  var done = 0;
+
+  function readOne(rec, idx) {
+    if (!rec.imagePath) {
+      return Promise.resolve({ idx: idx, bytes: null, hasPath: false });
+    }
     return readImageBytes(rec.imagePath).then(function (bytes) {
       return { idx: idx, bytes: bytes, hasPath: true };
     });
-  });
-  return Promise.all(tasks).then(function (results) {
-    var map = {};
-    var failures = [];   // 元素: { idx, name }，name 便于定位失败记录
-    results.forEach(function (r) {
-      if (r.bytes && r.bytes.length) {
-        map[r.idx] = r.bytes;
-      } else if (r.hasPath) {
-        var rec = records[r.idx] || {};
-        failures.push({ idx: r.idx, name: rec.customName || rec.id || ('记录#' + r.idx) });
+  }
+
+  // 处理从 start 开始的一批，批内并行
+  function processBatch(start) {
+    var end = Math.min(start + IMG_BATCH_SIZE, total);
+    var tasks = [];
+    for (var i = start; i < end; i++) {
+      tasks.push(readOne(records[i], i));
+    }
+    return Promise.all(tasks).then(function (results) {
+      results.forEach(function (r) {
+        if (r.bytes && r.bytes.length) {
+          map[r.idx] = r.bytes;
+        } else if (r.hasPath) {
+          var rec = records[r.idx] || {};
+          failures.push({ idx: r.idx, name: rec.customName || rec.id || ('记录#' + r.idx) });
+        }
+      });
+      done = end;
+      if (onProgress) {
+        try {
+          onProgress('正在读取图片 ' + done + '/' + total + '...');
+        } catch (e) {}
       }
+      if (end < total) return processBatch(end);
+      return { map: map, failures: failures, total: total };
     });
-    return { map: map, failures: failures, total: results.length };
-  });
+  }
+
+  return processBatch(0);
 }
 
 /**
@@ -456,8 +484,8 @@ function preTranslateRecords(records, onProgress) {
 function exportToXlsx(records, customFileName, onProgress) {
   // 1. 翻译预处理（依据文本真实语言填充 desEs/desZh）
   return preTranslateRecords(records, onProgress).then(function () {
-  // 2. 异步预读所有图片字节（并行）
-  return preReadImageBytes(records).then(function (preRead) {
+  // 2. 异步预读所有图片字节（分批串行，降低大数量导出时的内存/IO 峰值）
+  return preReadImageBytes(records, onProgress).then(function (preRead) {
     // 有图片读取失败 → reject 触发回退（用户要求：图片无法导入则回退伪 xls）
     if (preRead.failures.length > 0) {
       var failNames = preRead.failures.map(function (f) { return f.name; }).join(', ');
