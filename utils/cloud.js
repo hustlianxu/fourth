@@ -384,7 +384,7 @@ function _doSyncFromCloud(openid) {
       var remoteRecords = res.data || [];
       if (remoteRecords.length === 0) {
         console.log('[Cloud] 云端无记录');
-        return 0;
+        return { merged: 0, images: 0 };
       }
 
       var localRecords = storage.getAll();
@@ -393,11 +393,12 @@ function _doSyncFromCloud(openid) {
 
       var mergedCount = 0;
       var downloadTasks = [];
+      var needsReload = false;  // 是否需要前端刷新列表
 
       remoteRecords.forEach(function (r) {
         var localRec = localMap[r.recordId];
         if (!localRec) {
-          // 云端有、本地无 → 新增到本地（先创建记录，再异步下载图片）
+          // 云端有、本地无 → 新增到本地
           var newRecord = {
             id: r.recordId,
             templateId: r.templateId,
@@ -420,12 +421,12 @@ function _doSyncFromCloud(openid) {
           };
           storage.add(newRecord);
           mergedCount++;
+          needsReload = true;
 
-          // 异步下载水印图（不阻塞主同步流程）
+          // 加入下载队列
           if (r.imageFileID) {
-            var idx = downloadTasks.length;
             downloadTasks.push(
-              _downloadAndUpdate(openid, r.recordId, r.imageFileID, r.originalFileID)
+              _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
             );
           }
         } else if (r.updatedAt > (localRec.updatedAt || 0)) {
@@ -438,40 +439,50 @@ function _doSyncFromCloud(openid) {
             _syncStatus: 'synced'
           });
           mergedCount++;
+          needsReload = true;
+
+          // 本地无水印图或云端有更新 → 下载
+          if (!localRec.imagePath && r.imageFileID) {
+            downloadTasks.push(
+              _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
+            );
+          }
         }
       });
 
       storage.setLastSyncTime(Date.now());
 
-      // 后台下载图片（不阻塞返回）
+      // 等待图片全部下载完成
+      var allDonePromise;
       if (downloadTasks.length > 0) {
-        Promise.all(downloadTasks).then(function (results) {
+        allDonePromise = Promise.all(downloadTasks).then(function (results) {
           var ok = results.filter(function (r) { return r; }).length;
-          console.log('[Cloud] 图片下载完成:', ok, '/', results.length);
-        }).catch(function (err) {
-          console.warn('[Cloud] 部分图片下载失败:', err);
+          console.log('[Cloud] 图片下载完成:', ok, '/', results.length, '张');
+          return ok;
         });
+      } else {
+        allDonePromise = Promise.resolve(0);
       }
 
-      console.log('[Cloud] 同步完成，合并了', mergedCount, '条记录');
-      return mergedCount;
+      return allDonePromise.then(function (imageCount) {
+        console.log('[Cloud] 同步完成，合并了', mergedCount, '条记录，下载了', imageCount, '张图片');
+        return { merged: mergedCount, images: imageCount, reload: needsReload || imageCount > 0 };
+      });
     })
     .catch(function (err) {
       console.error('[Cloud] 从云端拉取失败:', err);
-      return 0;
+      return { merged: 0, images: 0, reload: false };
     });
 }
 
 /**
  * 下载云端图片并更新本地记录
  */
-function _downloadAndUpdate(openid, recordId, imageFileID, originalFileID) {
+function _downloadAndUpdate(recordId, imageFileID, originalFileID) {
   var storage = require('./storage.js');
   return downloadFile(imageFileID).then(function (localPath) {
     if (localPath) {
       storage.update(recordId, { imagePath: localPath });
-
-      // 如果有原图 fileID 也一并下载
       if (originalFileID) {
         return downloadFile(originalFileID).then(function (origPath) {
           if (origPath) {

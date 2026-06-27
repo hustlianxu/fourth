@@ -51,6 +51,33 @@
       </view>
     </scroll-view>
 
+    <!-- 回收站入口（仅在普通模式、非编辑/非选中态时显示） -->
+    <view wx:if="{{!exportMode && !batchMode && !trashMode}}" class="trash-bar" bindtap="onShowTrash">
+      <text class="trash-icon">🗑</text>
+      <text class="trash-count">回收站{{trashCount > 0 ? ' (' + trashCount + ')' : ''}}</text>
+    </view>
+
+    <!-- 回收站视图 -->
+    <view wx:if="{{trashMode}}" class="trash-header">
+      <text class="trash-title">回收站（30天后自动清理）</text>
+      <view class="trash-actions">
+        <text class="trash-link" bindtap="onEmptyTrash">清空</text>
+        <text class="trash-link" bindtap="onExitTrash">返回</text>
+      </view>
+    </view>
+
+    <!-- 回收站列表 -->
+    <view wx:if="{{trashMode && trashList.length > 0}}" class="trash-list">
+      <view wx:for="{{trashList}}" wx:key="id" class="trash-item" data-id="{{item.id}}">
+        <image class="trash-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
+        <view class="trash-body">
+          <view class="trash-title">{{item.customName || item.templateName}}</view>
+          <view class="trash-meta">删除于 {{formatTrashTime(item._deletedAt)}}</view>
+        </view>
+        <view class="trash-restore" bindtap="onRestoreFromTrash" data-id="{{item.id}}">恢复</view>
+      </view>
+    </view>
+
     <!-- ===== 搜索框（仅普通模式显示，导出/批量模式隐藏） ===== -->
     <view wx:if="{{!exportMode && !batchMode}}" class="search-bar">
       <view class="search-input-wrap {{searchActive ? 'active' : ''}}">
@@ -81,7 +108,7 @@
             <text class="batch-link" bindtap="onBatchSelectAll" style="margin-left:16rpx;">全选</text>
           </block>
           <block wx:else>
-            <view class="title" style="margin:0;">共 {{list.length}} 条</view>
+            <view class="title" style="margin:0;">共 {{filteredCount}} 条</view>
             <view class="dict-entry-btn" bindtap="goDict">📚 词典</view>
             <view class="dict-entry-btn" bindtap="goSettings" style="margin-left:8rpx;">⚙️</view>
           </block>

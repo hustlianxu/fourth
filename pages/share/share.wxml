@@ -13,8 +13,8 @@
   <view class="section">
     <view class="section-header">添加授权</view>
     <view class="form-row">
-      <text class="form-label">目标用户 openid</text>
-      <input class="form-input" placeholder="输入用户的 openid" value="{{targetOpenid}}" bindinput="onTargetInput" />
+      <text class="form-label">目标用户 openid（每行一个，支持多人）</text>
+      <textarea class="form-textarea" placeholder="输入对方的 openid&#10;每行一个，可同时授权多人" value="{{targetOpenids}}" bindinput="onTargetInput" auto-height="{{false}}" />
     </view>
     <view class="form-row">
       <text class="form-label">权限级别</text>
@@ -22,7 +22,8 @@
         <view class="picker-value">{{permOptions[currentPerm]}}</view>
       </picker>
     </view>
-    <button class="btn-primary" bindtap="onAddAuthorize" disabled="{{!targetOpenid}}">添加授权</button>
+    <button class="btn-primary" bindtap="onAddAuthorize" disabled="{{!targetOpenids}}">批量授权（{{targetCount}}人）</button>
+    <button class="btn-secondary" open-type="share" style="margin-top:12rpx;">📤 分享给微信好友</button>
   </view>
 
   <!-- 已授权列表 -->

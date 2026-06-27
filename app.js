@@ -29,6 +29,17 @@ App({
     } catch (e) {
       wx.setStorageSync('watermark_folders', []);
     }
+
+    // 清理超过30天的回收站记录
+    try {
+      var storage = require('/utils/storage.js');
+      var cleaned = storage.cleanupTrash(30);
+      if (cleaned > 0) {
+        console.log('[App] 回收站清理完成，删除了', cleaned, '条过期记录');
+      }
+    } catch (e) {
+      console.warn('[App] 回收站清理失败:', e);
+    }
   },
   globalData: {
     userInfo: null

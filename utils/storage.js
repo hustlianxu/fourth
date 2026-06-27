@@ -6,6 +6,7 @@ const KEY_TEMPLATES = 'watermark_custom_tpls';
 const KEY_FOLDERS = 'watermark_folders';
 const KEY_AUTO_ALBUM = 'watermark_auto_save_album';  // 是否拍照后自动保存到系统相册
 const KEY_AUTO_SAVE_EDIT_ALBUM = 'watermark_auto_save_edit_album';  // 编辑保存时是否自动保存水印图到系统相册
+const KEY_TRASH = 'watermark_trash';
 
 // ===== 内部辅助 =====
 
@@ -121,9 +122,69 @@ function remove(id) {
   return true;
 }
 
+// ===== 回收站操作 =====
+
+function moveToTrash(id) {
+  var record = getById(id);
+  if (!record) return false;
+  record._deletedAt = Date.now();
+  var trash = _getTrashRaw();
+  trash.unshift(record);
+  wx.setStorageSync(KEY_TRASH, trash);
+  remove(id);
+  return true;
+}
+
+function _getTrashRaw() {
+  try {
+    var list = wx.getStorageSync(KEY_TRASH);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function getTrash() {
+  return _getTrashRaw().map(_normalizeRecord);
+}
+
+function getTrashCount() {
+  return _getTrashRaw().length;
+}
+
+function restoreFromTrash(id) {
+  var trash = _getTrashRaw();
+  var idx = trash.findIndex(function (item) { return item.id === id; });
+  if (idx < 0) return false;
+  var record = trash[idx];
+  delete record._deletedAt;
+  trash.splice(idx, 1);
+  wx.setStorageSync(KEY_TRASH, trash);
+  add(record);
+  return true;
+}
+
+function emptyTrash() {
+  wx.setStorageSync(KEY_TRASH, []);
+}
+
+/**
+ * 清理超过指定天数的回收站记录
+ * @param {number} days - 保留天数，默认30
+ */
+function cleanupTrash(days) {
+  days = days || 30;
+  var cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  var trash = _getTrashRaw();
+  var remaining = trash.filter(function (item) { return (item._deletedAt || 0) > cutoff; });
+  wx.setStorageSync(KEY_TRASH, remaining);
+  return trash.length - remaining.length;
+}
+
 function clearAll() {
   wx.setStorageSync(KEY_PHOTOS, []);
   wx.setStorageSync(KEY_FOLDERS, []);
+  wx.setStorageSync(KEY_TRASH, []);
 }
 
 // ===== 自定义模板操作 =====
@@ -249,5 +310,12 @@ module.exports = {
   getSyncEnabled,
   setSyncEnabled,
   getLastSyncTime,
-  setLastSyncTime
+  setLastSyncTime,
+  // 回收站
+  moveToTrash,
+  getTrash,
+  getTrashCount,
+  restoreFromTrash,
+  emptyTrash,
+  cleanupTrash
 };

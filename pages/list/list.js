@@ -24,6 +24,7 @@ Page({
     loading: true,
     activeFolderId: null,        // null=全部, '__uncategorized__'=未分类, 其他=folder.id（普通模式使用）
     totalCount: 0,
+    filteredCount: 0,
     uncategorizedCount: 0,
     // 分页：list 仅渲染前 _renderedCount 条，onReachBottom 追加
     hasMore: false,
@@ -62,6 +63,10 @@ Page({
     searchKeyword: '',     // 实际生效的搜索关键词（防抖后落地）
     searchInput: '',       // 输入框实时值（受控）
     searchActive: false,   // 是否处于搜索态（输入框有焦点或有关键词）
+    // 回收站
+    trashMode: false,
+    trashList: [],
+    trashCount: 0,
   },
 
   onShow() {
@@ -72,8 +77,8 @@ Page({
     // 同步开启时从云端拉取变更
     if (cloud.isSyncEnabled()) {
       var that = this;
-      cloud.syncFromCloud().then(function (count) {
-        if (count > 0) {
+      cloud.syncFromCloud().then(function (result) {
+        if (result && result.reload) {
           if (that && that._loadList) {
             that._loadFolders();
             that._loadList();
@@ -215,6 +220,7 @@ Page({
     const folders = storage.getAllFolders();
     const allRecords = storage.getAll();
     const selectedIds = this.data.selectedFolderIds || [];
+    const trashCount = storage.getTrashCount();
     const foldersWithCount = folders.map(f => ({
       id: f.id,
       name: f.name,
@@ -227,7 +233,8 @@ Page({
       uncategorizedCount: uncategorizedCount,
       totalCount: allRecords.length,
       uncategorizedExportSelected: selectedIds.indexOf('__uncategorized__') >= 0,
-      allFoldersSelected: this._allFoldersSelected()
+      allFoldersSelected: this._allFoldersSelected(),
+      trashCount: trashCount
     });
   },
 
@@ -302,6 +309,8 @@ Page({
 
     // 保留全量记录到 _allRecords，分页渲染前 PAGE_SIZE 条
     this._allRecords = all;
+    this._allRecordsCount = all.length;
+    this.setData({ filteredCount: all.length });
     this._renderedCount = 0;
     // 列表整体重建：自增 token 使在途回调失效，分页追加时不应自增
     this._fillToken = (this._fillToken || 0) + 1;
@@ -949,10 +958,10 @@ Page({
     const that = this;
     wx.showModal({
       title: '删除确认',
-      content: '确定要删除本条记录吗？',
+      content: '确定要删除本条记录吗？（将移入回收站，30天后自动清理）',
       success(res) {
         if (res.confirm) {
-          storage.remove(id);
+          storage.moveToTrash(id);
           // 同步开启时云端软删除
           if (cloud.isSyncEnabled()) {
             cloud.getOpenid().then(function (openid) {
@@ -965,7 +974,7 @@ Page({
           }
           that._loadFolders();
           that._loadList();
-          wx.showToast({ title: '已删除', icon: 'success' });
+          wx.showToast({ title: '已移入回收站', icon: 'success' });
         }
       }
     });
@@ -1116,11 +1125,23 @@ Page({
     const selected = (this._allRecords || this.data.list).filter(item => item._checked);
     const ids = selected.map(item => item.id);
     this.setData({ showBatchDeleteModal: false });
-    wx.showLoading({ title: '删除中...', mask: true });
+    wx.showLoading({ title: '移入回收站...', mask: true });
     try {
-      ids.forEach(id => storage.remove(id));
+      ids.forEach(function (id) { storage.moveToTrash(id); });
+      // 同步开启时云端批量软删除
+      if (cloud.isSyncEnabled()) {
+        cloud.getOpenid().then(function (openid) {
+          if (openid) {
+            ids.forEach(function (id) {
+              cloud.softDelete(id, openid).catch(function (err) {
+                console.warn('[List] 云端软删除失败:', err);
+              });
+            });
+          }
+        });
+      }
       wx.hideLoading();
-      wx.showToast({ title: '已删除 ' + ids.length + ' 条', icon: 'success' });
+      wx.showToast({ title: '已移入回收站 ' + ids.length + ' 条', icon: 'success' });
       this.setData({ batchMode: false, batchSelectedCount: 0 });
       this._loadFolders();
       this._loadList();
@@ -1255,6 +1276,56 @@ Page({
   },
 
   // ===== 清空 =====
+
+  // ===== 回收站 =====
+
+  formatTrashTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+      + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  },
+
+  onShowTrash() {
+    var trash = storage.getTrash();
+    this.setData({ trashMode: true, trashList: trash, trashCount: trash.length });
+    this._collapseAllSwipe();
+  },
+
+  onExitTrash() {
+    this.setData({ trashMode: false, trashList: [], trashCount: storage.getTrashCount() });
+    this._loadFolders();
+    this._loadList();
+  },
+
+  onRestoreFromTrash(e) {
+    var id = e.currentTarget.dataset.id;
+    storage.restoreFromTrash(id);
+    var trash = storage.getTrash();
+    this.setData({ trashList: trash, trashCount: trash.length });
+    wx.showToast({ title: '已恢复', icon: 'success' });
+    if (trash.length === 0) {
+      this.onExitTrash();
+    }
+  },
+
+  onEmptyTrash() {
+    var that = this;
+    wx.showModal({
+      title: '清空回收站',
+      content: '将永久删除回收站中的所有记录，此操作不可恢复。',
+      success: function (res) {
+        if (res.confirm) {
+          storage.emptyTrash();
+          that.setData({ trashMode: false, trashList: [], trashCount: 0 });
+          that._loadFolders();
+          that._loadList();
+          wx.showToast({ title: '回收站已清空', icon: 'success' });
+        }
+      }
+    });
+  },
 
   onClear() {
     if (this.data.list.length === 0) return;

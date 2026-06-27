@@ -607,11 +607,11 @@ Page({
     var that = this;
     wx.showModal({
       title: '删除确认',
-      content: '确定要删除本条记录吗？',
+      content: '确定要删除本条记录吗？（将移入回收站，30天后自动清理）',
       success: (res) => {
         if (res.confirm) {
           var id = that.recordId;
-          storage.remove(id);
+          storage.moveToTrash(id);
           // 同步开启时云端软删除
           if (cloud.isSyncEnabled()) {
             cloud.getOpenid().then(function (openid) {
