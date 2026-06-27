@@ -143,11 +143,13 @@ Page({
     }));
     const viewportW = wx.getWindowInfo().windowWidth;
     const ratio = viewportW / 750;
-    const previewFontSize = Math.max(10, Math.round(22 * ratio));
+    // 字号/行高与最终水印渲染保持一致（避免预览与实际换行位置不符）
+    const tplStyle = (this.data.template && this.data.template.style) || {};
+    const previewFontSize = Math.max(10, Math.round((tplStyle.fontSize || 22) * ratio));
     // 未缩放尺寸（CSS transform: scale 会处理缩放）
-    const lineHeight = Math.round(previewFontSize * 1.6);
+    const lineHeight = Math.round(previewFontSize * (tplStyle.lineHeight || 1.7));
     const fieldCount = previewFields.length;
-    const padding = Math.round(14 * ratio);
+    const padding = Math.round((tplStyle.padding || 14) * ratio);
     this._wmEstW = this.viewportW * 0.42;
     this._wmEstH = fieldCount * 2 * lineHeight + padding * 2 + 30;
     this.setData({
@@ -543,7 +545,9 @@ Page({
         wx.getImageInfo({
           src: res.tempFiles[0].tempFilePath,
           success: (info) => this._saveAndGoDetail(info.path, { width: info.width, height: info.height }),
-          fail: () => this._saveAndGoDetail(res.tempFiles[0].tempFilePath, { width: 1080, height: 1440 })
+          // 降级值与拍照路径 _getPhotoInfo 保持一致（3024×4032，4:3），
+          // 避免 1080×1440 导致 Canvas 缓冲区与真实图片比例不符造成水印拉伸/裁切
+          fail: () => this._saveAndGoDetail(res.tempFiles[0].tempFilePath, { width: 3024, height: 4032 })
         });
       }
     });
