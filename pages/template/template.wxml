@@ -107,6 +107,10 @@
           <text class="section-title">字段列表</text>
           <view class="mini-btn" bindtap="onAddField">+ 添加字段</view>
         </view>
+        <!-- 新增模板时的字段映射提示 -->
+        <view class="field-tip" wx:if="{{!editingId}}">
+          提示：自定义字段如未与系统预设字段映射，导出 Excel 时可能无法保证对应列正常显示，建议优先复用预设字段标签。
+        </view>
         <view class="field-list">
           <view wx:for="{{form.fields}}" wx:key="index" class="field-row" data-index="{{index}}">
             <view class="field-input-wrap">

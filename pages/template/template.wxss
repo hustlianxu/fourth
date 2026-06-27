@@ -285,6 +285,8 @@
   font-size: 26rpx;
   color: #666;
   border: 2rpx solid transparent;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .pos-btn.active {
@@ -319,6 +321,18 @@
   gap: 16rpx;
 }
 
+/* 新增模板字段映射提示条 */
+.field-tip {
+  background: #fff7e6;
+  border: 1rpx solid #ffd591;
+  border-radius: 10rpx;
+  padding: 16rpx 20rpx;
+  font-size: 24rpx;
+  color: #d46b08;
+  line-height: 1.6;
+  margin-bottom: 16rpx;
+}
+
 .field-row {
   display: flex;
   align-items: center;
@@ -327,6 +341,7 @@
 
 .field-input-wrap {
   flex: 1;
+  min-width: 0;
 }
 
 .field-input {
@@ -336,6 +351,7 @@
   border-radius: 10rpx;
   font-size: 28rpx;
   min-height: 80rpx;
+  box-sizing: border-box;
 }
 
 .field-type {
@@ -346,6 +362,8 @@
   color: #666;
   min-width: 120rpx;
   text-align: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .field-actions {
@@ -521,5 +539,11 @@
 
   .field-remove {
     color: rgb(255, 77, 79);
+  }
+
+  .field-tip {
+    background: rgba(255, 167, 38, 0.12);
+    border-color: rgba(255, 167, 38, 0.4);
+    color: rgb(255, 183, 77);
   }
 }
