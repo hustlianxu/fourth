@@ -57,6 +57,10 @@ Page({
     batchMode: false,
     batchSelectedCount: 0,
     showBatchDeleteModal: false,
+    // 搜索：普通模式下按货号/描述/价格/体积等 values 字段 + 自定义名/模板名模糊匹配
+    searchKeyword: '',     // 实际生效的搜索关键词（防抖后落地）
+    searchInput: '',       // 输入框实时值（受控）
+    searchActive: false,   // 是否处于搜索态（输入框有焦点或有关键词）
   },
 
   onShow() {
@@ -264,6 +268,24 @@ Page({
       all.forEach(item => { item._checked = true; });
     }
 
+    // 普通模式搜索过滤：对货号/西语描述/中文描述/价格/装箱数/件数/体积/重量等
+    // 所有 values 字段 + customName + templateName 做模糊匹配（不区分大小写）
+    var kw = (this.data.searchKeyword || '').trim().toLowerCase();
+    if (kw && !this.data.exportMode) {
+      all = all.filter(function (item) {
+        // customName / templateName
+        if (String(item.customName || '').toLowerCase().indexOf(kw) >= 0) return true;
+        if (String(item.templateName || '').toLowerCase().indexOf(kw) >= 0) return true;
+        // 所有 values 字段
+        var vals = item.values || {};
+        var keys = Object.keys(vals);
+        for (var i = 0; i < keys.length; i++) {
+          if (String(vals[keys[i]] || '').toLowerCase().indexOf(kw) >= 0) return true;
+        }
+        return false;
+      });
+    }
+
     // 保留全量记录到 _allRecords，分页渲染前 PAGE_SIZE 条
     this._allRecords = all;
     this._renderedCount = 0;
@@ -392,6 +414,33 @@ Page({
     return Object.keys(item.values).slice(0, 3).map((k) => {
       return k + ': ' + (item.values[k] || '');
     }).join(' · ');
+  },
+
+  // ===== 搜索 =====
+  // 防抖：输入停顿 300ms 后落地关键词并重新过滤
+  _searchTimer: null,
+  onSearchInput(e) {
+    const val = e.detail.value || '';
+    this.setData({ searchInput: val, searchActive: true });
+    if (this._searchTimer) clearTimeout(this._searchTimer);
+    const that = this;
+    this._searchTimer = setTimeout(function () {
+      that._searchTimer = null;
+      that.setData({ searchKeyword: val });
+      that._loadList();
+    }, 300);
+  },
+  onSearchFocus() {
+    this.setData({ searchActive: true });
+  },
+  onSearchBlur() {
+    // 失焦但有关键词时保持搜索态；无关键词则退出
+    if (!this.data.searchInput) this.setData({ searchActive: false });
+  },
+  onSearchClear() {
+    if (this._searchTimer) { clearTimeout(this._searchTimer); this._searchTimer = null; }
+    this.setData({ searchInput: '', searchKeyword: '', searchActive: false });
+    this._loadList();
   },
 
   // 异步读取每条记录图片的文件大小，回填 sizeText（与分辨率一起作为暗文显示）

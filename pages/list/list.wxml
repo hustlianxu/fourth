@@ -51,6 +51,25 @@
       </view>
     </scroll-view>
 
+    <!-- ===== 搜索框（仅普通模式显示，导出/批量模式隐藏） ===== -->
+    <view wx:if="{{!exportMode && !batchMode}}" class="search-bar">
+      <view class="search-input-wrap {{searchActive ? 'active' : ''}}">
+        <text class="search-icon">🔍</text>
+        <input
+          class="search-input"
+          type="text"
+          value="{{searchInput}}"
+          placeholder="搜索货号 / 描述 / 价格 / 体积..."
+          placeholder-class="search-placeholder"
+          confirm-type="search"
+          bindinput="onSearchInput"
+          bindfocus="onSearchFocus"
+          bindblur="onSearchBlur"
+        />
+        <view wx:if="{{searchInput}}" class="search-clear" bindtap="onSearchClear">✕</view>
+      </view>
+    </view>
+
     <!-- ===== 顶部操作栏（渐进式：选中态保留导出/新增，标题变✕已选，左侧加红色删除） ===== -->
     <block wx:if="{{!exportMode}}">
       <view class="row between" style="margin-bottom:24rpx;">
@@ -92,7 +111,7 @@
 
     <!-- 当前文件夹空提示 -->
     <view wx:if="{{list.length === 0}}" class="folder-empty">
-      <text>当前文件夹为空</text>
+      <text>{{searchKeyword ? '没有匹配的记录' : '当前文件夹为空'}}</text>
     </view>
 
     <!-- ===== 记录列表 ===== -->
