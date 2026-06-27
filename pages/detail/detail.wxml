@@ -106,6 +106,12 @@
     </view>
   </view>
 
+  <!-- 非编辑模式：授权管理和历史版本入口 -->
+  <view wx:if="{{!editing}}" class="row between" style="margin-bottom:16rpx;">
+    <view class="btn secondary" bindtap="onGoShare" style="flex:1;margin-right:16rpx;">🔗 授权管理<text wx:if="{{authorizedCount > 0}}" class="action-badge" style="margin-left:6rpx;">{{authorizedCount}}</text></view>
+    <view class="btn secondary" bindtap="onGoTimeline" style="flex:1;">🕰️ 历史版本</view>
+  </view>
+
   <view class="row between">
     <view class="btn secondary" bindtap="onSaveAlbum" style="flex:1;margin-right:16rpx;">保存到相册</view>
     <view class="btn" bindtap="onEditToggle" style="flex:1;">{{editing ? '保存修改' : '编辑字段'}}</view>

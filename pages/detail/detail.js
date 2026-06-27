@@ -439,30 +439,57 @@ Page({
     const record = this.data.record;
     const tpl = templates.getTemplateById(record.templateId);
     if (!tpl) throw new Error('模板不存在');
-    const originalPath = record.originalPath;
-    if (!originalPath) throw new Error('原始照片不存在，无法重新渲染');
 
-    console.log('[Detail] 重新渲染, x:', record.watermarkX, 'y:', record.watermarkY, 'scale:', this.data.editScale);
+    // 优先用原图重渲，降级到已水印图
+    var imgPath = record.originalPath || record.imagePath;
+    var usedFallback = !record.originalPath;
 
-    const outPath = await watermark.renderWatermarkedImage({
-      imagePath: originalPath,
-      template: tpl,
-      values: this.data.editValues,
-      imgW: record.width || 1080,
-      imgH: record.height || 1440,
-      customX: record.watermarkX,
-      customY: record.watermarkY,
-      customScale: this.data.editScale,
-      opacity: this.data.editOpacity,
-      widthRatio: this.data.editWidthRatio,
-      maxEdge: 4096
-    });
+    console.log('[Detail] 重新渲染, imagePath:', imgPath, 'fallback:', usedFallback);
 
-    // 持久化水印图，防止临时文件被回收（Mac 开发者工具上尤其明显）
-    const persistentWmPath = await this._persistWmPhoto(outPath);
-    console.log('[Detail] 水印图重渲并持久化:', persistentWmPath);
-    if (!persistentWmPath) throw new Error('水印图持久化失败');
-    return persistentWmPath;
+    try {
+      const outPath = await watermark.renderWatermarkedImage({
+        imagePath: imgPath,
+        template: tpl,
+        values: this.data.editValues,
+        imgW: record.width || 1080,
+        imgH: record.height || 1440,
+        customX: record.watermarkX,
+        customY: record.watermarkY,
+        customScale: this.data.editScale,
+        opacity: this.data.editOpacity,
+        widthRatio: this.data.editWidthRatio,
+        maxEdge: 4096
+      });
+
+      const persistentWmPath = await this._persistWmPhoto(outPath);
+      console.log('[Detail] 水印图重渲并持久化:', persistentWmPath);
+      if (!persistentWmPath) throw new Error('水印图持久化失败');
+      return persistentWmPath;
+
+    } catch (e) {
+      // 原图加载失败 + 有降级图且尚未尝试 → 用 imagePath 重试
+      if (!usedFallback && record.imagePath && record.imagePath !== record.originalPath) {
+        console.warn('[Detail] 原图加载失败，降级到已水印图重试:', e.message);
+        const outPath = await watermark.renderWatermarkedImage({
+          imagePath: record.imagePath,
+          template: tpl,
+          values: this.data.editValues,
+          imgW: record.width || 1080,
+          imgH: record.height || 1440,
+          customX: record.watermarkX,
+          customY: record.watermarkY,
+          customScale: this.data.editScale,
+          opacity: this.data.editOpacity,
+          widthRatio: this.data.editWidthRatio,
+          maxEdge: 4096
+        });
+        const persistentWmPath = await this._persistWmPhoto(outPath);
+        console.log('[Detail] 降级渲染完成:', persistentWmPath);
+        if (!persistentWmPath) throw new Error('水印图持久化失败');
+        return persistentWmPath;
+      }
+      throw e; // 已尝试过降级或无降级图，抛出原始错误
+    }
   },
 
   _persistWmPhoto(tempPath) {
