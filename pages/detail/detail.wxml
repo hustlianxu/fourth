@@ -3,6 +3,15 @@
   <view class="action-menu-mask" wx:if="{{showActionMenu}}" bindtap="onToggleActionMenu"></view>
   <!-- 浮层菜单（固定定位） -->
   <view class="action-menu" wx:if="{{showActionMenu}}">
+    <view class="action-menu-item" bindtap="onGoShare" data-eventid="share">
+      <text class="action-menu-icon">🔗</text>
+      <text>授权管理</text>
+      <text wx:if="{{authorizedCount > 0}}" class="action-badge">{{authorizedCount}}</text>
+    </view>
+    <view class="action-menu-item" bindtap="onGoTimeline">
+      <text class="action-menu-icon">🕰️</text>
+      <text>历史版本</text>
+    </view>
     <view class="action-menu-item danger" bindtap="onDeleteFromMenu">
       <text class="action-menu-icon">🗑</text>
       <text>删除记录</text>

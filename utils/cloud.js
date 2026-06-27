@@ -426,6 +426,171 @@ function _doSyncFromCloud(openid) {
     });
 }
 
+// ===== 授权管理（云函数版） =====
+
+/**
+ * 通过云函数授权其他用户
+ * @param {string} recordId
+ * @param {string} targetOpenid
+ * @param {string} permission - 'read' | 'write' | 'readwrite'
+ * @returns {Promise<Object>}
+ */
+function callAuthorize(recordId, targetOpenid, permission) {
+  return wx.cloud.callFunction({
+    name: 'authorize',
+    data: { recordId: recordId, targetOpenid: targetOpenid, permission: permission }
+  }).then(function (res) {
+    return res.result;
+  }).catch(function (err) {
+    console.error('[Cloud] callAuthorize 失败:', err);
+    return { success: false, error: err.message };
+  });
+}
+
+/**
+ * 通过云函数撤回授权
+ * @param {string} recordId
+ * @param {string} targetOpenid
+ * @returns {Promise<Object>}
+ */
+function callRevoke(recordId, targetOpenid) {
+  return wx.cloud.callFunction({
+    name: 'revoke',
+    data: { recordId: recordId, targetOpenid: targetOpenid }
+  }).then(function (res) {
+    return res.result;
+  }).catch(function (err) {
+    console.error('[Cloud] callRevoke 失败:', err);
+    return { success: false, error: err.message };
+  });
+}
+
+/**
+ * 获取记录的已授权用户列表
+ * @param {string} recordId
+ * @returns {Promise<Array>}
+ */
+function getAuthorizedList(recordId) {
+  var openid = _getCachedOpenid();
+  if (!openid) {
+    return getOpenid().then(function (oid) {
+      if (!oid) return [];
+      _cacheOpenid(oid);
+      return _doGetAuthorizedList(recordId, oid);
+    });
+  }
+  return _doGetAuthorizedList(recordId, openid);
+}
+
+function _doGetAuthorizedList(recordId, openid) {
+  return _db().collection('records')
+    .where({ recordId: recordId, owner: openid })
+    .get()
+    .then(function (res) {
+      if (!res.data || res.data.length === 0) return [];
+      return res.data[0].sharedWith || [];
+    })
+    .catch(function (err) {
+      console.error('[Cloud] getAuthorizedList 失败:', err);
+      return [];
+    });
+}
+
+/**
+ * 批量分享记录到目标用户
+ * @param {Array} recordIds
+ * @param {string} targetOpenid
+ * @param {string} permission
+ * @param {Object} [recordsMap] - 可选，本地记录数据映射 { recordId: {...} }
+ * @returns {Promise<Object>}
+ */
+function batchShareRecords(recordIds, targetOpenid, permission, recordsMap) {
+  return wx.cloud.callFunction({
+    name: 'batchShareRecords',
+    data: {
+      recordIds: recordIds,
+      targetOpenid: targetOpenid,
+      permission: permission,
+      records: recordsMap || {}
+    }
+  }).then(function (res) {
+    return res.result;
+  }).catch(function (err) {
+    console.error('[Cloud] batchShareRecords 失败:', err);
+    return { success: false, error: err.message };
+  });
+}
+
+// ===== 时光机 =====
+
+/**
+ * 获取指定记录的历史版本列表
+ * @param {string} recordId
+ * @returns {Promise<Array>} 按版本降序排列的历史快照
+ */
+function getHistory(recordId) {
+  return _db().collection('records_history')
+    .where({ recordId: recordId })
+    .orderBy('version', 'desc')
+    .get()
+    .then(function (res) {
+      return (res.data || []).map(function (h) {
+        return {
+          version: h.version,
+          snapshot: h.snapshot,
+          changedAt: h.changedAt,
+          changeType: h.changeType,
+          changeSummary: h.changeSummary || '更新了记录'
+        };
+      });
+    })
+    .catch(function (err) {
+      console.error('[Cloud] getHistory 失败:', err);
+      return [];
+    });
+}
+
+/**
+ * 回滚到指定历史版本
+ * @param {string} recordId
+ * @param {Object} snapshot - 历史快照对象
+ * @returns {Promise<Object>}
+ */
+function restoreVersion(recordId, snapshot) {
+  // 查找当前记录
+  return _db().collection('records')
+    .where({ recordId: recordId })
+    .get()
+    .then(function (res) {
+      if (!res.data || res.data.length === 0) {
+        throw new Error('记录不存在');
+      }
+      var doc = res.data[0];
+      // 保存当前版本到历史（作为回滚前的快照）
+      return _saveHistorySnapshot(doc).then(function () {
+        // 用快照数据覆盖当前记录
+        var patch = {
+          values: snapshot.values || {},
+          updatedAt: Date.now(),
+          version: (snapshot.version || 0) + 1,
+          templateId: snapshot.templateId || doc.templateId,
+          templateName: snapshot.templateName || doc.templateName,
+          watermarkPosition: snapshot.watermarkPosition || doc.watermarkPosition,
+          watermarkScale: snapshot.watermarkScale || doc.watermarkScale,
+          customName: snapshot.customName || doc.customName
+        };
+        return _db().collection('records').doc(doc._id).update({ data: patch });
+      });
+    })
+    .then(function () {
+      return { success: true };
+    })
+    .catch(function (err) {
+      console.error('[Cloud] restoreVersion 失败:', err);
+      return { success: false, error: err.message };
+    });
+}
+
 module.exports = {
   CLOUD_ENV: CLOUD_ENV,
   init: init,
@@ -437,11 +602,19 @@ module.exports = {
   softDelete: softDelete,
   authorize: authorize,
   revoke: revoke,
+  // 云函数版授权
+  callAuthorize: callAuthorize,
+  callRevoke: callRevoke,
+  getAuthorizedList: getAuthorizedList,
+  batchShareRecords: batchShareRecords,
   // 同步开关
   isSyncEnabled: isSyncEnabled,
   setSyncEnabled: setSyncEnabled,
   // 拉取
   syncFromCloud: syncFromCloud,
+  // 时光机
+  getHistory: getHistory,
+  restoreVersion: restoreVersion,
   // 内部（供设置页使用）
   _getCachedOpenid: _getCachedOpenid
 };

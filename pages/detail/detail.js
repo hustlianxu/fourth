@@ -30,7 +30,8 @@ Page({
     // 浮层菜单
     showActionMenu: false,
     autoSaveEditAlbum: false,
-    _syncStatus: 'off'
+    _syncStatus: 'off',
+    authorizedCount: 0
   },
 
   recordId: '',
@@ -72,6 +73,16 @@ Page({
   onDeleteFromMenu() {
     this.setData({ showActionMenu: false });
     this.onDelete();
+  },
+
+  onGoShare() {
+    this.setData({ showActionMenu: false });
+    wx.navigateTo({ url: '/pages/share/share?id=' + this.recordId });
+  },
+
+  onGoTimeline() {
+    this.setData({ showActionMenu: false });
+    wx.navigateTo({ url: '/pages/timeline/timeline?id=' + this.recordId });
   },
 
   onShow() {
@@ -118,6 +129,13 @@ Page({
       ocrResult: record.ocr || null,
       verifyIssues: record.verifyIssues || [],
       _syncStatus: record._syncStatus || 'off'
+    });
+    // 异步获取已授权人数
+    var that = this;
+    cloud.getAuthorizedList(this.recordId).then(function (list) {
+      if (list) {
+        that.setData({ authorizedCount: list.length });
+      }
     });
   },
 

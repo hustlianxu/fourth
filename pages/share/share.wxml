@@ -1,0 +1,43 @@
+<!-- pages/share/share.wxml -->
+<view class="page">
+  <!-- 记录信息 -->
+  <view class="record-info" wx:if="{{record}}">
+    <image class="record-thumb" src="{{record.imagePath}}" mode="aspectFill"></image>
+    <view class="record-body">
+      <view class="record-title">{{record.customName || record.templateName}}</view>
+      <view class="record-meta">已授权 {{authorizedList.length}} 人</view>
+    </view>
+  </view>
+
+  <!-- 添加授权 -->
+  <view class="section">
+    <view class="section-header">添加授权</view>
+    <view class="form-row">
+      <text class="form-label">目标用户 openid</text>
+      <input class="form-input" placeholder="输入用户的 openid" value="{{targetOpenid}}" bindinput="onTargetInput" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">权限级别</text>
+      <picker class="form-picker" mode="selector" range="{{permOptions}}" bindchange="onPermChange">
+        <view class="picker-value">{{permOptions[currentPerm]}}</view>
+      </picker>
+    </view>
+    <button class="btn-primary" bindtap="onAddAuthorize" disabled="{{!targetOpenid}}">添加授权</button>
+  </view>
+
+  <!-- 已授权列表 -->
+  <view class="section">
+    <view class="section-header">已授权用户</view>
+    <view wx:if="{{authorizedList.length === 0}}" class="empty-tip">暂无授权</view>
+    <view wx:for="{{authorizedList}}" wx:key="openid" class="auth-row">
+      <view class="auth-info">
+        <text class="auth-openid">{{item.openid}}</text>
+        <text class="auth-perm {{'perm-' + item.permission}}">{{permLabel(item.permission)}}</text>
+        <text class="auth-time">授权于 {{formatTime(item.grantedAt)}}</text>
+      </view>
+      <view class="auth-actions">
+        <button class="btn-sm" bindtap="onRevoke" data-openid="{{item.openid}}">撤回</button>
+      </view>
+    </view>
+  </view>
+</view>

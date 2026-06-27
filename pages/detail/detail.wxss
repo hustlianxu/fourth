@@ -63,6 +63,17 @@
   font-size: 32rpx;
 }
 
+.action-badge {
+  display: inline-block;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 20rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}
+
 .img-area {
   position: relative;
   margin-bottom: 16rpx;

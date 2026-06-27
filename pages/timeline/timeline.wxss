@@ -1,0 +1,194 @@
+/* pages/timeline/timeline.wxss */
+.page {
+  padding: 0 32rpx 40rpx;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+/* 记录信息栏 */
+.record-bar {
+  display: flex;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-top: 24rpx;
+  align-items: center;
+}
+
+.record-thumb {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 8rpx;
+  margin-right: 20rpx;
+  background: #eee;
+}
+
+.record-info {
+  flex: 1;
+}
+
+.record-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.record-meta {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+/* 加载/空状态 */
+.loading, .empty {
+  text-align: center;
+  padding: 80rpx 0;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 16rpx;
+}
+
+.empty-text {
+  font-size: 30rpx;
+  color: #666;
+}
+
+.empty-desc {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+/* 时间线 */
+.timeline {
+  position: relative;
+  padding-left: 20rpx;
+  margin-top: 24rpx;
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 60rpx;
+  padding-bottom: 32rpx;
+}
+
+/* 竖线 */
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 32rpx;
+  top: 40rpx;
+  bottom: 0;
+  width: 2rpx;
+  background: #e0e0e0;
+}
+
+.timeline-item:last-child::before {
+  display: none;
+}
+
+/* 时间线节点 */
+.timeline-dot {
+  position: absolute;
+  left: 18rpx;
+  top: 4rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  z-index: 1;
+}
+
+.timeline-dot.create {
+  background: #e6f7ff;
+}
+
+.timeline-dot.delete {
+  background: #fff2f0;
+}
+
+/* 时间线内容 */
+.timeline-content {
+  background: #fff;
+  border-radius: 12rpx;
+  padding: 20rpx;
+}
+
+.tl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.tl-version {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #07c160;
+}
+
+.tl-time {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.tl-summary {
+  font-size: 24rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+/* 字段值预览 */
+.tl-values {
+  background: #f7f8fa;
+  border-radius: 8rpx;
+  padding: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.tl-value-row {
+  display: flex;
+  margin-bottom: 4rpx;
+  font-size: 22rpx;
+}
+
+.tl-value-row:last-child {
+  margin-bottom: 0;
+}
+
+.tl-vk {
+  color: #999;
+  width: 140rpx;
+  flex-shrink: 0;
+}
+
+.tl-vv {
+  color: #333;
+  flex: 1;
+  word-break: break-all;
+}
+
+/* 操作按钮 */
+.tl-actions {
+  display: flex;
+  gap: 12rpx;
+}
+
+.tl-btn {
+  font-size: 24rpx;
+  padding: 10rpx 24rpx;
+  border-radius: 8rpx;
+}
+
+.tl-btn.restore {
+  background: #07c160;
+  color: #fff;
+}

@@ -6,7 +6,9 @@
     "pages/detail/detail",
     "pages/template/template",
     "pages/dict/dict",
-    "pages/settings/settings"
+    "pages/settings/settings",
+    "pages/share/share",
+    "pages/timeline/timeline"
   ],
   "window": {
     "backgroundTextStyle": "light",
