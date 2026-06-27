@@ -166,8 +166,8 @@
 .modal-body {
   flex: 1;
   padding: 24rpx;
-  /* 滚动容器右侧内缩 6px，使原生滚动条距浮层右边框约 6px */
-  margin-right: 6px;
+  /* 滚动容器右侧内缩，使原生滚动条不遮挡字迹 */
+  margin-right: 16px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
