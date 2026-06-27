@@ -242,7 +242,7 @@ Page({
         if (r._checked) prevCheckedMap[r.id] = true;
       });
     }
-    const all = raw.map((item) => {
+    let all = raw.map((item) => {
       const date = new Date(item.createdAt);
       // 分辨率暗文：宽×高 + 文件大小（KB），异步填充 sizeText
       const resolutionText = (item.width && item.height)
