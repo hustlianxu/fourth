@@ -109,7 +109,7 @@
         </view>
         <!-- 新增模板时的字段映射提示 -->
         <view class="field-tip" wx:if="{{!editingId}}">
-          提示：自定义字段如未与系统预设字段映射，导出 Excel 时可能无法保证对应列正常显示，建议优先复用预设字段标签。
+          提示：导出 Excel 依赖字段 key 映射，建议字段标签优先复用预设：货号(modelo)、西语描述(desEs)、中文描述(desZh)、单价(precio)、每箱件数(pzs)、件数(cajas)、体积(volumen)、重量(peso)、备注(nota)、日期(fecha)。未映射的自定义字段可能无法保证导出列正常显示。
         </view>
         <view class="field-list">
           <view wx:for="{{form.fields}}" wx:key="index" class="field-row" data-index="{{index}}">
