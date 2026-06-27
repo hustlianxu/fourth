@@ -165,11 +165,12 @@
 
 .modal-body {
   flex: 1;
-  padding: 24rpx 32rpx 24rpx 24rpx;
+  padding: 24rpx;
+  /* 滚动容器右侧内缩 6px，使原生滚动条距浮层右边框约 6px */
+  margin-right: 6px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
-  width: 100%;
 }
 
 .modal-footer {
