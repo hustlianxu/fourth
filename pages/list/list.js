@@ -2,6 +2,7 @@
 const storage = require('../../utils/storage.js');
 const templates = require('../../utils/templates.js');
 const exporter = require('../../utils/exporter.js');
+const cloud = require('../../utils/cloud.js');
 
 const MAX_FOLDERS = 30;
 
@@ -68,6 +69,18 @@ Page({
     this._loadList();
     // 模拟短暂加载状态（让骨架屏可见）
     setTimeout(() => this.setData({ loading: false }), 300);
+    // 同步开启时从云端拉取变更
+    if (cloud.isSyncEnabled()) {
+      var that = this;
+      cloud.syncFromCloud().then(function (count) {
+        if (count > 0) {
+          if (that && that._loadList) {
+            that._loadFolders();
+            that._loadList();
+          }
+        }
+      });
+    }
   },
 
   // ===== 左滑/右滑手势状态 =====
@@ -254,6 +267,7 @@ Page({
         sizeText: '',  // 异步填充
         summary: this._buildSummary(item),
         _checked: !!prevCheckedMap[item.id],
+        _syncStatus: item._syncStatus || 'off',
         _swipeX: 0,
         _swiping: false,
         _swipeAnim: true,
@@ -505,6 +519,10 @@ Page({
 
   goDict() {
     wx.navigateTo({ url: '/pages/dict/dict' });
+  },
+
+  goSettings() {
+    wx.navigateTo({ url: '/pages/settings/settings' });
   },
 
   // ===== 文件夹Tab交互 =====
@@ -916,6 +934,16 @@ Page({
       success(res) {
         if (res.confirm) {
           storage.remove(id);
+          // 同步开启时云端软删除
+          if (cloud.isSyncEnabled()) {
+            cloud.getOpenid().then(function (openid) {
+              if (openid) {
+                cloud.softDelete(id, openid).catch(function (err) {
+                  console.warn('[List] 云端软删除失败:', err);
+                });
+              }
+            });
+          }
           that._loadFolders();
           that._loadList();
           wx.showToast({ title: '已删除', icon: 'success' });

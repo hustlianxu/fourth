@@ -39,7 +39,7 @@
 
   <view class="card">
     <view class="row between">
-      <view class="title">{{record.customName || record.templateName}}</view>
+      <view class="title">{{record.customName || record.templateName}}<text wx:if="{{_syncStatus === 'off'}}" class="sync-badge">📴</text><text wx:if="{{_syncStatus === 'synced'}}" class="sync-badge">☁️</text><text wx:if="{{_syncStatus === 'pending'}}" class="sync-badge">⏳</text></view>
       <view class="muted">{{timeText}}</view>
     </view>
 

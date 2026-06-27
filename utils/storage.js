@@ -188,6 +188,36 @@ function setAutoSaveEditAlbum(enabled) {
   wx.setStorageSync(KEY_AUTO_SAVE_EDIT_ALBUM, !!enabled);
 }
 
+// ===== 云同步配置 =====
+
+const KEY_SYNC_ENABLED = 'watermark_sync_enabled';
+const KEY_LAST_SYNC_TIME = 'watermark_last_sync_time';
+
+function getSyncEnabled() {
+  try {
+    return wx.getStorageSync(KEY_SYNC_ENABLED) === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function setSyncEnabled(enabled) {
+  wx.setStorageSync(KEY_SYNC_ENABLED, !!enabled);
+}
+
+function getLastSyncTime() {
+  try {
+    var t = wx.getStorageSync(KEY_LAST_SYNC_TIME);
+    return typeof t === 'number' ? t : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function setLastSyncTime(timestamp) {
+  wx.setStorageSync(KEY_LAST_SYNC_TIME, timestamp || Date.now());
+}
+
 module.exports = {
   getAll,
   getById,
@@ -214,5 +244,10 @@ module.exports = {
   setAutoSaveAlbum,
   // 编辑保存时自动保存到相册
   getAutoSaveEditAlbum,
-  setAutoSaveEditAlbum
+  setAutoSaveEditAlbum,
+  // 云同步
+  getSyncEnabled,
+  setSyncEnabled,
+  getLastSyncTime,
+  setLastSyncTime
 };

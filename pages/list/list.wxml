@@ -83,6 +83,7 @@
           <block wx:else>
             <view class="title" style="margin:0;">共 {{list.length}} 条</view>
             <view class="dict-entry-btn" bindtap="goDict">📚 词典</view>
+            <view class="dict-entry-btn" bindtap="goSettings" style="margin-left:8rpx;">⚙️</view>
           </block>
         </view>
         <view class="row">
@@ -135,7 +136,7 @@
 
         <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
         <view class="record-body">
-          <view class="record-title">{{item.customName || item.templateName}}</view>
+          <view class="record-title">{{item.customName || item.templateName}}<text wx:if="{{item._syncStatus === 'off'}}" class="sync-badge off">📴</text><text wx:if="{{item._syncStatus === 'synced'}}" class="sync-badge synced">☁️</text><text wx:if="{{item._syncStatus === 'pending'}}" class="sync-badge pending">⏳</text></view>
           <view class="record-time">{{item.timeText}}<text wx:if="{{item.sizeText}}" class="record-meta">{{item.sizeText}}</text></view>
           <view class="record-summary">{{item.summary}}</view>
         </view>

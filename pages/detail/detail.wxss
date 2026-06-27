@@ -319,3 +319,11 @@
     color: rgb(149, 149, 149);
   }
 }
+
+/* 同步状态标记 */
+.sync-badge {
+  display: inline-block;
+  font-size: 20rpx;
+  margin-left: 8rpx;
+  vertical-align: middle;
+}

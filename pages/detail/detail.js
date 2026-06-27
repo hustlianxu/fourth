@@ -2,6 +2,7 @@
 const storage = require('../../utils/storage.js');
 const templates = require('../../utils/templates.js');
 const watermark = require('../../utils/watermark.js');
+const cloud = require('../../utils/cloud.js');
 
 Page({
   data: {
@@ -28,7 +29,8 @@ Page({
     verifyIssues: [],
     // 浮层菜单
     showActionMenu: false,
-    autoSaveEditAlbum: false
+    autoSaveEditAlbum: false,
+    _syncStatus: 'off'
   },
 
   recordId: '',
@@ -114,7 +116,8 @@ Page({
       imgDisplayW: displayW,
       imgDisplayH: displayH,
       ocrResult: record.ocr || null,
-      verifyIssues: record.verifyIssues || []
+      verifyIssues: record.verifyIssues || [],
+      _syncStatus: record._syncStatus || 'off'
     });
   },
 
@@ -341,6 +344,25 @@ Page({
         };
         storage.update(this.recordId, patch);
 
+        // 云同步：同步开启时上传到云端
+        if (cloud.isSyncEnabled()) {
+          var updatedRecord = storage.getById(this.recordId);
+          if (updatedRecord) {
+            var that = this;
+            cloud.getOpenid().then(function (oid) {
+              if (oid) {
+                return cloud.syncRecord(updatedRecord, oid, true);
+              }
+            }).then(function (res) {
+              if (res && res.success) {
+                storage.update(that.recordId, { _syncStatus: 'synced' });
+              }
+            }).catch(function (err) {
+              console.warn('[Detail] 云同步失败:', err);
+            });
+          }
+        }
+
         wx.hideLoading();
 
         // 若开启"自动保存修改到相册"，则把修改后的水印图存入系统相册，防止小程序数据丢失
@@ -500,12 +522,24 @@ Page({
   },
 
   onDelete() {
+    var that = this;
     wx.showModal({
       title: '删除确认',
       content: '确定要删除本条记录吗？',
       success: (res) => {
         if (res.confirm) {
-          storage.remove(this.recordId);
+          var id = that.recordId;
+          storage.remove(id);
+          // 同步开启时云端软删除
+          if (cloud.isSyncEnabled()) {
+            cloud.getOpenid().then(function (openid) {
+              if (openid) {
+                cloud.softDelete(id, openid).catch(function (err) {
+                  console.warn('[Detail] 云端软删除失败:', err);
+                });
+              }
+            });
+          }
           wx.navigateBack();
         }
       }

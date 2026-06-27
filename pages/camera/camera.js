@@ -3,6 +3,7 @@ const templates = require('../../utils/templates.js');
 const storage = require('../../utils/storage.js');
 const watermark = require('../../utils/watermark.js');
 const ocr = require('../../utils/ocr.js');
+const cloud = require('../../utils/cloud.js');
 
 const POSITIONS = [
   { id: 'top-left',     grid: '1 / 1', label: '左上' },
@@ -536,15 +537,34 @@ Page({
         height: imgH,
         createdAt: Date.now(),
         ocr: null,
-        verifyIssues: []
+        verifyIssues: [],
+        _syncStatus: cloud.isSyncEnabled() ? 'pending' : 'off',
+        _cloudOwner: null,
+        _permission: null
       };
       storage.add(record);
       console.log('[Camera] 记录已保存:', record.id);
 
+      // 4. 云同步（后台进行，不阻塞跳转）
+      if (cloud.isSyncEnabled()) {
+        cloud.getOpenid().then(function (oid) {
+          if (oid) {
+            return cloud.syncRecord(record, oid, true);
+          }
+        }).then(function (res) {
+          if (res && res.success) {
+            storage.update(record.id, { _syncStatus: 'synced' });
+            console.log('[Camera] 云同步成功:', res.recordId);
+          }
+        }).catch(function (err) {
+          console.warn('[Camera] 云同步失败（不影响本地保存）:', err);
+        });
+      }
+
       wx.hideLoading();
       wx.showToast({ title: '已保存', icon: 'success' });
 
-      // 4. 跳转详情页（redirectTo 替换当前页，避免返回到拍照页）
+      // 5. 跳转详情页（redirectTo 替换当前页，避免返回到拍照页）
       setTimeout(() => {
         wx.redirectTo({ url: '/pages/detail/detail?id=' + record.id });
       }, 500);

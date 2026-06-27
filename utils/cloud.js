@@ -295,6 +295,137 @@ function revoke(recordId, targetOpenid, ownerOpenid) {
   });
 }
 
+// ===== 同步开关管理 =====
+
+/**
+ * 读取云同步开关状态
+ */
+function isSyncEnabled() {
+  try {
+    return wx.getStorageSync('watermark_sync_enabled') === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 设置云同步开关
+ */
+function setSyncEnabled(enabled) {
+  try {
+    wx.setStorageSync('watermark_sync_enabled', !!enabled);
+  } catch (e) {
+    console.warn('[Cloud] 设置同步开关失败:', e);
+  }
+}
+
+/**
+ * 缓存 openid 到本地
+ */
+function _cacheOpenid(openid) {
+  try {
+    wx.setStorageSync('watermark_openid_cache', openid);
+  } catch (e) {}
+}
+
+function _getCachedOpenid() {
+  try {
+    return wx.getStorageSync('watermark_openid_cache') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ===== 从云端拉取变更到本地 =====
+
+/**
+ * 从云端拉取当前用户的记录，合并到本地 storage
+ * @returns {Promise<number>} 拉取到的记录数
+ */
+function syncFromCloud() {
+  var openid = _getCachedOpenid();
+  if (!openid) {
+    return getOpenid().then(function (oid) {
+      if (!oid) { console.warn('[Cloud] syncFromCloud: 无法获取 openid'); return 0; }
+      _cacheOpenid(oid);
+      return _doSyncFromCloud(oid);
+    });
+  }
+  return _doSyncFromCloud(openid);
+}
+
+function _doSyncFromCloud(openid) {
+  console.log('[Cloud] 开始从云端拉取变更 for', openid);
+  var storage = require('./storage.js');
+
+  return _db().collection('records')
+    .where({
+      owner: openid,
+      deletedAt: null
+    })
+    .get()
+    .then(function (res) {
+      var remoteRecords = res.data || [];
+      if (remoteRecords.length === 0) {
+        console.log('[Cloud] 云端无记录');
+        return 0;
+      }
+
+      var localRecords = storage.getAll();
+      var localMap = {};
+      localRecords.forEach(function (r) { localMap[r.id] = r; });
+
+      var mergedCount = 0;
+      remoteRecords.forEach(function (r) {
+        var localRec = localMap[r.recordId];
+        if (!localRec) {
+          // 云端有、本地无 → 新增到本地
+          var newRecord = {
+            id: r.recordId,
+            templateId: r.templateId,
+            templateName: r.templateName,
+            watermarkPosition: r.watermarkPosition,
+            watermarkScale: r.watermarkScale,
+            watermarkOpacity: r.watermarkOpacity,
+            watermarkWidthRatio: r.watermarkWidthRatio,
+            values: r.values || {},
+            imagePath: '',
+            originalPath: '',
+            width: r.width,
+            height: r.height,
+            folderId: r.folderId,
+            customName: r.customName || '',
+            createdAt: r.createdAt,
+            _cloudOwner: r.owner,
+            _permission: r.owner === openid ? 'readwrite' : null,
+            _syncStatus: 'synced'
+          };
+          storage.add(newRecord);
+          mergedCount++;
+        } else if (r.updatedAt > (localRec.updatedAt || 0)) {
+          // 云端更新、本地旧 → 更新本地
+          storage.update(r.recordId, {
+            templateId: r.templateId,
+            templateName: r.templateName,
+            values: r.values || {},
+            folderId: r.folderId,
+            customName: r.customName || '',
+            _syncStatus: 'synced'
+          });
+          mergedCount++;
+        }
+      });
+
+      storage.setLastSyncTime(Date.now());
+      console.log('[Cloud] 同步完成，合并了', mergedCount, '条记录');
+      return mergedCount;
+    })
+    .catch(function (err) {
+      console.error('[Cloud] 从云端拉取失败:', err);
+      return 0;
+    });
+}
+
 module.exports = {
   CLOUD_ENV: CLOUD_ENV,
   init: init,
@@ -305,5 +436,13 @@ module.exports = {
   fetchRemoteChanges: fetchRemoteChanges,
   softDelete: softDelete,
   authorize: authorize,
-  revoke: revoke
+  revoke: revoke,
+  // 同步开关
+  isSyncEnabled: isSyncEnabled,
+  setSyncEnabled: setSyncEnabled,
+  // 拉取
+  syncFromCloud: syncFromCloud,
+  // 内部（供设置页使用）
+  _getCachedOpenid: _getCachedOpenid
 };
+

@@ -1,0 +1,49 @@
+<!-- pages/settings/settings.wxml -->
+<view class="page">
+  <view class="section">
+    <view class="section-header">云同步</view>
+
+    <view class="row">
+      <view class="row-left">
+        <text class="row-title">启用云同步</text>
+        <text class="row-desc">开启后拍照和编辑将自动同步到云端</text>
+      </view>
+      <switch checked="{{syncEnabled}}" bindchange="onSyncToggle" color="#07c160" />
+    </view>
+
+    <view class="row" wx:if="{{syncEnabled}}">
+      <view class="row-left">
+        <text class="row-title">最后同步时间</text>
+        <text class="row-desc">{{lastSyncText || '尚未同步'}}</text>
+      </view>
+    </view>
+
+    <view class="row" wx:if="{{syncEnabled}}">
+      <view class="row-left">
+        <text class="row-title">当前用户</text>
+        <text class="row-desc">{{openid || '未获取'}}</text>
+      </view>
+    </view>
+
+    <button class="sync-btn" wx:if="{{syncEnabled}}" bindtap="onManualSync"
+      loading="{{syncing}}" disabled="{{syncing}}">
+      {{syncing ? '同步中...' : '立即同步'}}
+    </button>
+  </view>
+
+  <view class="section">
+    <view class="section-header">关于</view>
+    <view class="row">
+      <view class="row-left">
+        <text class="row-title">数据存储</text>
+        <text class="row-desc">照片存储在微信云开发，按量付费，月均 < 1 元</text>
+      </view>
+    </view>
+    <view class="row">
+      <view class="row-left">
+        <text class="row-title">数据隔离</text>
+        <text class="row-desc">每个用户数据独立，可授权给他人</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,63 @@
+/* pages/settings/settings.wxss */
+.page {
+  padding: 0 32rpx 40rpx;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.section {
+  background: #fff;
+  border-radius: 16rpx;
+  margin-top: 24rpx;
+  padding: 0 32rpx;
+}
+
+.section-header {
+  font-size: 26rpx;
+  color: #999;
+  padding: 28rpx 0 16rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-title {
+  font-size: 28rpx;
+  color: #333;
+  display: block;
+}
+
+.row-desc {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 6rpx;
+  display: block;
+  word-break: break-all;
+}
+
+.sync-btn {
+  margin: 24rpx 0;
+  background: #07c160;
+  color: #fff;
+  font-size: 28rpx;
+  border-radius: 12rpx;
+}
+
+.sync-btn[disabled] {
+  background: #ccc;
+}
