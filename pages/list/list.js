@@ -10,6 +10,12 @@ const SWIPE_ACTION_WIDTH = 280;
 // 右滑选中触发阈值（px）
 const SWIPE_SELECT_THRESHOLD = 60;
 
+// 分页相关：每页记录数、当前已渲染页数、是否还有更多、是否正在加载更多
+const PAGE_SIZE = 20;
+
+// touchmove 节流间隔（ms），避免高频 setData 拖垮渲染
+const SWIPE_THROTTLE_MS = 16;
+
 Page({
   data: {
     list: [],
@@ -18,6 +24,9 @@ Page({
     activeFolderId: null,        // null=全部, '__uncategorized__'=未分类, 其他=folder.id（普通模式使用）
     totalCount: 0,
     uncategorizedCount: 0,
+    // 分页：list 仅渲染前 _renderedCount 条，onReachBottom 追加
+    hasMore: false,
+    loadingMore: false,
     // 导出模式
     exportMode: false,
     selectedCount: 0,
@@ -82,6 +91,10 @@ Page({
   onRecordTouchMove(e) {
     if (this.data.exportMode) return;
     if (!this._swipeRecordId) return;
+    // 节流：两次 setData 间隔不小于 SWIPE_THROTTLE_MS，避免高频 setData 拖垮渲染
+    const now = Date.now();
+    if (this._lastSwipeMoveTs && now - this._lastSwipeMoveTs < SWIPE_THROTTLE_MS) return;
+    this._lastSwipeMoveTs = now;
     const dx = e.touches[0].clientX - this._swipeStartX;
     const dy = e.touches[0].clientY - this._swipeStartY;
     // 水平滑动为主才处理
@@ -215,7 +228,7 @@ Page({
         if (r._checked) prevCheckedMap[r.id] = true;
       });
     }
-    const list = raw.map((item) => {
+    const all = raw.map((item) => {
       const date = new Date(item.createdAt);
       // 分辨率暗文：宽×高 + 文件大小（KB），异步填充 sizeText
       const resolutionText = (item.width && item.height)
@@ -233,18 +246,73 @@ Page({
         _swipeActionsW: 0
       });
     });
-    // 异步读取每条记录的图片文件大小，回填 sizeText（暗文）
-    this._fillImageSizes(list);
     // 按创建时间倒序
-    list.sort((a, b) => b.createdAt - a.createdAt);
+    all.sort((a, b) => b.createdAt - a.createdAt);
 
     // 导出模式下，如果有选中文件夹则自动勾选所有记录
     if (this.data.exportMode && this.data.selectedFolderIds.length > 0) {
-      list.forEach(item => { item._checked = true; });
+      all.forEach(item => { item._checked = true; });
     }
 
-    const count = list.filter(i => i._checked).length;
-    this.setData({ list: list, selectedCount: count });
+    // 保留全量记录到 _allRecords，分页渲染前 PAGE_SIZE 条
+    this._allRecords = all;
+    this._renderedCount = 0;
+    this._renderMore(true);
+  },
+
+  // 渲染下一页（首屏或触底加载更多）
+  // isReset=true 时渲染首屏（替换 list），否则追加
+  _renderMore(isReset) {
+    if (!this._allRecords) return;
+    const total = this._allRecords.length;
+    if (isReset) {
+      this._renderedCount = 0;
+    }
+    const target = Math.min(this._renderedCount + PAGE_SIZE, total);
+    if (target <= this._renderedCount) {
+      // 无新数据可加载
+      this.setData({ hasMore: false, loadingMore: false });
+      return;
+    }
+    const slice = this._allRecords.slice(this._renderedCount, target);
+    this._renderedCount = target;
+    // 异步回填图片大小（仅对新切片）
+    this._fillImageSizes(slice, this._renderedCount - slice.length);
+
+    if (isReset) {
+      const count = this._allRecords.filter(i => i._checked).length;
+      this.setData({
+        list: slice,
+        selectedCount: count,
+        hasMore: this._renderedCount < total,
+        loadingMore: false
+      });
+    } else {
+      // 追加：保留已渲染 list，concat 新切片
+      const newList = this.data.list.concat(slice);
+      const count = newList.filter(i => i._checked).length;
+      this.setData({
+        list: newList,
+        selectedCount: count,
+        hasMore: this._renderedCount < total,
+        loadingMore: false
+      });
+    }
+  },
+
+  // 页面级滚动触底，加载下一页
+  onReachBottom() {
+    if (!this._allRecords) return;
+    if (this._renderedCount >= this._allRecords.length) return;
+    if (this.data.loadingMore) return;
+    this.setData({ loadingMore: true });
+    // 延迟一帧，避免与 setData 抢主线程；分页数据已在内存中，开销很小
+    setTimeout(() => this._renderMore(false), 50);
+  },
+
+  // 页面卸载：兜底关闭屏幕常亮（导出途中返回时防止 keepScreenOn 残留耗电）
+  onUnload() {
+    wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
   },
 
   /**
@@ -298,12 +366,14 @@ Page({
   },
 
   // 异步读取每条记录图片的文件大小，回填 sizeText（与分辨率一起作为暗文显示）
-  _fillImageSizes(list) {
+  // startIdx 为 slice 在已渲染 list 中的起始下标（用于路径式 setData 定位）
+  _fillImageSizes(list, startIdx) {
     const fs = wx.getFileSystemManager();
     const that = this;
     // 每次加载自增 token，异步回调比对 token，防止列表重建后旧回调写错位置
     this._fillToken = (this._fillToken || 0) + 1;
     const token = this._fillToken;
+    const offset = startIdx || 0;
     // 收集结果一次性 setData，避免每条记录单独 setData 造成 N 次跨层通信
     const pending = {};
     let pendingCount = 0;
@@ -315,6 +385,7 @@ Page({
     list.forEach((item, idx) => {
       if (!item.imagePath) return;
       pendingCount++;
+      const listIdx = offset + idx;
       fs.getFileInfo({
         filePath: item.imagePath,
         success: function (res) {
@@ -322,13 +393,13 @@ Page({
           const size = res.size || 0;
           const kb = size > 1024 ? (size / 1024).toFixed(0) + 'KB' : size + 'B';
           const sizeText = item.metaText ? (item.metaText + ' · ' + kb) : ('· ' + kb);
-          pending['list[' + idx + '].sizeText'] = sizeText;
+          pending['list[' + listIdx + '].sizeText'] = sizeText;
           if (--pendingCount === 0) flush();
         },
         fail: function () {
           if (token !== that._fillToken) return;
           if (item.metaText) {
-            pending['list[' + idx + '].sizeText'] = item.metaText;
+            pending['list[' + listIdx + '].sizeText'] = item.metaText;
           }
           if (--pendingCount === 0) flush();
         }
@@ -796,30 +867,43 @@ Page({
 
   toggleSelect(e) {
     const id = e.currentTarget.dataset.id;
-    var count = 0;
-    const list = this.data.list.map(item => {
-      if (item.id === id) {
-        item._checked = !item._checked;
-      }
-      if (item._checked) count++;
+    // 同步更新全量记录，保证分页下未渲染记录的选中态一致
+    const all = (this._allRecords || this.data.list).map(item => {
+      if (item.id === id) item._checked = !item._checked;
       return item;
     });
-    this.setData({ list, selectedCount: count });
+    this._allRecords = all;
+    const count = all.filter(i => i._checked).length;
+    // 路径式更新当前可见项（若该记录已渲染）
+    const idx = this.data.list.findIndex(r => r.id === id);
+    if (idx >= 0) {
+      this.setData({
+        ['list[' + idx + ']._checked']: all.find(r => r.id === id)._checked,
+        selectedCount: count
+      });
+    } else {
+      this.setData({ selectedCount: count });
+    }
   },
 
   selectAll() {
-    const list = this.data.list.map(item => {
+    // 选中全量记录（含未渲染的分页），导出时才能拿到完整集合
+    const all = (this._allRecords || this.data.list).map(item => {
       item._checked = true;
       return item;
     });
-    this.setData({ list, selectedCount: list.length });
+    this._allRecords = all;
+    const list = this.data.list.map(item => Object.assign({}, item, { _checked: true }));
+    this.setData({ list, selectedCount: all.length });
   },
 
   deselectAll() {
-    const list = this.data.list.map(item => {
+    const all = (this._allRecords || this.data.list).map(item => {
       item._checked = false;
       return item;
     });
+    this._allRecords = all;
+    const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
     this.setData({ list, selectedCount: 0 });
   },
 
@@ -827,10 +911,12 @@ Page({
 
   // 右滑触发：进入选中态并选中当前记录
   _enterBatchAndToggle(id) {
-    // 进入选中态：清空旧选中态并选中当前记录
-    const list = this.data.list.map(item => Object.assign({}, item, { _checked: false }));
-    const idx = list.findIndex(r => r.id === id);
-    if (idx >= 0) list[idx]._checked = true;
+    // 进入选中态：清空全量记录选中态并选中当前记录（分页下未渲染记录也需清空）
+    const all = (this._allRecords || this.data.list).map(item => Object.assign({}, item, { _checked: false }));
+    const target = all.find(r => r.id === id);
+    if (target) target._checked = true;
+    this._allRecords = all;
+    const list = this.data.list.map(item => Object.assign({}, item, { _checked: item.id === id }));
     this._collapseAllSwipe();
     this.setData({ list, batchMode: true, batchSelectedCount: 1 });
   },
@@ -839,24 +925,33 @@ Page({
   onBatchToggle(e) {
     if (!this.data.batchMode) return;
     const id = e.currentTarget.dataset.id;
-    let count = 0;
-    const list = this.data.list.map(item => {
+    // 同步全量记录选中态
+    const all = (this._allRecords || this.data.list).map(item => {
       if (item.id === id) item._checked = !item._checked;
-      if (item._checked) count++;
       return item;
     });
+    this._allRecords = all;
+    const count = all.filter(i => i._checked).length;
+    // 路径式更新当前可见项
+    const idx = this.data.list.findIndex(r => r.id === id);
+    const patch = { batchSelectedCount: count };
+    if (idx >= 0) {
+      patch['list[' + idx + ']._checked'] = all.find(r => r.id === id)._checked;
+    }
     // 选中数归0 → 自动退出选中态
     if (count === 0) {
-      this._exitBatchMode(list);
+      this._exitBatchMode(this.data.list);
     } else {
-      this.setData({ list, batchSelectedCount: count });
+      this.setData(patch);
     }
   },
 
-  // 选中态：全选当前列表
+  // 选中态：全选（含未渲染的分页记录）
   onBatchSelectAll() {
+    const all = (this._allRecords || this.data.list).map(item => Object.assign({}, item, { _checked: true }));
+    this._allRecords = all;
     const list = this.data.list.map(item => Object.assign({}, item, { _checked: true }));
-    this.setData({ list, batchSelectedCount: list.length });
+    this.setData({ list, batchSelectedCount: all.length });
   },
 
   // 退出选中态（点✕或取消）
@@ -864,8 +959,11 @@ Page({
     this._exitBatchMode();
   },
 
-  // 内部：退出选中态，清空选中标记
+  // 内部：退出选中态，清空选中标记（含未渲染记录）
   _exitBatchMode(list) {
+    if (this._allRecords) {
+      this._allRecords = this._allRecords.map(item => Object.assign({}, item, { _checked: false }));
+    }
     const newList = (list || this.data.list).map(item => Object.assign({}, item, { _checked: false }));
     this.setData({ list: newList, batchMode: false, batchSelectedCount: 0 });
   },
@@ -882,7 +980,8 @@ Page({
 
   // 确认批量删除
   onBatchDeleteConfirm() {
-    const selected = this.data.list.filter(item => item._checked);
+    // 从全量记录取选中项，分页下未渲染的记录也能被删除
+    const selected = (this._allRecords || this.data.list).filter(item => item._checked);
     const ids = selected.map(item => item.id);
     this.setData({ showBatchDeleteModal: false });
     wx.showLoading({ title: '删除中...', mask: true });
@@ -902,7 +1001,8 @@ Page({
   // ===== 导出 =====
 
   doExport() {
-    const selected = this.data.list.filter(item => item._checked);
+    // 从全量记录取选中项，分页下未渲染的记录也能被导出
+    const selected = (this._allRecords || this.data.list).filter(item => item._checked);
     if (selected.length === 0) {
       wx.showToast({ title: '请先选择记录', icon: 'none' });
       return;

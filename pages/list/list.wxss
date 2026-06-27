@@ -68,6 +68,18 @@
   margin-top: 8rpx;
 }
 
+/* 分页加载提示 */
+.load-more-tip {
+  text-align: center;
+  font-size: 24rpx;
+  color: #888;
+  padding: 24rpx 0;
+}
+
+.load-more-tip.muted {
+  color: #aaa;
+}
+
 /* ===== 文件夹Tab栏 ===== */
 .folder-tabs {
   width: 100%;

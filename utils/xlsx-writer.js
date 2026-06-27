@@ -164,52 +164,53 @@ function buildXlsx(records, columns, helpers) {
   // 列宽（Excel 列宽单位 ≈ 字符数，1 字符约 7px）
   // calcColumnWidths 返回 {key: widthPx} 对象，需按 column.key 取值
   var colWidthsMap = helpers.calcColumnWidths ? helpers.calcColumnWidths(records) : {};
-  sheetXml += '<cols>';
+  // 用数组 push + join 替代字符串 += 拼接，避免长字符串反复拷贝
+  var sheetParts = [sheetXml, '<cols>'];
   for (var i = 0; i < columns.length; i++) {
     var w = colWidthsMap[columns[i].key] || 80;
     // px 转 Excel 列宽单位（约 w / 7）
     var cw = Math.max(8, Math.round(w / 7));
-    sheetXml += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + cw + '" customWidth="1"/>';
+    sheetParts.push('<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + cw + '" customWidth="1"/>');
   }
-  sheetXml += '</cols>';
+  sheetParts.push('</cols>');
 
   // 行数据
-  sheetXml += '<sheetData>';
+  sheetParts.push('<sheetData>');
   // 表头行
-  sheetXml += '<row r="1" ht="' + pxToRowHeight(28) + '" customHeight="1">';
+  sheetParts.push('<row r="1" ht="' + pxToRowHeight(28) + '" customHeight="1">');
   for (var i = 0; i < columns.length; i++) {
     var cellRef = colLetter(i) + '1';
-    sheetXml += '<c r="' + cellRef + '" s="2" t="inlineStr"><is><t>' + xmlEscape(columns[i].header) + '</t></is></c>';
+    sheetParts.push('<c r="' + cellRef + '" s="2" t="inlineStr"><is><t>' + xmlEscape(columns[i].header) + '</t></is></c>');
   }
-  sheetXml += '</row>';
+  sheetParts.push('</row>');
 
   // 数据行
   for (var ri = 0; ri < records.length; ri++) {
     var rec = records[ri];
     var rowH = calcRowHeight(rec);
     var rowIdx = ri + 2; // Excel 行从 1 开始，1 是表头
-    sheetXml += '<row r="' + rowIdx + '" ht="' + pxToRowHeight(rowH) + '" customHeight="1">';
+    sheetParts.push('<row r="' + rowIdx + '" ht="' + pxToRowHeight(rowH) + '" customHeight="1">');
     for (var ci = 0; ci < columns.length; ci++) {
       var col = columns[ci];
       var cellRef = colLetter(ci) + rowIdx;
       var val = rec[col.key] != null ? rec[col.key] : '';
       // 图片列不写字符串，留空，由 drawing 层覆盖
       if (col.isImage) {
-        sheetXml += '<c r="' + cellRef + '" s="1"/>';
+        sheetParts.push('<c r="' + cellRef + '" s="1"/>');
       } else {
-        sheetXml += '<c r="' + cellRef + '" s="1" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(val) + '</t></is></c>';
+        sheetParts.push('<c r="' + cellRef + '" s="1" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(val) + '</t></is></c>');
       }
     }
-    sheetXml += '</row>';
+    sheetParts.push('</row>');
   }
-  sheetXml += '</sheetData>';
+  sheetParts.push('</sheetData>');
 
   // drawing 关系引用
   if (imageEntries.length > 0) {
-    sheetXml += '<drawing r:id="rId3"/>';
+    sheetParts.push('<drawing r:id="rId3"/>');
   }
-  sheetXml += '</worksheet>';
-  zip.addFile('xl/worksheets/sheet1.xml', sheetXml);
+  sheetParts.push('</worksheet>');
+  zip.addFile('xl/worksheets/sheet1.xml', sheetParts.join(''));
 
   // ===== 7. xl/worksheets/_rels/sheet1.xml.rels（图片引用）=====
   if (imageEntries.length > 0) {
@@ -231,6 +232,8 @@ function buildXlsx(records, columns, helpers) {
       + 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
       + 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
 
+    // 用数组 push + join 替代字符串 += 拼接
+    var drawingParts = [drawingXml];
     for (var i = 0; i < imageEntries.length; i++) {
       var ie = imageEntries[i];
       var rec = records[ie.recordIdx];
@@ -246,20 +249,20 @@ function buildXlsx(records, columns, helpers) {
       var toCol = IMG_COL + 1;
       var toRow = rowIdx;       // 下一行的起点
 
-      drawingXml += '<xdr:twoCellAnchor>';
-      drawingXml += '<xdr:from><xdr:col>' + fromCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + fromRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>';
-      drawingXml += '<xdr:to><xdr:col>' + toCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + toRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>';
-      drawingXml += '<xdr:pic>';
-      drawingXml += '<xdr:nvPicPr><xdr:cNvPr id="' + (i + 1) + '" name="图片' + (i + 1) + '"/><xdr:cNvPicPr/></xdr:nvPicPr>';
-      drawingXml += '<xdr:blipFill><a:blip r:embed="' + ie.rId + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>';
-      drawingXml += '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + (imgColW * EMU_PER_PX) + '" cy="' + (imgH * EMU_PER_PX) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>';
-      drawingXml += '</xdr:pic>';
-      drawingXml += '<xdr:clientData/>';
-      drawingXml += '</xdr:twoCellAnchor>';
+      drawingParts.push('<xdr:twoCellAnchor>');
+      drawingParts.push('<xdr:from><xdr:col>' + fromCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + fromRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>');
+      drawingParts.push('<xdr:to><xdr:col>' + toCol + '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' + toRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>');
+      drawingParts.push('<xdr:pic>');
+      drawingParts.push('<xdr:nvPicPr><xdr:cNvPr id="' + (i + 1) + '" name="图片' + (i + 1) + '"/><xdr:cNvPicPr/></xdr:nvPicPr>');
+      drawingParts.push('<xdr:blipFill><a:blip r:embed="' + ie.rId + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>');
+      drawingParts.push('<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + (imgColW * EMU_PER_PX) + '" cy="' + (imgH * EMU_PER_PX) + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>');
+      drawingParts.push('</xdr:pic>');
+      drawingParts.push('<xdr:clientData/>');
+      drawingParts.push('</xdr:twoCellAnchor>');
     }
 
-    drawingXml += '</xdr:wsDr>';
-    zip.addFile('xl/drawings/drawing1.xml', drawingXml);
+    drawingParts.push('</xdr:wsDr>');
+    zip.addFile('xl/drawings/drawing1.xml', drawingParts.join(''));
 
     // ===== 9. xl/drawings/_rels/drawing1.xml.rels（图片文件引用）=====
     var drawRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'

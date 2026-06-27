@@ -294,7 +294,12 @@ async function buildHtmlTable(records, onProgress) {
   COLUMNS.forEach(function (c) { html += '<th>' + c.header + '</th>'; });
   html += '</tr>';
 
-  // 数据行
+  // 数据行：先并行预读所有图片 base64，避免循环内串行 await 导致 N 张图 N 次串行 IO
+  var b64Promises = records.map(function (rec) {
+    return rec.imagePath ? readFileAsBase64(rec.imagePath) : Promise.resolve('');
+  });
+  var b64List = await Promise.all(b64Promises);
+
   for (var ri = 0; ri < records.length; ri++) {
     var rec = records[ri];
     var imgH = calcImgDisplayH(rec);
@@ -306,7 +311,7 @@ async function buildHtmlTable(records, onProgress) {
       if (col.isImage) {
         var imgHtml = '';
         if (rec.imagePath) {
-          var b64 = await readFileAsBase64(rec.imagePath);
+          var b64 = b64List[ri];
           if (b64) {
             imgHtml = '<!--[if gte vml 1]>'
               + '<v:shape style="width:' + IMG_CELL_W + 'px;height:' + imgH + 'px;'

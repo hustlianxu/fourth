@@ -143,6 +143,11 @@
       </view>
     </view>
 
+    <!-- 分页加载提示 -->
+    <view wx:if="{{loadingMore}}" class="load-more-tip">加载中...</view>
+    <view wx:elif="{{hasMore}}" class="load-more-tip muted">上滑加载更多</view>
+    <view wx:elif="{{list.length > 0}}" class="load-more-tip muted">没有更多了</view>
+
     <view class="btn danger" bindtap="onClear" style="margin-top:24rpx;">清空本地记录</view>
   </view>
 
