@@ -182,12 +182,13 @@ function preReadImageBytes(records) {
   });
   return Promise.all(tasks).then(function (results) {
     var map = {};
-    var failures = [];
+    var failures = [];   // 元素: { idx, name }，name 便于定位失败记录
     results.forEach(function (r) {
       if (r.bytes && r.bytes.length) {
         map[r.idx] = r.bytes;
       } else if (r.hasPath) {
-        failures.push(r.idx);
+        var rec = records[r.idx] || {};
+        failures.push({ idx: r.idx, name: rec.customName || rec.id || ('记录#' + r.idx) });
       }
     });
     return { map: map, failures: failures, total: results.length };
@@ -459,9 +460,10 @@ function exportToXlsx(records, customFileName, onProgress) {
   return preReadImageBytes(records).then(function (preRead) {
     // 有图片读取失败 → reject 触发回退（用户要求：图片无法导入则回退伪 xls）
     if (preRead.failures.length > 0) {
-      console.warn('[Exporter] 图片字节预读失败 ' + preRead.failures.length + ' 张，记录索引:',
-        preRead.failures.join(', '), '→ 触发回退伪 xls');
-      throw new Error('图片读取失败：' + preRead.failures.length + ' 张无法导入');
+      var failNames = preRead.failures.map(function (f) { return f.name; }).join(', ');
+      console.warn('[Exporter] 图片字节预读失败 ' + preRead.failures.length + ' 张，记录:',
+        failNames, '→ 触发回退伪 xls');
+      throw new Error('图片读取失败 ' + preRead.failures.length + ' 张：' + failNames.slice(0, 60));
     }
 
     // 3. 构建 xlsx（同步，使用预读字节）

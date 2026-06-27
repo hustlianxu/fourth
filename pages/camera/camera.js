@@ -311,10 +311,14 @@ Page({
   onPickTemplate(e) {
     const id = e.currentTarget.dataset.id;
     const tpl = templates.getTemplateById(id);
+    // 切换模板时重置编辑状态，防止 editingFieldKey 残留阻止拖拽、editValue 显示旧值、wmScale 带入旧缩放
     this.setData({
       template: tpl,
       values: templates.getDefaultValues(tpl, { location: this.data.values.location }),
-      wPos: (tpl && tpl.position) || 'bottom-center'
+      wPos: (tpl && tpl.position) || 'bottom-center',
+      editingFieldKey: '',
+      editValue: '',
+      wmScale: 1.0
     });
     this._calcWmPreview();
     this._applyWmPosition();

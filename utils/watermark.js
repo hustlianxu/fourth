@@ -9,6 +9,10 @@
 function hexToRgba(hex, alpha) {
   let h = (hex || '#000000').replace('#', '');
   if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  // 校验：仅允许 6 位十六进制字符，非法值回退默认黑色，避免产出 rgba(NaN,...)
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) {
+    return 'rgba(0,0,0,' + alpha + ')';
+  }
   const r = parseInt(h.substring(0, 2), 16);
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);

@@ -310,7 +310,10 @@ Page({
 
   // === 编辑切换 ===
   async onEditToggle() {
+    // 防重入：保存或测量进行中时忽略再次点击，避免 setTimeout/异步重渲染竞态
+    if (this._toggling) return;
     if (this.data.editing) {
+      this._toggling = true;
       wx.showLoading({ title: '保存中...', mask: true });
 
       try {
@@ -363,6 +366,8 @@ Page({
         console.error('[Detail] 重新渲染水印失败:', e);
         const errMsg = e.message || String(e);
         wx.showToast({ title: '更新失败: ' + errMsg.slice(0, 20), icon: 'none', duration: 3000 });
+      } finally {
+        this._toggling = false;
       }
     } else {
       const rec = this.data.record;

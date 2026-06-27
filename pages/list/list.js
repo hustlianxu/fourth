@@ -333,12 +333,14 @@ Page({
     }, 50);
   },
 
-  // 页面卸载：清理触底加载定时器 + 兜底关闭屏幕常亮
+  // 页面卸载：清理触底加载定时器 + 失效图片大小回填回调 + 兜底关闭屏幕常亮
   onUnload() {
     if (this._loadMoreTimer) {
       clearTimeout(this._loadMoreTimer);
       this._loadMoreTimer = null;
     }
+    // 自增 token 使在途的 getFileInfo 回调短路，避免对已销毁页面 setData
+    this._fillToken = (this._fillToken || 0) + 1;
     wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
   },
 
@@ -1073,15 +1075,33 @@ Page({
       itemList: ['xlsx（推荐·图片不压缩）', 'xls（伪 xls·兼容老版本）'],
       success: function (res) {
         const fmt = res.tapIndex === 0 ? 'xlsx' : 'xls';
-        // _doExport 为 async，未 catch 会变成 unhandled rejection，导出失败时用户无提示
-        that._doExport(selected, customFileName, fmt).catch(function (err) {
-          wx.hideLoading();
-          console.error('[List] 导出失败:', err);
-          wx.showToast({ title: '导出失败: ' + ((err && err.message) || '').slice(0, 20), icon: 'none', duration: 3000 });
-        });
+        // 大数量导出提示：记录过多可能因内存/IO 紧张导致生成慢或失败
+        if (selected.length > 200) {
+          wx.showModal({
+            title: '导出数量较大',
+            content: '选中 ' + selected.length + ' 条记录，数量较多可能耗时较长，是否继续？',
+            confirmText: '继续导出',
+            cancelText: '取消',
+            success: function (m) {
+              if (m.confirm) {
+                that._doExport(selected, customFileName, fmt).catch(that._onExportError);
+              }
+            }
+          });
+          return;
+        }
+        that._doExport(selected, customFileName, fmt).catch(that._onExportError);
       },
       fail: function () { /* 用户取消选择，无需处理 */ }
     });
+  },
+
+  // 导出异常统一处理
+  _onExportError(err) {
+    wx.hideLoading();
+    wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
+    console.error('[List] 导出失败:', err);
+    wx.showToast({ title: '导出失败: ' + ((err && err.message) || '').slice(0, 20), icon: 'none', duration: 3000 });
   },
 
   async _doExport(selected, customFileName, format) {
