@@ -1,4 +1,5 @@
 <view class="container"
+  style="transition: transform 0.18s ease-out, opacity 0.18s ease-out; {{slideOutStyle}}"
   bindtouchstart="onTouchStart"
   bindtouchend="onTouchEnd">
   <view class="hero">
