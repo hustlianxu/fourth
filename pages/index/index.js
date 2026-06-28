@@ -105,12 +105,20 @@ Page({
     // 阈值：水平滑动 > 60px、手势快于 500ms、水平幅度大于垂直幅度
     if (Math.abs(dx) > 60 && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (dx > 0) {
-        // 右滑 → 我的记录
-        wx.navigateTo({ url: '/pages/list/list' });
+        // 右滑 → 我的记录（页面从左滑入，跟随手指方向）
+        wx.navigateTo({
+          url: '/pages/list/list',
+          animationType: 'slide-in-left',
+          animationDuration: 250
+        });
       } else {
-        // 左滑 → 拍照
+        // 左滑 → 拍照（页面从右滑入，跟随手指方向）
         const id = this.data.selectedId;
-        wx.navigateTo({ url: '/pages/camera/camera?templateId=' + id });
+        wx.navigateTo({
+          url: '/pages/camera/camera?templateId=' + id,
+          animationType: 'slide-in-right',
+          animationDuration: 250
+        });
       }
     }
   },
