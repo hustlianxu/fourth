@@ -1,5 +1,8 @@
 <!-- pages/timeline/timeline.wxml -->
 <view class="page">
+
+
+
   <!-- 记录信息 -->
   <view class="record-bar" wx:if="{{record}}">
     <image class="record-thumb" src="{{record.imagePath}}" mode="aspectFill"></image>

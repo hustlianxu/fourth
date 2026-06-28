@@ -1,0 +1,9 @@
+{
+  "name": "authorizeByShare",
+  "version": "1.0.0",
+  "description": "通过分享卡片自动授权",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

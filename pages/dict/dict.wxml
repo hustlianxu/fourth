@@ -1,4 +1,7 @@
 <view class="container">
+
+
+  
   <!-- 顶部 Tab：自定义词典 / 白名单 / 内置词典 / API 配置 -->
   <view class="tabs">
     <view class="tab {{activeTab === 'custom' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="custom">我的词典</view>

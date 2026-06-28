@@ -60,8 +60,11 @@ Page({
   viewportW: 0,
   viewportH: 0,
 
+
+
   onLoad(options) {
     const tplId = options.templateId || 'minimal';
+
     const tpl = templates.getTemplateById(tplId);
     // 模板可能被删除或参数异常，做 null 防护，避免后续 getDefaultValues/validate 崩溃白屏
     if (!tpl) {

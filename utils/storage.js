@@ -36,12 +36,18 @@ function getFolderById(id) {
   return list.find(item => item.id === id);
 }
 
-function addFolder(name) {
+function getFolderByName(name) {
+  const list = getAllFolders();
+  return list.find(item => item.name === String(name).trim());
+}
+
+function addFolder(name, id) {
   const list = getAllFolders();
   const folder = {
-    id: genFolderId(),
+    id: id || genFolderId(),
     name: String(name).trim(),
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    updatedAt: Date.now()
   };
   list.unshift(folder);
   wx.setStorageSync(KEY_FOLDERS, list);
@@ -249,10 +255,42 @@ function setAutoSaveEditAlbum(enabled) {
   wx.setStorageSync(KEY_AUTO_SAVE_EDIT_ALBUM, !!enabled);
 }
 
+// ===== 云端导出记录 =====
+
+const KEY_EXPORTS = 'watermark_exports';
+
+function addExportRecord(record) {
+  var list = getExportRecords();
+  list.unshift({
+    fileID: record.fileID,
+    fileName: record.fileName,
+    createdAt: record.createdAt || Date.now()
+  });
+  // 只保留最近 20 条
+  if (list.length > 20) list = list.slice(0, 20);
+  wx.setStorageSync(KEY_EXPORTS, list);
+}
+
+function getExportRecords() {
+  try {
+    var list = wx.getStorageSync(KEY_EXPORTS);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function removeExportRecord(fileID) {
+  var list = getExportRecords();
+  var next = list.filter(function (item) { return item.fileID !== fileID; });
+  wx.setStorageSync(KEY_EXPORTS, next);
+}
+
 // ===== 云同步配置 =====
 
 const KEY_SYNC_ENABLED = 'watermark_sync_enabled';
 const KEY_LAST_SYNC_TIME = 'watermark_last_sync_time';
+const KEY_CONFIG_SYNC_ENABLED = 'watermark_config_sync_enabled';
 
 function getSyncEnabled() {
   try {
@@ -279,6 +317,18 @@ function setLastSyncTime(timestamp) {
   wx.setStorageSync(KEY_LAST_SYNC_TIME, timestamp || Date.now());
 }
 
+function getConfigSyncEnabled() {
+  try {
+    return wx.getStorageSync(KEY_CONFIG_SYNC_ENABLED) === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function setConfigSyncEnabled(enabled) {
+  wx.setStorageSync(KEY_CONFIG_SYNC_ENABLED, !!enabled);
+}
+
 module.exports = {
   getAll,
   getById,
@@ -291,6 +341,7 @@ module.exports = {
   // 文件夹
   getAllFolders,
   getFolderById,
+  getFolderByName,
   addFolder,
   updateFolder,
   removeFolder,
@@ -311,6 +362,12 @@ module.exports = {
   setSyncEnabled,
   getLastSyncTime,
   setLastSyncTime,
+  getConfigSyncEnabled,
+  setConfigSyncEnabled,
+  // 云端导出记录
+  addExportRecord,
+  getExportRecords,
+  removeExportRecord,
   // 回收站
   moveToTrash,
   getTrash,

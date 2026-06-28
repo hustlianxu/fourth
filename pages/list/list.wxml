@@ -1,3 +1,4 @@
+
 <view class="container">
   <!-- 骨架屏加载状态 -->
   <view wx:if="{{loading}}" class="skeleton-list">
@@ -109,7 +110,7 @@
           </block>
           <block wx:else>
             <view class="title" style="margin:0;">共 {{filteredCount}} 条</view>
-            <view class="dict-entry-btn" bindtap="goDict">📚 词典</view>
+            <view class="dict-entry-btn" bindtap="goDict" style="margin-left:8rpx;">📚</view>
             <view class="dict-entry-btn" bindtap="goSettings" style="margin-left:8rpx;">⚙️</view>
           </block>
         </view>
@@ -290,7 +291,7 @@
       请选择如何处理这些记录：
     </view>
     <view class="folder-modal-actions" style="flex-direction:column;gap:12rpx;">
-      <view class="btn danger" bindtap="onDeleteFolderWithRecords">一起删除记录</view>
+      <view class="btn danger" bindtap="onDeleteFolderWithRecords">移入回收站</view>
       <view class="btn secondary" bindtap="onDeleteFolderKeepRecords">移入未分类</view>
       <view class="btn secondary" bindtap="closeDeleteFolderModal" style="background:#f5f5f5;color:#999;">取消</view>
     </view>
@@ -301,7 +302,7 @@
   <view class="folder-modal" wx:if="{{showBatchDeleteModal}}">
     <view class="folder-modal-title">批量删除确认</view>
     <view class="folder-modal-desc">
-      确定要删除选中的 {{batchSelectedCount}} 条记录吗？此操作不可撤销，删除后无法恢复。
+      确定将选中的 {{batchSelectedCount}} 条记录移入回收站吗？30天后自动清理。
     </view>
     <view class="folder-modal-actions">
       <view class="btn secondary" bindtap="closeBatchDeleteModal">取消</view>

@@ -7,12 +7,15 @@ Page({
     record: null,
     recordId: '',
     authorizedList: [],
-    targetOpenids: '',
-    targetCount: 0,
     currentPerm: 0,
     permOptions: ['只读 (read)', '只写 (write)', '读写 (readwrite)'],
-    loading: true
+    loading: true,
+    // 高级选项（手动输入 openid）
+    showAdvanced: false,
+    targetOpenids: '',
+    targetCount: 0
   },
+
 
   onLoad(options) {
     var id = options.id;
@@ -48,11 +51,7 @@ Page({
     });
   },
 
-  onTargetInput(e) {
-    var raw = e.detail.value || '';
-    var lines = raw.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
-    this.setData({ targetOpenids: raw, targetCount: lines.length });
-  },
+  // ===== 权限选择 =====
 
   onPermChange(e) {
     this.setData({ currentPerm: parseInt(e.detail.value, 10) });
@@ -71,6 +70,31 @@ Page({
       + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   },
 
+  // ===== 分享到好友授权（主要授权方式） =====
+
+  onShareAppMessage() {
+    var record = this.data.record;
+    var perm = ['read', 'write', 'readwrite'][this.data.currentPerm];
+    var title = '水印照片分享 · ' + (record ? (record.customName || record.templateName) : '照片');
+    return {
+      title: title,
+      path: '/pages/detail/detail?id=' + this.data.recordId + '&_authPerm=' + perm,
+      imageUrl: record ? record.imagePath : ''
+    };
+  },
+
+  // ===== 高级选项：手动输入 openid（收起状态，供有需要的用户） =====
+
+  toggleAdvanced() {
+    this.setData({ showAdvanced: !this.data.showAdvanced });
+  },
+
+  onTargetInput(e) {
+    var raw = e.detail.value || '';
+    var lines = raw.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+    this.setData({ targetOpenids: raw, targetCount: lines.length });
+  },
+
   onAddAuthorize() {
     var raw = this.data.targetOpenids || '';
     var openids = raw.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
@@ -84,7 +108,6 @@ Page({
 
     wx.showLoading({ title: '授权中...', mask: true });
 
-    // 逐人授权
     var tasks = openids.map(function (oid) {
       return cloud.callAuthorize(that.data.recordId, oid, perm).then(function (res) {
         return { openid: oid, success: res && res.success, error: (res && res.error) || '' };
@@ -95,7 +118,11 @@ Page({
       wx.hideLoading();
       var ok = results.filter(function (r) { return r.success; }).length;
       var fail = results.filter(function (r) { return !r.success; }).length;
-      wx.showToast({ title: '授权完成: ' + ok + '成功' + (fail ? ', ' + fail + '失败' : ''), icon: fail > 0 ? 'none' : 'success', duration: 2500 });
+      wx.showToast({
+        title: '授权完成: ' + ok + '成功' + (fail ? ', ' + fail + '失败' : ''),
+        icon: fail > 0 ? 'none' : 'success',
+        duration: 2500
+      });
       that.setData({ targetOpenids: '', targetCount: 0 });
       that.loadAuthorizedList();
     }).catch(function (err) {
@@ -104,6 +131,8 @@ Page({
       console.error('[Share] 批量授权失败:', err);
     });
   },
+
+  // ===== 撤回授权 =====
 
   onRevoke(e) {
     var openid = e.currentTarget.dataset.openid;
@@ -131,14 +160,5 @@ Page({
         }
       }
     });
-  },
-
-  onShareAppMessage() {
-    var record = this.data.record;
-    return {
-      title: '水印相机 · ' + (record ? (record.customName || record.templateName) : '分享照片'),
-      path: '/pages/detail/detail?id=' + this.data.recordId,
-      imageUrl: record ? record.imagePath : ''
-    };
   }
 });

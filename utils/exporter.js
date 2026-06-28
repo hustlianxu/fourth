@@ -577,10 +577,62 @@ function exportToLegacyXls(records, customFileName, onProgress) {
   });  // preTranslateRecords.then
 }
 
+/**
+ * 静默生成 xlsx 文件（不打开预览），供云端上传使用
+ * @param {Array} records
+ * @param {string} [customFileName]
+ * @param {Function} [onProgress]
+ * @returns {Promise<string>} 本地文件路径
+ */
+function generateXlsxFile(records, customFileName, onProgress) {
+  return preTranslateRecords(records, onProgress).then(function () {
+  return preReadImageBytes(records, onProgress).then(function (preRead) {
+    if (preRead.failures.length > 0) {
+      var failNames = preRead.failures.map(function (f) { return f.name; }).join(', ');
+      throw new Error('图片读取失败 ' + preRead.failures.length + ' 张：' + failNames.slice(0, 60));
+    }
+
+    var bytes;
+    try {
+      var flatRecords = flattenRecords(records);
+      var colWidths = calcColumnWidths(records);
+      bytes = xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
+        imageBytesMap: preRead.map,
+        getImageBytes: null,
+        calcRowHeight: calcRowHeight,
+        calcImgDisplayH: calcImgDisplayH,
+        calcColumnWidths: function () { return colWidths; },
+        imgColW: IMG_CELL_W
+      });
+    } catch (e) {
+      throw e instanceof Error ? e : new Error(String(e));
+    }
+
+    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
+    var fileName = baseName + '.xlsx';
+    var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
+
+    return new Promise(function (resolve, reject) {
+      wx.getFileSystemManager().writeFile({
+        filePath: filePath,
+        data: bytes.buffer,
+        encoding: 'binary',
+        success: function () {
+          console.log('[Exporter] xlsx 文件已生成（静默）:', filePath, '大小:', bytes.length, 'bytes');
+          resolve(filePath);
+        },
+        fail: function (err) { reject(new Error('写入 xlsx 失败: ' + (err && err.errMsg))); }
+      });
+    });
+  });
+  });
+}
+
 module.exports = {
   exportToExcel: exportToExcel,
   exportToXlsx: exportToXlsx,
   exportToLegacyXls: exportToLegacyXls,
+  generateXlsxFile: generateXlsxFile,
   sanitizeFileName: sanitizeFileName,
   COLUMNS: COLUMNS,
   buildHtmlTable: buildHtmlTable

@@ -49,5 +49,21 @@
     <switch checked="{{autoSaveAlbum}}" bindchange="onToggleAutoAlbum" color="#07c160"/>
   </view>
 
+  <view class="card setting-row" wx:if="{{openid || true}}">
+    <view class="setting-info">
+      <view class="setting-title">☁️ 云同步</view>
+      <view class="setting-desc">同步照片、文件夹到所有设备</view>
+    </view>
+    <switch checked="{{syncEnabled}}" bindchange="onToggleSync" color="#07c160"/>
+  </view>
+
+  <view class="card setting-row" wx:if="{{syncEnabled || configSyncEnabled}}">
+    <view class="setting-info">
+      <view class="setting-title">⚙️ 配置同步</view>
+      <view class="setting-desc">同步自动保存、翻译引擎（含 API Key）、自定义词典、提示词等全部配置</view>
+    </view>
+    <switch checked="{{configSyncEnabled}}" bindchange="onToggleConfigSync" color="#07c160"/>
+  </view>
+
   <view class="footer" bindtap="goAbout">使用说明</view>
 </view>

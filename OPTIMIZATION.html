@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>水印相机小程序体验优化建议</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">水印相机小程序体验优化建议</h1>
+</header>
+<h1
+id="水印相机小程序外贸版体验优化建议">水印相机小程序（外贸版）体验优化建议</h1>
+<blockquote>
+<p>本文档为体验专家 +
+外贸资深运营双视角的审视结论，作为后续迭代储备。当前阶段优先打磨基础功能，本文档中的建议暂不立即实施，按优先级择期推进。</p>
+</blockquote>
+<hr />
+<h2 id="一体验专家视角">一、体验专家视角</h2>
+<h3 id="拍照流程步骤过多缺少一键直达">1.
+拍照流程：步骤过多，缺少”一键直达”</h3>
+<p>外贸场景下一名跟单员一次装柜可能要拍 30–80
+张，每张都重复填字段是痛点。</p>
+<ul>
+<li><strong>A. 场景化快速模板</strong>：装柜 / 装箱 / 验货 /
+提货四种典型场景，首页直接给四个大卡片，点进去就用预设字段（如装柜默认带”柜号
+/ 封条号 / 件数”三个字段，其余留空）。</li>
+<li><strong>B.
+字段”沿用上次”</strong>：柜号、封条号在同一票货里高度重复，应默认带入上一张照片的值，仅当用户主动修改时才覆盖，可减少
+70% 输入量。</li>
+<li><strong>C.
+连续拍照模式</strong>：拍完一张合成后不跳回列表，停留在相机页，水印字段保留，仅替换照片，可一次性拍完整柜。</li>
+</ul>
+<h3 id="水印编辑缺少实时预览与所见即所得">2.
+水印编辑：缺少实时预览与所见即所得</h3>
+<ul>
+<li><strong>D.
+实时预览缩略图</strong>：在填写页给一个小尺寸实时预览，让用户在保存前看到西语换行是否溢出、字号是否合适，避免拍完才发现要重拍。</li>
+<li><strong>E.
+长描述字符数预警</strong>：多行字段接近上限时变红预警，避免合成后内容溢出。</li>
+</ul>
+<h3 id="列表与查找1000-张照片后的体验瓶颈">3. 列表与查找：1000+
+张照片后的体验瓶颈</h3>
+<p>外贸场景查找通常按”客户 / 订单号 / 柜号 / 日期”。</p>
+<ul>
+<li><strong>F.
+分组视图</strong>：增加”按客户分组”“按订单号聚合”“按柜号折叠”的视图切换，而非纯时间线瀑布流。</li>
+<li><strong>G. 全局搜索</strong>：顶部增加柜号 / 订单号 /
+客户名模糊匹配搜索，比下拉筛选更直接。</li>
+<li><strong>H. 卡片关键信息外显</strong>：列表卡片直接显示柜号 + 件数 +
+日期，而不是只有缩略图。</li>
+</ul>
+<h3 id="错误处理与离线体验">4. 错误处理与离线体验</h3>
+<ul>
+<li><strong>I. 失败可降级</strong>：定位 / OCR
+失败时给”稍后补填”而非阻塞流程，外贸现场信号差是常态。</li>
+<li><strong>J. 同步状态可见</strong>：本地 /
+云双模式下应有明确的”未同步”角标提示，避免用户误以为已上云。</li>
+<li><strong>K. 合成失败自动降级</strong>：Canvas 内存不足时自动降级到
+2048px 重试一次，而不是直接报错。</li>
+</ul>
+<h3 id="新手引导与空状态">5. 新手引导与空状态</h3>
+<ul>
+<li><strong>L. 首次使用引导</strong>：3 步引导（选模板 → 拍照 →
+保存）。</li>
+<li><strong>M. 空状态
+CTA</strong>：列表空状态给”去拍第一张”按钮，而不是只写”暂无记录”。</li>
+</ul>
+<hr />
+<h2 id="二外贸资深运营视角">二、外贸资深运营视角</h2>
+<h3 id="场景适配缺一票货的概念">1. 场景适配：缺”一票货”的概念</h3>
+<p>外贸业务的最小单元是<strong>一票货（订单 /
+柜）</strong>，一票货下有多张照片，当前”一张照片一条记录”不够贴合业务。</p>
+<ul>
+<li><strong>N（最重要）</strong>：引入”批次 /
+工单”概念，一个工单下挂多张照片，导出 Excel 时按工单分 sheet。</li>
+<li><strong>O. 装柜报告 PDF</strong>：工单维度生成”提货确认单 /
+装柜报告”PDF，附图附字段，可直接发给海外客户。</li>
+</ul>
+<h3 id="多客户-多订单管理">2. 多客户 / 多订单管理</h3>
+<ul>
+<li><strong>P.
+客户档案</strong>：增加”客户档案”（名称、币种、默认语言），拍照时选客户，导出时可按客户筛选。</li>
+<li><strong>Q. 客户级模板</strong>：模板按客户预设（A 客户要英文、B
+客户要西语），切换客户自动切模板。</li>
+</ul>
+<h3 id="语言扩展性">3. 语言扩展性</h3>
+<ul>
+<li><strong>R. 水印语言可配置</strong>：英 / 西 / 法 / 阿 / 俄 /
+葡，适配不同目的港，复用现有词典模块。</li>
+<li><strong>S. 本地化格式</strong>：日期 / 数字按目的国本地化（欧洲
+dd/MM/yyyy、货币符号）。</li>
+</ul>
+<h3 id="团队协作">4. 团队协作</h3>
+<ul>
+<li><strong>T. 团队 /
+成员</strong>：云开发模式下照片可归属成员，老板端可只读查看全团队数据。</li>
+<li><strong>U.
+交付状态标记</strong>：照片加”已交付客户”状态，避免重复发送。</li>
+</ul>
+<h3 id="合规与防篡改外贸场景关键">5. 合规与防篡改（外贸场景关键）</h3>
+<ul>
+<li><strong>V. 防伪信息</strong>：水印叠加”经纬度 +
+拍摄时间”小字在角落，海外客户验真时有用。</li>
+<li><strong>W. 原始照片哈希</strong>：导出 Excel
+附”原始照片哈希”列，防止后期被 PS 篡改引发纠纷。</li>
+<li><strong>X.
+客户代号化</strong>：敏感客户名可选代号化存储，不明文落本地。</li>
+</ul>
+<h3 id="数据统计">6. 数据统计</h3>
+<ul>
+<li><strong>Y. 首页看板</strong>：本月装柜次数 / 拍照张数 /
+待交付工单数。</li>
+<li><strong>Z. 汇总报表</strong>：按”客户 /
+月份”汇总件数与柜数，对接财务对账。</li>
+</ul>
+<hr />
+<h2 id="三优先级建议按-roi-排序">三、优先级建议（按 ROI 排序）</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>优先级</th>
+<th>优化项</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0</td>
+<td>N（工单概念）、B（字段沿用）、C（连续拍照）</td>
+<td>直接解决高频痛点，改动相对可控</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>D（实时预览）、I（离线降级）</td>
+<td>降低重拍率，提升单次可用性</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>F/G（列表分组搜索）、P（客户档案）</td>
+<td>数据量上来后的刚需</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>O（PDF 装柜报告）、Y（首页看板）</td>
+<td>直接产出可交付物，体现运营价值</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>R（多语言扩展）、T（团队协作）</td>
+<td>扩展市场与组织能力</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>V/W/X（防篡改合规）</td>
+<td>风险控制，长尾但重要</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="当前阶段策略">当前阶段策略</h2>
+<p><strong>优先打磨基础功能</strong>：双语水印合成、本地存储、拍照与导出主链路的稳定性与可用性。本文档中复杂业务改造（工单、客户档案、团队协作、PDF
+报告等）暂缓，待基础体验打磨成熟后再分阶段引入。</p>
+</body>
+</html>

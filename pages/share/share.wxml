@@ -1,5 +1,8 @@
 <!-- pages/share/share.wxml -->
 <view class="page">
+
+
+
   <!-- 记录信息 -->
   <view class="record-info" wx:if="{{record}}">
     <image class="record-thumb" src="{{record.imagePath}}" mode="aspectFill"></image>
@@ -9,26 +12,53 @@
     </view>
   </view>
 
-  <!-- 添加授权 -->
-  <view class="section">
-    <view class="section-header">添加授权</view>
-    <view class="form-row">
-      <text class="form-label">目标用户 openid（每行一个，支持多人）</text>
-      <textarea class="form-textarea" placeholder="输入对方的 openid&#10;每行一个，可同时授权多人" value="{{targetOpenids}}" bindinput="onTargetInput" auto-height="{{false}}" />
+  <!-- ===== 分享授权（主要方式） ===== -->
+  <view class="section share-section">
+    <view class="section-header">📤 分享给好友授权</view>
+    <view class="share-desc">
+      将照片分享到微信聊天，好友打开后自动获得授权，无需手动输入对方 openid。
     </view>
+
     <view class="form-row">
-      <text class="form-label">权限级别</text>
+      <text class="form-label">选择权限级别</text>
       <picker class="form-picker" mode="selector" range="{{permOptions}}" bindchange="onPermChange">
         <view class="picker-value">{{permOptions[currentPerm]}}</view>
       </picker>
     </view>
-    <button class="btn-primary" bindtap="onAddAuthorize" disabled="{{!targetOpenids}}">批量授权（{{targetCount}}人）</button>
-    <button class="btn-secondary" open-type="share" style="margin-top:12rpx;">📤 分享给微信好友</button>
+
+    <button class="btn-primary" open-type="share">
+      <text class="btn-icon">📤</text>
+      <text>分享给好友授权</text>
+    </button>
   </view>
 
-  <!-- 已授权列表 -->
+  <!-- ===== 高级选项：手动输入 openid（折叠态） ===== -->
+  <view class="section advanced-section">
+    <view class="section-link" bindtap="toggleAdvanced">
+      <text wx:if="{{!showAdvanced}}">➕ 更多授权方式</text>
+      <text wx:if="{{showAdvanced}}">➖ 收起高级选项</text>
+    </view>
+
+    <view wx:if="{{showAdvanced}}">
+      <view class="form-row" style="margin-top:16rpx;">
+        <text class="form-label">手动输入对方 openid（每行一个，支持多人）</text>
+        <textarea
+          class="form-textarea"
+          placeholder="输入对方的 openid&#10;每行一个"
+          value="{{targetOpenids}}"
+          bindinput="onTargetInput"
+          auto-height="{{false}}"
+        />
+      </view>
+      <button class="btn-primary" bindtap="onAddAuthorize" disabled="{{!targetOpenids}}">
+        授权（{{targetCount}}人）
+      </button>
+    </view>
+  </view>
+
+  <!-- ===== 已授权用户列表 ===== -->
   <view class="section">
-    <view class="section-header">已授权用户</view>
+    <view class="section-header">已授权用户（{{authorizedList.length}}）</view>
     <view wx:if="{{authorizedList.length === 0}}" class="empty-tip">暂无授权</view>
     <view wx:for="{{authorizedList}}" wx:key="openid" class="auth-row">
       <view class="auth-info">

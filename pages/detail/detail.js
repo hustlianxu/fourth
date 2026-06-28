@@ -50,8 +50,17 @@ Page({
 
   onLoad(options) {
     this.recordId = options.id;
-    const windowInfo = wx.getWindowInfo();
-    this.screenWidth = windowInfo.windowWidth;
+
+    this.screenWidth = wx.getWindowInfo().windowWidth;
+
+    // 检测是否为分享授权打开（好友从分享卡片点进来）
+    if (options._authPerm) {
+      this.setData({ autoSaveEditAlbum: storage.getAutoSaveEditAlbum() });
+      // 先处理授权，再加载记录
+      this._handleAuthShare(options._authPerm);
+      return;
+    }
+
     this.setData({ autoSaveEditAlbum: storage.getAutoSaveEditAlbum() });
   },
 
@@ -65,6 +74,98 @@ Page({
     }
   },
 
+  // ===== 分享授权处理（好友打开分享卡片时自动授权） =====
+
+  /**
+   * 处理从分享卡片打开的授权请求
+   */
+  _handleAuthShare(permission) {
+    var that = this;
+    var recordId = this.recordId;
+
+    wx.showModal({
+      title: '照片授权',
+      content: '好友与您分享了一张水印照片，是否接受授权？',
+      success: function (modalRes) {
+        if (!modalRes.confirm) {
+          wx.navigateBack();
+          return;
+        }
+
+        wx.showLoading({ title: '授权中...', mask: true });
+
+        cloud.callAuthorizeByShare(recordId, permission).then(function (res) {
+          wx.hideLoading();
+
+          if (res && res.success && res.record) {
+            var cloudData = res.record;
+            // 授权成功，检查本地是否已有该记录（可能之前同步已下载）
+            var existingRecord = storage.getById(cloudData.recordId);
+            if (!existingRecord) {
+              // 本地无记录 → 写入本地
+              var localRecord = {
+                id: cloudData.recordId,
+                templateId: cloudData.templateId,
+                templateName: cloudData.templateName,
+                values: cloudData.values || {},
+                imagePath: '',
+                originalPath: '',
+                width: cloudData.width,
+                height: cloudData.height,
+                folderId: null,
+                customName: cloudData.customName || '',
+                createdAt: cloudData.createdAt,
+                _cloudOwner: cloudData.owner,
+                _permission: permission,
+                _syncStatus: 'synced'
+              };
+              storage.add(localRecord);
+
+              // 下载水印图
+              if (cloudData.imageFileID) {
+                cloud.downloadFile(cloudData.imageFileID).then(function (localPath) {
+                  if (localPath) {
+                    storage.update(localRecord.id, { imagePath: localPath });
+                    if (that && that.load) {
+                      that.setData({
+                        autoSaveEditAlbum: storage.getAutoSaveEditAlbum()
+                      });
+                      that.load();
+                    }
+                  }
+                });
+              }
+            } else {
+              // 本地已有 → 更新权限和同步状态
+              storage.update(cloudData.recordId, {
+                _permission: permission,
+                _cloudOwner: cloudData.owner,
+                _syncStatus: 'synced'
+              });
+            }
+
+            wx.showToast({ title: '授权成功！', icon: 'success', duration: 2000 });
+            // 授权成功后加载该记录
+            setTimeout(function () {
+              if (that && that.load) {
+                that.setData({
+                  autoSaveEditAlbum: storage.getAutoSaveEditAlbum()
+                });
+                that.load();
+              }
+            }, 800);
+          } else {
+            wx.showToast({ title: '授权失败: ' + ((res && res.error) || '未知错误'), icon: 'none' });
+          }
+        }).catch(function (err) {
+          wx.hideLoading();
+          wx.showToast({ title: '授权失败', icon: 'none' });
+          console.error('[Detail] 分享授权失败:', err);
+        });
+      }
+    });
+  },
+
   // 浮层菜单
   onToggleActionMenu() {
     this.setData({ showActionMenu: !this.data.showActionMenu });
@@ -74,6 +175,7 @@ Page({
     this.setData({ showActionMenu: false });
     this.onDelete();
   },
+
 
   onGoShare() {
     this.setData({ showActionMenu: false });
@@ -632,6 +734,12 @@ Page({
     const v = e.detail.value;
     storage.setAutoSaveEditAlbum(v);
     this.setData({ autoSaveEditAlbum: v });
+    // 配置同步开启时推送到云端
+    if (cloud.getConfigSyncEnabled()) {
+      cloud.getOpenid().then(function (oid) {
+        if (oid) cloud.pushConfigChanges(oid);
+      });
+    }
   },
 
   onShareAppMessage() {

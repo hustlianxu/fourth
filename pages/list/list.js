@@ -522,6 +522,7 @@ Page({
     wx.navigateTo({ url: '/pages/detail/detail?id=' + id });
   },
 
+
   goCamera() {
     wx.navigateTo({ url: '/pages/camera/camera' });
   },
@@ -663,8 +664,26 @@ Page({
       storage.addFolder(name);
     }
 
+    // 获取文件夹对象（用于后续云端同步，需在 setData 清空 editingFolderId 前）
+    var folderForSync = null;
+    if (cloud.isSyncEnabled()) {
+      if (isRename) {
+        folderForSync = storage.getFolderById(this.data.editingFolderId);
+      } else {
+        folderForSync = storage.getFolderByName(name);
+      }
+    }
+
     this.setData({ showFolderModal: false, editingFolderId: null, folderNameInput: '' });
     this._loadFolders();
+
+    // 同步文件夹到云端
+    if (folderForSync) {
+      cloud.getOpenid().then(function (oid) {
+        if (oid) cloud.syncFolder(folderForSync, oid);
+      });
+    }
+
     wx.showToast({ title: isRename ? '已重命名' : '文件夹已创建', icon: 'success' });
   },
 
@@ -678,8 +697,23 @@ Page({
     const folderId = this.data.deleteFolderId;
     const records = storage.getByFolderId(folderId);
 
-    records.forEach(r => storage.remove(r.id));
+    var trashedIds = [];
+    records.forEach(function (r) { storage.moveToTrash(r.id); trashedIds.push(r.id); });
     storage.removeFolder(folderId);
+
+    // 同步开启时云端软删除
+    if (cloud.isSyncEnabled() && trashedIds.length > 0) {
+      cloud.getOpenid().then(function (openid) {
+        if (openid) {
+          trashedIds.forEach(function (id) {
+            cloud.softDelete(id, openid).catch(function (err) {
+              console.warn('[List] 文件夹删除, 云端软删除失败:', id, err);
+            });
+          });
+          cloud.softDeleteFolder(folderId, openid);
+        }
+      });
+    }
 
     this.setData({ showDeleteFolderModal: false });
 
@@ -695,7 +729,7 @@ Page({
 
     this._loadFolders();
     this._loadList();
-    wx.showToast({ title: '已删除文件夹及记录', icon: 'success' });
+    wx.showToast({ title: '已移入回收站', icon: 'success' });
   },
 
   onDeleteFolderKeepRecords() {
@@ -704,6 +738,13 @@ Page({
 
     records.forEach(r => storage.update(r.id, { folderId: null }));
     storage.removeFolder(folderId);
+
+    // 同步开启时云端软删除文件夹
+    if (cloud.isSyncEnabled()) {
+      cloud.getOpenid().then(function (oid) {
+        if (oid) cloud.softDeleteFolder(folderId, oid);
+      });
+    }
 
     this.setData({ showDeleteFolderModal: false });
 
@@ -1175,6 +1216,8 @@ Page({
     if (!defaultName) {
       defaultName = '水印照片导出';
     }
+    // 默认文件名带时间戳，方便用户区分导出时间
+    defaultName += '_' + this._formatTimeForFile();
 
     this.setData({
       showExportNameModal: true,
@@ -1196,9 +1239,33 @@ Page({
 
     // 选择导出格式：xlsx（真实 OOXML，图片原始字节不压缩）/ xls（伪 xls，HTML+VML，base64 图片）
     wx.showActionSheet({
-      itemList: ['xlsx（推荐·图片不压缩）', 'xls（伪 xls·兼容老版本）'],
+      itemList: [
+        'xlsx（推荐·图片不压缩）',
+        'xls（伪 xls·兼容老版本）',
+        'xlsx + 上传到云端'
+      ],
       success: function (res) {
-        const fmt = res.tapIndex === 0 ? 'xlsx' : 'xls';
+        const tapIndex = res.tapIndex;
+        if (tapIndex === 2) {
+          // 导出到云端
+          if (selected.length > 200) {
+            wx.showModal({
+              title: '导出数量较大',
+              content: '选中 ' + selected.length + ' 条记录，数量较多可能耗时较长，是否继续？',
+              confirmText: '继续导出',
+              cancelText: '取消',
+              success: function (m) {
+                if (m.confirm) {
+                  that._doExportToCloud(selected, customFileName).catch(that._onExportError);
+                }
+              }
+            });
+            return;
+          }
+          that._doExportToCloud(selected, customFileName).catch(that._onExportError);
+          return;
+        }
+        const fmt = tapIndex === 0 ? 'xlsx' : 'xls';
         // 大数量导出提示：记录过多可能因内存/IO 紧张导致生成慢或失败
         if (selected.length > 200) {
           wx.showModal({
@@ -1218,6 +1285,93 @@ Page({
       },
       fail: function () { /* 用户取消选择，无需处理 */ }
     });
+  },
+
+  // ===== 导出到云端 =====
+
+  async _doExportToCloud(selected, customFileName) {
+    // 非阻塞提示，用户可折叠小程序等待
+    wx.showToast({ title: '正在生成导出文件...', icon: 'none', duration: 10000 });
+    var toastTimer = setTimeout(function () {
+      wx.showToast({ title: '仍在处理中，请稍候...', icon: 'none', duration: 10000 });
+    }, 10000);
+
+    try {
+      // 1. 生成 xlsx 文件
+      const filePath = await exporter.generateXlsxFile(selected, customFileName, null);
+      if (!filePath) throw new Error('文件生成失败');
+
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+      wx.showToast({ title: '正在上传到云端...', icon: 'none', duration: 8000 });
+
+      // 2. 获取 openid 并上传
+      var openid = cloud._getCachedOpenid();
+      if (!openid) {
+        openid = await cloud.getOpenid();
+      }
+      if (!openid) throw new Error('无法获取用户身份');
+
+      // 验证生成的文件是否存在
+      try {
+        wx.getFileSystemManager().accessSync(filePath);
+      } catch (accessErr) {
+        console.error('[List] 导出文件不存在:', filePath);
+        throw new Error('导出文件在本地不存在，请重试');
+      }
+
+      // 只在未设置文件名时自动生成带时间戳的名称
+      var ts = this._formatTimeForFile();
+      var baseName = customFileName
+        ? customFileName.replace(/[/\:*?"<>|]/g, '_')
+        : ('export_' + ts);
+      var fileName = baseName + '.xlsx';
+      console.log('[List] 开始上传导出文件:', fileName, '大小:', (wx.getFileSystemManager().statSync(filePath).size || 0), 'bytes');
+      var fileID = await cloud.uploadExportFile(filePath, openid, fileName);
+      console.log('[List] 上传结果:', fileID ? '成功' : '失败', 'fileID:', fileID);
+      if (!fileID) throw new Error('上传到云端失败，请检查网络后重试');
+
+      wx.hideToast();
+      wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
+
+      // 3. 保存导出记录（本地 + 云端，云端使跨设备可见）
+      storage.addExportRecord({ fileID: fileID, fileName: fileName });
+      cloud.saveExportRecordToCloud(openid, fileID, fileName);
+
+      // 4. 提示成功并提供操作选项
+      wx.showModal({
+        title: '导出完成',
+        content: '文件 "' + fileName + '" 已上传到云端。\n前往「设置」→「云端导出文件」可随时下载。',
+        confirmText: '确认',
+        showCancel: false
+      });
+    } catch (e) {
+      wx.hideToast();
+      if (toastTimer) clearTimeout(toastTimer);
+      wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
+      throw e;
+    }
+
+    // 退出导出模式
+    this.setData({
+      exportMode: false,
+      selectedFolderIds: [],
+      selectedCount: 0,
+      showExportNameModal: false,
+      exportFileName: ''
+    }, () => {
+      this._loadList();
+    });
+  },
+
+  _formatTimeForFile() {
+    var d = new Date();
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear()
+      + pad(d.getMonth() + 1)
+      + pad(d.getDate()) + '_'
+      + pad(d.getHours())
+      + pad(d.getMinutes())
+      + pad(d.getSeconds());
   },
 
   // 导出异常统一处理

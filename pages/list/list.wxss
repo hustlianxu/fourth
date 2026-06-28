@@ -641,19 +641,16 @@
 
 /* ===== 回收站 ===== */
 .trash-bar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 16rpx;
-  margin-top: 8rpx;
-  background: #fff7e6;
-  border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #d46b08;
+  padding: 8rpx 16rpx;
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  color: #999;
 }
-.trash-bar:active { background: #fff1cc; }
-.trash-icon { margin-right: 8rpx; }
-.trash-count { color: #d46b08; }
+.trash-bar:active { opacity: 0.6; }
+.trash-icon { margin-right: 4rpx; font-size: 22rpx; }
+.trash-count { color: #999; }
 
 .trash-header {
   display: flex;
@@ -912,3 +909,4 @@
     color: rgb(115, 115, 115);
   }
 }
+

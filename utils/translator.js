@@ -12,6 +12,23 @@
 
 var builtin = require('./builtinDict.js');
 
+// ===== 配置变更回调（用于配置同步） =====
+var _configChangeCallback = null;
+
+/**
+ * 注册配置变更回调（每次配置保存后触发）
+ * @param {Function} cb - () => void
+ */
+function setOnConfigChange(cb) {
+  _configChangeCallback = cb;
+}
+
+function _triggerConfigChange() {
+  if (typeof _configChangeCallback === 'function') {
+    setTimeout(_configChangeCallback, 0);
+  }
+}
+
 // ============ 用户词典 & API 配置 存取 ============
 
 var STORAGE_DICT_KEY = 'watermark_custom_dict';
@@ -41,6 +58,7 @@ function getUserDict() {
 function setUserDict(dict) {
   wx.setStorageSync(STORAGE_DICT_KEY, dict || []);
   invalidateDictCache();
+  _triggerConfigChange();
 }
 
 // 用户自定义白名单（与内置白名单合并使用）
@@ -54,6 +72,7 @@ function getUserWhitelist() {
 function setUserWhitelist(list) {
   wx.setStorageSync(STORAGE_WHITELIST_KEY, list || []);
   invalidateDictCache();
+  _triggerConfigChange();
 }
 
 // 合并后的白名单（内置 + 用户自定义），缓存避免每次翻译重复 concat + 线性扫描
@@ -111,6 +130,7 @@ function setConfig(cfg) {
   if (cfg.apiKey !== undefined && cfg.apiKey !== null) p.apiKey = cfg.apiKey || '';
   profiles[provider] = p;
   wx.setStorageSync(STORAGE_PROFILES_KEY, profiles);
+  _triggerConfigChange();
 }
 
 // 读取所有 provider 的配置档案
@@ -128,6 +148,7 @@ function _writeProfile(provider, field, value) {
   p[field] = value || '';
   profiles[provider] = p;
   wx.setStorageSync(STORAGE_PROFILES_KEY, profiles);
+  _triggerConfigChange();
 }
 
 function _readProfile(provider, field) {
@@ -158,6 +179,7 @@ function getCustomPrompt() {
 
 function setCustomPrompt(prompt) {
   wx.setStorageSync(STORAGE_PROMPT_KEY, prompt || '');
+  _triggerConfigChange();
 }
 
 function getDefaultPromptTemplate() {
@@ -366,6 +388,7 @@ function setFreeDictConfig(cfg) {
     enabled: !!cfg.enabled,
     provider: cfg.provider || ''
   });
+  _triggerConfigChange();
 }
 
 // 有道智云凭证：{appId, secret}
@@ -383,6 +406,7 @@ function setYoudaoCreds(creds) {
     appId: creds.appId || '',
     secret: creds.secret || ''
   });
+  _triggerConfigChange();
 }
 
 // 调用 MyMemory 免费 API（无需 key）
@@ -850,6 +874,7 @@ function translateBatch(items, withDebug) {
 module.exports = {
   translate: translate,
   translateBatch: translateBatch,
+  setOnConfigChange: setOnConfigChange,
   getUserDict: getUserDict,
   setUserDict: setUserDict,
   getUserWhitelist: getUserWhitelist,

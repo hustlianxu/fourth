@@ -97,6 +97,21 @@
   color: #222;
 }
 
+.share-section {
+  border-left: 6rpx solid #07c160;
+}
+
+.share-desc {
+  font-size: 24rpx;
+  color: #888;
+  line-height: 1.6;
+  margin-bottom: 20rpx;
+}
+
+.btn-icon {
+  margin-right: 8rpx;
+}
+
 .btn-primary {
   width: 100%;
   background: #07c160;
@@ -104,6 +119,7 @@
   font-size: 28rpx;
   border-radius: 12rpx;
   margin-top: 8rpx;
+  padding: 22rpx 0;
 }
 
 .btn-primary[disabled] {
@@ -122,6 +138,17 @@
 
 .btn-secondary:active {
   background: #eaeaea;
+}
+
+.advanced-section {
+  padding-bottom: 8rpx;
+}
+
+.section-link {
+  font-size: 26rpx;
+  color: #1890ff;
+  padding: 12rpx 0;
+  text-align: center;
 }
 
 .empty-tip {
@@ -185,3 +212,4 @@
   padding: 10rpx 24rpx;
   border-radius: 8rpx;
 }
+

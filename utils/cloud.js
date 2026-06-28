@@ -64,6 +64,18 @@ function downloadFile(fileID) {
     });
 }
 
+/**
+ * 上传导出文件到云存储
+ * @param {string} localPath - 本地导出文件路径
+ * @param {string} openid - 当前用户 openid
+ * @param {string} fileName - 文件名（如 "客户A.xlsx"）
+ * @returns {Promise<string|null>} fileID
+ */
+function uploadExportFile(localPath, openid, fileName) {
+  var cloudPath = 'exports/' + openid + '/' + Date.now() + '_' + fileName;
+  return uploadFile(localPath, cloudPath);
+}
+
 // ===== 云数据库 - 记录 CRUD =====
 
 var db = null;
@@ -373,106 +385,198 @@ function syncFromCloud() {
 function _doSyncFromCloud(openid) {
   console.log('[Cloud] 开始从云端拉取变更 for', openid);
   var storage = require('./storage.js');
+  var _ = _db().command;
 
-  return _db().collection('records')
-    .where({
-      owner: openid,
-      deletedAt: null
-    })
-    .get()
-    .then(function (res) {
-      var remoteRecords = res.data || [];
-      if (remoteRecords.length === 0) {
-        console.log('[Cloud] 云端无记录');
-        return { merged: 0, images: 0 };
+  // 同时查询非删除记录 + 已删除记录 + 文件夹 + 配置
+  var nonDeletedPromise = _db().collection('records')
+    .where({ owner: openid, deletedAt: null })
+    .get();
+
+  var lastSyncTime = storage.getLastSyncTime() || 0;
+  // 只拉取上次同步之后新删除的记录（避免每次拉取全部历史删除）
+  var deletedPromise = _db().collection('records')
+    .where({ owner: openid, deletedAt: _.gt(lastSyncTime > 0 ? lastSyncTime : 0) })
+    .get();
+
+  // 拉取云端文件夹（非删除）
+  var foldersPromise = _db().collection('folders')
+    .where({ owner: openid, deletedAt: null })
+    .get();
+
+  // 拉取云端已删除的文件夹（增量）
+  var foldersDeletedPromise = _db().collection('folders')
+    .where({ owner: openid, deletedAt: _.gt(lastSyncTime > 0 ? lastSyncTime : 0) })
+    .get();
+
+  return Promise.all([nonDeletedPromise, deletedPromise, foldersPromise, foldersDeletedPromise]).then(function (results) {
+    var remoteRecords = results[0].data || [];
+    var deletedRecords = results[1].data || [];
+    var cloudFolders = results[2].data || [];
+    var cloudFoldersDeleted = results[3].data || [];
+
+    var localRecords = storage.getAll();
+    var localMap = {};
+    localRecords.forEach(function (r) { localMap[r.id] = r; });
+
+    var mergedCount = 0;
+    var downloadTasks = [];
+    var needsReload = false;
+    var trashCount = 0;
+
+    // === 1. 先处理云端已删除的记录 → 移入本地回收站 ===
+    deletedRecords.forEach(function (r) {
+      var localRec = localMap[r.recordId];
+      if (localRec) {
+        storage.moveToTrash(r.recordId);
+        delete localMap[r.recordId]; // 已处理，不再进入下方非删除流程
+        needsReload = true;
+        trashCount++;
       }
+    });
 
-      var localRecords = storage.getAll();
-      var localMap = {};
-      localRecords.forEach(function (r) { localMap[r.id] = r; });
+    // === 2. 处理非删除记录（云端有的本地补上，更新的覆盖） ===
+    remoteRecords.forEach(function (r) {
+      var localRec = localMap[r.recordId];
+      if (!localRec) {
+        // 云端有、本地无 → 新增到本地
+        var newRecord = {
+          id: r.recordId,
+          templateId: r.templateId,
+          templateName: r.templateName,
+          watermarkPosition: r.watermarkPosition,
+          watermarkScale: r.watermarkScale,
+          watermarkOpacity: r.watermarkOpacity,
+          watermarkWidthRatio: r.watermarkWidthRatio,
+          values: r.values || {},
+          imagePath: '',
+          originalPath: '',
+          width: r.width,
+          height: r.height,
+          folderId: r.folderId,
+          customName: r.customName || '',
+          createdAt: r.createdAt,
+          _cloudOwner: r.owner,
+          _permission: r.owner === openid ? 'readwrite' : null,
+          _syncStatus: 'synced'
+        };
+        storage.add(newRecord);
+        mergedCount++;
+        needsReload = true;
 
-      var mergedCount = 0;
-      var downloadTasks = [];
-      var needsReload = false;  // 是否需要前端刷新列表
+        // 加入下载队列
+        if (r.imageFileID) {
+          downloadTasks.push(
+            _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
+          );
+        }
+      } else if (r.updatedAt > (localRec.updatedAt || 0)) {
+        storage.update(r.recordId, {
+          templateId: r.templateId,
+          templateName: r.templateName,
+          values: r.values || {},
+          folderId: r.folderId,
+          customName: r.customName || '',
+          _syncStatus: 'synced'
+        });
+        mergedCount++;
+        needsReload = true;
 
-      remoteRecords.forEach(function (r) {
-        var localRec = localMap[r.recordId];
-        if (!localRec) {
-          // 云端有、本地无 → 新增到本地
-          var newRecord = {
-            id: r.recordId,
-            templateId: r.templateId,
-            templateName: r.templateName,
-            watermarkPosition: r.watermarkPosition,
-            watermarkScale: r.watermarkScale,
-            watermarkOpacity: r.watermarkOpacity,
-            watermarkWidthRatio: r.watermarkWidthRatio,
-            values: r.values || {},
-            imagePath: '',
-            originalPath: '',
-            width: r.width,
-            height: r.height,
-            folderId: r.folderId,
-            customName: r.customName || '',
-            createdAt: r.createdAt,
-            _cloudOwner: r.owner,
-            _permission: r.owner === openid ? 'readwrite' : null,
-            _syncStatus: 'synced'
-          };
-          storage.add(newRecord);
-          mergedCount++;
-          needsReload = true;
+        // 本地无水印图或云端有更新 → 下载
+        if (!localRec.imagePath && r.imageFileID) {
+          downloadTasks.push(
+            _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
+          );
+        }
+      }
+    });
 
-          // 加入下载队列
-          if (r.imageFileID) {
-            downloadTasks.push(
-              _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
-            );
+    // === 3. 合并云端文件夹（随照片同步开关一起） ===
+    if (isSyncEnabled()) {
+      var localFolders = storage.getAllFolders();
+      var folderMap = {};      // keyed by folder.id
+      var nameMap = {};        // keyed by folder.name
+      localFolders.forEach(function (f) {
+        folderMap[f.id] = f;
+        if (f.name) nameMap[f.name] = f;
+      });
+
+      cloudFolders.forEach(function (cf) {
+        if (folderMap[cf.folderId]) {
+          // 云端 ID 在本地已存在 → 更新名称
+          if (cf.updatedAt > (folderMap[cf.folderId].updatedAt || 0)) {
+            storage.updateFolder(cf.folderId, { name: cf.name });
+            needsReload = true;
           }
-        } else if (r.updatedAt > (localRec.updatedAt || 0)) {
-          storage.update(r.recordId, {
-            templateId: r.templateId,
-            templateName: r.templateName,
-            values: r.values || {},
-            folderId: r.folderId,
-            customName: r.customName || '',
-            _syncStatus: 'synced'
+        } else if (nameMap[cf.name]) {
+          // 同名但不同 ID → 可能是旧 bug 产生的重复，
+          // 将所有引用旧 ID 的记录更新为云端 folderId，然后删除旧文件夹
+          var dup = nameMap[cf.name];
+          var allRecs = storage.getAll();
+          allRecs.forEach(function (r) {
+            if (r.folderId === dup.id) {
+              storage.update(r.id, { folderId: cf.folderId });
+            }
           });
-          mergedCount++;
+          storage.removeFolder(dup.id);
+          storage.addFolder(cf.name, cf.folderId);
           needsReload = true;
-
-          // 本地无水印图或云端有更新 → 下载
-          if (!localRec.imagePath && r.imageFileID) {
-            downloadTasks.push(
-              _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
-            );
-          }
+        } else {
+          // 云端有、本地完全无 → 新增（保留云端 folderId，避免重复）
+          storage.addFolder(cf.name, cf.folderId);
+          needsReload = true;
         }
       });
+    }
 
-      storage.setLastSyncTime(Date.now());
-
-      // 等待图片全部下载完成
-      var allDonePromise;
-      if (downloadTasks.length > 0) {
-        allDonePromise = Promise.all(downloadTasks).then(function (results) {
-          var ok = results.filter(function (r) { return r; }).length;
-          console.log('[Cloud] 图片下载完成:', ok, '/', results.length, '张');
-          return ok;
-        });
-      } else {
-        allDonePromise = Promise.resolve(0);
-      }
-
-      return allDonePromise.then(function (imageCount) {
-        console.log('[Cloud] 同步完成，合并了', mergedCount, '条记录，下载了', imageCount, '张图片');
-        return { merged: mergedCount, images: imageCount, reload: needsReload || imageCount > 0 };
+    // === 4. 处理云端已删除的文件夹 ===
+    if (isSyncEnabled()) {
+      cloudFoldersDeleted.forEach(function (cfd) {
+        var localFolder = storage.getFolderById(cfd.folderId);
+        if (localFolder) {
+          // 将该文件夹下的记录移入未分类，然后删除本地文件夹
+          var folderRecs = storage.getByFolderId(cfd.folderId);
+          folderRecs.forEach(function (r) { storage.update(r.id, { folderId: null }); });
+          storage.removeFolder(cfd.folderId);
+          needsReload = true;
+        }
       });
-    })
-    .catch(function (err) {
-      console.error('[Cloud] 从云端拉取失败:', err);
-      return { merged: 0, images: 0, reload: false };
+    }
+
+    // === 5. 合并云端配置（走云函数，不依赖数据库集合） ===
+    if (getConfigSyncEnabled()) {
+      // 异步拉取，不阻塞后续流程
+      pullConfigFromCloud(openid).then(function (changed) {
+        if (changed) needsReload = true;
+      });
+    }
+
+    storage.setLastSyncTime(Date.now());
+
+    if (trashCount > 0) {
+      console.log('[Cloud] 回收站处理:', trashCount, '条记录移入回收站');
+    }
+
+    // 等待图片全部下载完成
+    var allDonePromise;
+    if (downloadTasks.length > 0) {
+      allDonePromise = Promise.all(downloadTasks).then(function (ds) {
+        var ok = ds.filter(function (r) { return r; }).length;
+        console.log('[Cloud] 图片下载完成:', ok, '/', ds.length, '张');
+        return ok;
+      });
+    } else {
+      allDonePromise = Promise.resolve(0);
+    }
+
+    return allDonePromise.then(function (imageCount) {
+      console.log('[Cloud] 同步完成，合并了', mergedCount, '条记录，下载了', imageCount, '张图片');
+      return { merged: mergedCount, images: imageCount, reload: needsReload || imageCount > 0 };
     });
+  })
+  .catch(function (err) {
+    console.error('[Cloud] 从云端拉取失败:', err);
+    return { merged: 0, images: 0, reload: false };
+  });
 }
 
 /**
@@ -500,14 +604,297 @@ function _downloadAndUpdate(recordId, imageFileID, originalFileID) {
   });
 }
 
-// ===== 授权管理（云函数版） =====
+// ===== 文件夹同步 =====
+
+/**
+ * 同步一个文件夹到云端
+ * @param {Object} folder - 文件夹对象 { id, name, createdAt }
+ * @param {string} openid
+ * @returns {Promise<Object>}
+ */
+function syncFolder(folder, openid) {
+  if (!folder || !folder.id) return Promise.resolve({ success: false, error: '无数据' });
+  var cloudData = {
+    folderId: folder.id,
+    owner: openid,
+    name: folder.name,
+    createdAt: folder.createdAt || Date.now(),
+    updatedAt: Date.now(),
+    deletedAt: null
+  };
+  return _db().collection('folders').where({
+    folderId: folder.id,
+    owner: openid
+  }).get().then(function (res) {
+    if (res.data && res.data.length > 0) {
+      return _db().collection('folders').doc(res.data[0]._id).update({ data: cloudData });
+    } else {
+      return _db().collection('folders').add({ data: cloudData });
+    }
+  }).then(function () {
+    return { success: true };
+  }).catch(function (err) {
+    console.warn('[Cloud] 同步文件夹失败:', err);
+    return { success: false, error: err.message };
+  });
+}
+
+/**
+ * 软删除文件夹（云端标记 deletedAt）
+ */
+function softDeleteFolder(folderId, openid) {
+  return _db().collection('folders').where({
+    folderId: folderId,
+    owner: openid
+  }).get().then(function (res) {
+    if (res.data && res.data.length > 0) {
+      return _db().collection('folders').doc(res.data[0]._id).update({
+        data: { deletedAt: Date.now() }
+      });
+    }
+  }).catch(function (err) {
+    console.warn('[Cloud] 软删除文件夹失败:', err);
+  });
+}
+
+/**
+ * 从云端拉取文件夹并合并到本地
+ */
+function _mergeCloudFolders(openid) {
+  var storage = require('./storage.js');
+  return _db().collection('folders').where({
+    owner: openid,
+    deletedAt: null
+  }).get().then(function (res) {
+    var cloudFolders = res.data || [];
+    if (cloudFolders.length === 0) return 0;
+
+    var localFolders = storage.getAllFolders();
+    var localMap = {};    // keyed by folder.id
+    var nameMap = {};     // keyed by folder.name
+    localFolders.forEach(function (f) {
+      localMap[f.id] = f;
+      if (f.name) nameMap[f.name] = f;
+    });
+
+    var merged = 0;
+    cloudFolders.forEach(function (cf) {
+      if (localMap[cf.folderId]) {
+        // 云端 ID 已存在 → 更新名称
+        if (cf.updatedAt > (localMap[cf.folderId].updatedAt || 0)) {
+          storage.updateFolder(cf.folderId, { name: cf.name });
+          merged++;
+        }
+      } else if (nameMap[cf.name]) {
+        // 同名不同 ID → 旧 bug 重复，清理
+        var dup = nameMap[cf.name];
+        var allRecs = storage.getAll();
+        allRecs.forEach(function (r) {
+          if (r.folderId === dup.id) storage.update(r.id, { folderId: cf.folderId });
+        });
+        storage.removeFolder(dup.id);
+        storage.addFolder(cf.name, cf.folderId);
+        merged++;
+      } else {
+        // 新增
+        storage.addFolder(cf.name, cf.folderId);
+        merged++;
+      }
+    });
+    return merged;
+  }).catch(function (err) {
+    console.warn('[Cloud] 拉取文件夹失败:', err);
+    return 0;
+  });
+}
+
+// ===== 配置同步 =====
+
+/**
+ * 读取配置同步开关
+ */
+function getConfigSyncEnabled() {
+  try {
+    return wx.getStorageSync('watermark_config_sync_enabled') === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 设置配置同步开关
+ */
+function setConfigSyncEnabled(enabled) {
+  try {
+    wx.setStorageSync('watermark_config_sync_enabled', !!enabled);
+  } catch (e) {
+    console.warn('[Cloud] 设置配置同步开关失败:', e);
+  }
+}
+
+/**
+ * 上传用户配置到云端
+ * 包括：自动保存设置、自定义模板、自定义词典
+ */
+function syncConfig(openid) {
+  var storage = require('./storage.js');
+
+  // 收集所有配置项（含翻译引擎、词典等）
+  var translatorConfig, translatorProfiles, translatorPrompt, freeDict, customDict, customWhitelist;
+  try { translatorConfig = wx.getStorageSync('watermark_translator_config'); } catch (e) {}
+  try { translatorProfiles = wx.getStorageSync('watermark_translator_profiles'); } catch (e) {}
+  try { translatorPrompt = wx.getStorageSync('watermark_translator_prompt'); } catch (e) {}
+  try { freeDict = wx.getStorageSync('watermark_free_dict'); } catch (e) {}
+  try { customDict = wx.getStorageSync('watermark_custom_dict'); } catch (e) {}
+  try { customWhitelist = wx.getStorageSync('watermark_custom_whitelist'); } catch (e) {}
+
+  var config = {
+    // 基本设置
+    autoSaveAlbum: storage.getAutoSaveAlbum(),
+    autoSaveEditAlbum: storage.getAutoSaveEditAlbum(),
+    customTemplates: storage.getCustomTemplates(),
+    // 翻译引擎配置
+    translatorConfig: translatorConfig || null,
+    translatorProfiles: translatorProfiles || null,
+    translatorPrompt: translatorPrompt || null,
+    freeDict: freeDict || null,
+    // 词典/白名单
+    customDict: customDict || null,
+    customWhitelist: customWhitelist || null
+  };
+  return wx.cloud.callFunction({
+    name: 'userConfig',
+    data: { action: 'push', config: config }
+  }).then(function (res) {
+    var ok = res.result && res.result.success;
+    if (ok && res.result.updatedAt) {
+      try { wx.setStorageSync('watermark_config_updated_at', res.result.updatedAt); } catch (e) {}
+    }
+    return ok ? { success: true } : { success: false, error: '上传失败' };
+  }).catch(function (err) {
+    console.warn('[Cloud] 同步配置失败:', err);
+    return { success: false, error: err.message };
+  });
+}
+
+/**
+ * 从云端拉取用户配置并合并到本地（走云函数，不依赖数据库集合）
+ */
+function pullConfigFromCloud(openid) {
+  var storage = require('./storage.js');
+  return wx.cloud.callFunction({
+    name: 'userConfig',
+    data: { action: 'pull' }
+  }).then(function (res) {
+    if (res.result && res.result.success && res.result.config) {
+      var cloudConfig = res.result.config;
+      if (!cloudConfig.updatedAt) return false;
+
+      // 比较时间戳，云端更新则覆盖
+      var localUpdatedAt = 0;
+      try { localUpdatedAt = wx.getStorageSync('watermark_config_updated_at') || 0; } catch (e) {}
+      if (cloudConfig.updatedAt > localUpdatedAt) {
+        // 基本设置
+        if (cloudConfig.autoSaveAlbum != null) storage.setAutoSaveAlbum(cloudConfig.autoSaveAlbum);
+        if (cloudConfig.autoSaveEditAlbum != null) storage.setAutoSaveEditAlbum(cloudConfig.autoSaveEditAlbum);
+        if (cloudConfig.customTemplates && cloudConfig.customTemplates.length > 0) {
+          cloudConfig.customTemplates.forEach(function (ct) { storage.saveCustomTemplate(ct); });
+        }
+        // 翻译引擎配置
+        if (cloudConfig.translatorConfig != null) {
+          try { wx.setStorageSync('watermark_translator_config', cloudConfig.translatorConfig); } catch (e) {}
+        }
+        if (cloudConfig.translatorProfiles != null) {
+          try { wx.setStorageSync('watermark_translator_profiles', cloudConfig.translatorProfiles); } catch (e) {}
+        }
+        if (cloudConfig.translatorPrompt != null) {
+          try { wx.setStorageSync('watermark_translator_prompt', cloudConfig.translatorPrompt); } catch (e) {}
+        }
+        if (cloudConfig.freeDict != null) {
+          try { wx.setStorageSync('watermark_free_dict', cloudConfig.freeDict); } catch (e) {}
+        }
+        // 词典/白名单
+        if (cloudConfig.customDict != null) {
+          try { wx.setStorageSync('watermark_custom_dict', cloudConfig.customDict); } catch (e) {}
+        }
+        if (cloudConfig.customWhitelist != null) {
+          try { wx.setStorageSync('watermark_custom_whitelist', cloudConfig.customWhitelist); } catch (e) {}
+        }
+        try { wx.setStorageSync('watermark_config_updated_at', cloudConfig.updatedAt); } catch (e) {}
+        return true;
+      }
+    }
+    return false;
+  }).catch(function (err) {
+    console.warn('[Cloud] 拉取配置失败:', err);
+    return false;
+  });
+}
+
+/**
+ * 快速推送当前配置到云端（配置变更时调用）
+ */
+function pushConfigChanges(openid) {
+  if (!getConfigSyncEnabled()) return Promise.resolve(false);
+  return syncConfig(openid).then(function (res) { return res.success; });
+}
+
+// ===== 云端导出记录（走云函数，无需安全规则） =====
+
+/**
+ * 保存导出记录到云端（跨设备可见）
+ */
+function saveExportRecordToCloud(openid, fileID, fileName) {
+  return wx.cloud.callFunction({
+    name: 'exportRecords',
+    data: { action: 'save', fileID: fileID, fileName: fileName }
+  }).then(function (res) {
+    var ok = res.result && res.result.success;
+    console.log('[Cloud] 导出记录保存' + (ok ? '成功' : '失败') + ':', fileName);
+    return ok;
+  }).catch(function (err) {
+    console.warn('[Cloud] 保存导出记录失败:', err);
+    return false;
+  });
+}
+
+/**
+ * 从云端拉取当前用户的导出记录
+ */
+function fetchExportRecordsFromCloud(openid) {
+  return wx.cloud.callFunction({
+    name: 'exportRecords',
+    data: { action: 'list' }
+  }).then(function (res) {
+    if (res.result && res.result.success && res.result.records) {
+      return res.result.records;
+    }
+    return [];
+  }).catch(function (err) {
+    console.warn('[Cloud] 拉取导出记录失败:', err);
+    return [];
+  });
+}
+
+/**
+ * 从云端删除导出记录（跨设备同步删除 + 删除云存储文件）
+ * @param {string} fileID
+ * @returns {Promise<boolean>}
+ */
+function deleteExportRecordFromCloud(fileID) {
+  return wx.cloud.callFunction({
+    name: 'exportRecords',
+    data: { action: 'delete', fileID: fileID }
+  }).then(function (res) {
+    return !!(res.result && res.result.success);
+  }).catch(function (err) {
+    console.warn('[Cloud] 删除导出记录失败:', err);
+    return false;
+  });
+}
 
 /**
  * 通过云函数授权其他用户
- * @param {string} recordId
- * @param {string} targetOpenid
- * @param {string} permission - 'read' | 'write' | 'readwrite'
- * @returns {Promise<Object>}
  */
 function callAuthorize(recordId, targetOpenid, permission) {
   return wx.cloud.callFunction({
@@ -535,6 +922,24 @@ function callRevoke(recordId, targetOpenid) {
     return res.result;
   }).catch(function (err) {
     console.error('[Cloud] callRevoke 失败:', err);
+    return { success: false, error: err.message };
+  });
+}
+
+/**
+ * 通过分享卡片自动授权（不依赖 openid 输入）
+ * @param {string} recordId
+ * @param {string} permission - 'read' | 'write' | 'readwrite'
+ * @returns {Promise<Object>}
+ */
+function callAuthorizeByShare(recordId, permission) {
+  return wx.cloud.callFunction({
+    name: 'authorizeByShare',
+    data: { recordId: recordId, permission: permission }
+  }).then(function (res) {
+    return res.result;
+  }).catch(function (err) {
+    console.error('[Cloud] callAuthorizeByShare 失败:', err);
     return { success: false, error: err.message };
   });
 }
@@ -701,6 +1106,7 @@ module.exports = {
   getOpenid: getOpenid,
   uploadFile: uploadFile,
   downloadFile: downloadFile,
+  uploadExportFile: uploadExportFile,
   syncRecord: syncRecord,
   fetchRemoteChanges: fetchRemoteChanges,
   softDelete: softDelete,
@@ -709,11 +1115,25 @@ module.exports = {
   // 云函数版授权
   callAuthorize: callAuthorize,
   callRevoke: callRevoke,
+  callAuthorizeByShare: callAuthorizeByShare,
   getAuthorizedList: getAuthorizedList,
   batchShareRecords: batchShareRecords,
   // 同步开关
   isSyncEnabled: isSyncEnabled,
   setSyncEnabled: setSyncEnabled,
+  // 文件夹同步
+  syncFolder: syncFolder,
+  softDeleteFolder: softDeleteFolder,
+  // 配置同步
+  getConfigSyncEnabled: getConfigSyncEnabled,
+  setConfigSyncEnabled: setConfigSyncEnabled,
+  syncConfig: syncConfig,
+  pullConfigFromCloud: pullConfigFromCloud,
+  pushConfigChanges: pushConfigChanges,
+  // 云端导出记录
+  saveExportRecordToCloud: saveExportRecordToCloud,
+  fetchExportRecordsFromCloud: fetchExportRecordsFromCloud,
+  deleteExportRecordFromCloud: deleteExportRecordFromCloud,
   // 拉取
   syncFromCloud: syncFromCloud,
   fetchCloudRecord: fetchCloudRecord,

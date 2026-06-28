@@ -30,6 +30,20 @@ App({
       wx.setStorageSync('watermark_folders', []);
     }
 
+    // 注册翻译引擎配置变更回调（用于配置同步）
+    try {
+      var translator = require('/utils/translator.js');
+      var cloud = require('/utils/cloud.js');
+      translator.setOnConfigChange(function () {
+        if (cloud.getConfigSyncEnabled()) {
+          var oid = cloud._getCachedOpenid();
+          if (oid) cloud.pushConfigChanges(oid);
+        }
+      });
+    } catch (e) {
+      console.warn('[App] 注册配置变更回调失败:', e);
+    }
+
     // 清理超过30天的回收站记录
     try {
       var storage = require('/utils/storage.js');

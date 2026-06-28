@@ -52,6 +52,7 @@ Page({
     deleteId: ''
   },
 
+
   onLoad() {
     this.loadTemplates();
   },

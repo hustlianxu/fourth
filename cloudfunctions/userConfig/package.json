@@ -1,0 +1,9 @@
+{
+  "name": "userConfig",
+  "version": "1.0.0",
+  "description": "同步用户配置（设置/模板）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -21,6 +21,10 @@
   transform: scale(0.92);
 }
 
+.home-fab {
+  font-size: 32rpx;
+}
+
 /* 浮层菜单遮罩 */
 .action-menu-mask {
   position: fixed;
@@ -338,3 +342,4 @@
   margin-left: 8rpx;
   vertical-align: middle;
 }
+

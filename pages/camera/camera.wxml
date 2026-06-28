@@ -1,4 +1,7 @@
 <view class="camera-wrap">
+
+
+  
   <!-- 拍照闪光动画 -->
   <view class="flash-overlay {{flashAnim ? 'flash' : ''}}"></view>
 

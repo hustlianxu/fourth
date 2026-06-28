@@ -60,6 +60,7 @@ Page({
     freeDictTestResult: ''
   },
 
+
   onLoad() {
     this.setData({
       customDict: translator.getUserDict(),

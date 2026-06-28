@@ -11,6 +11,7 @@ Page({
     currentVersion: 0
   },
 
+
   onLoad(options) {
     var id = options.id;
     if (!id) {
