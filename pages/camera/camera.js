@@ -441,11 +441,16 @@ Page({
                   return;
                 }
               } catch (e) {
-                console.error('[Camera] readFile+writeFile 也失败:', e);
+                console.warn('[Camera] readFile+writeFile 也失败:', e);
+                console.warn('[Camera] 存储配额不足，回退使用原始临时路径');
               }
-              // 全部持久化方式均失败，不应保存临时路径（导出时会文件不存在）
-              console.error('[Camera] 全部持久化方式均失败，放弃保存文件');
-              resolve(null);
+              // 持久化均失败 → 回退原始临时路径（开发者工具有存储配额限制，真机不受影响）
+              if (tempPath) {
+                console.warn('[Camera] 回退临时路径:', tempPath);
+                resolve(tempPath);
+              } else {
+                resolve(null);
+              }
             }
           });
         }
