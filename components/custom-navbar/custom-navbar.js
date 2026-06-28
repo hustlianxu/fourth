@@ -20,9 +20,9 @@ Component({
   },
   methods: {
     calcNavSize() {
-      var sysInfo = wx.getSystemInfoSync();
+      var winInfo = wx.getWindowInfo();
       var menuBtn = wx.getMenuButtonBoundingClientRect();
-      var statusBarHeight = sysInfo.statusBarHeight;
+      var statusBarHeight = winInfo.statusBarHeight;
 
       // 导航栏主体高度 = (胶囊顶部 - 状态栏高度) * 2 + 胶囊高度
       // 确保左侧按钮与右上角胶囊垂直居中对齐
@@ -30,7 +30,7 @@ Component({
       var totalNavBarHeight = statusBarHeight + navBarHeight;
 
       // 右侧防遮挡宽度 = 屏幕宽度 - 胶囊左边缘坐标
-      var menuBtnRightPadding = sysInfo.windowWidth - menuBtn.left;
+      var menuBtnRightPadding = winInfo.windowWidth - menuBtn.left;
 
       this.setData({
         statusBarHeight: statusBarHeight,

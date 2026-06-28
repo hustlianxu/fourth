@@ -1,6 +1,7 @@
 // pages/template/template.js
 const templates = require('../../utils/templates.js');
 const storage = require('../../utils/storage.js');
+const cloud = require('../../utils/cloud.js');
 
 const POSITIONS = [
   { id: 'top-left', label: '左上' },
@@ -250,6 +251,12 @@ Page({
     storage.saveCustomTemplate(template);
     this.closeModal();
     this.loadTemplates();
+    // 配置同步开启时推送到云端
+    if (cloud.isSyncEnabled && cloud.isSyncEnabled()) {
+      cloud.getOpenid().then(function (oid) {
+        if (oid) cloud.pushConfigChanges(oid);
+      });
+    }
     wx.showToast({ title: '保存成功', icon: 'success' });
   },
 
@@ -258,6 +265,12 @@ Page({
     storage.deleteCustomTemplate(this.data.deleteId);
     this.cancelDelete();
     this.loadTemplates();
+    // 配置同步开启时推送到云端
+    if (cloud.isSyncEnabled && cloud.isSyncEnabled()) {
+      cloud.getOpenid().then(function (oid) {
+        if (oid) cloud.pushConfigChanges(oid);
+      });
+    }
     wx.showToast({ title: '已删除', icon: 'success' });
   },
 
