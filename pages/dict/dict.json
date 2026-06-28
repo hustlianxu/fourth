@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "翻译词典",
-  "usingComponents": {}
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "custom-nav": "../../components/custom-navbar/custom-navbar"
+  }
 }

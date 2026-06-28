@@ -1,3 +1,5 @@
+<custom-nav title="词典翻译" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
 <view class="container">
 
 
@@ -240,4 +242,6 @@
       <view class="btn" bindtap="onConfirmEdit">确定</view>
     </view>
   </view>
+</view>
+
 </view>

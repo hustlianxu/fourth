@@ -13,6 +13,7 @@ Page({
     // 高级选项（手动输入 openid）
     showAdvanced: false,
     targetOpenids: '',
+    navTotalHeight: 0,
     targetCount: 0
   },
 
@@ -160,5 +161,10 @@ Page({
         }
       }
     });
-  }
+  },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });

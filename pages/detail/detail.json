@@ -1,4 +1,6 @@
 {
-  "navigationBarTitleText": "记录详情",
-  "usingComponents": {}
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "custom-nav": "../../components/custom-navbar/custom-navbar"
+  }
 }

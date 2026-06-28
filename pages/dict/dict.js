@@ -57,6 +57,7 @@ Page({
     freeDictProvider: '',
     youdaoAppId: '',
     youdaoSecret: '',
+    navTotalHeight: 0,
     freeDictTestResult: ''
   },
 
@@ -410,5 +411,10 @@ Page({
           '\n\n' + sourceLabel + missInfo + reasonInfo
       });
     });
-  }
+  },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });

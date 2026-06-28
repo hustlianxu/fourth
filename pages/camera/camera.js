@@ -45,6 +45,7 @@ Page({
     // 名称输入
     customName: '',
     // 拍照闪光动画
+    navTotalHeight: 0,
     flashAnim: false,
   },
 
@@ -600,4 +601,9 @@ Page({
       }
     });
   },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });

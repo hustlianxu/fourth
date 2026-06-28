@@ -1,0 +1,27 @@
+<view class="navbar-fixed">
+  <!-- 状态栏占位区域 -->
+  <view style="height: {{statusBarHeight}}px;"></view>
+
+  <!-- 导航栏主体 -->
+  <view class="navbar-wrap" style="height: {{navBarHeight}}px;">
+
+    <!-- 左侧按钮组 -->
+    <view class="navbar-left">
+      <!-- 返回按钮 -->
+      <view class="nav-btn" bindtap="onBack">
+        <image src="/images/icons/back.svg" class="icon-svg" mode="aspectFit"></image>
+      </view>
+
+      <!-- 主页按钮 -->
+      <view wx:if="{{showHome}}" class="nav-btn home-btn" bindtap="toHome">
+        <image src="/images/icons/home.svg" class="icon-svg" mode="aspectFit"></image>
+      </view>
+    </view>
+
+    <!-- 页面标题（绝对居中） -->
+    <view class="navbar-title">{{title}}</view>
+
+    <!-- 右侧占位（防止遮挡系统胶囊） -->
+    <view class="navbar-right" style="width: {{menuBtnRightPadding}}px;"></view>
+  </view>
+</view>

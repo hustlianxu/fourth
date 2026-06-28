@@ -1,3 +1,5 @@
+<custom-nav title="我的记录" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
 
 <view class="container">
   <!-- 骨架屏加载状态 -->
@@ -196,7 +198,7 @@
     <view wx:elif="{{hasMore}}" class="load-more-tip muted">上滑加载更多</view>
     <view wx:elif="{{list.length > 0}}" class="load-more-tip muted">没有更多了</view>
 
-    <view class="btn danger" bindtap="onClear" style="margin-top:24rpx;">清空本地记录</view>
+    <view class="btn danger" bindtap="onClear" style="margin-top:24rpx;">清空未同步的本地记录（已同步云端的不受影响）</view>
   </view>
 
   <!-- ===== 文件夹创建/重命名弹层 ===== -->
@@ -309,4 +311,6 @@
       <view class="btn danger" bindtap="onBatchDeleteConfirm">确认删除</view>
     </view>
   </view>
+</view>
+
 </view>

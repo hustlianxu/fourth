@@ -1,3 +1,5 @@
+<custom-nav title="模板管理" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
 
 <view class="page {{hasModal ? 'no-scroll' : ''}}">
   <!-- 头部 -->
@@ -146,4 +148,6 @@
       <view class="btn danger" bindtap="onDelete">删除</view>
     </view>
   </view>
+</view>
+
 </view>

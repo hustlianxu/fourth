@@ -1,3 +1,5 @@
+<custom-nav title="记录详情" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
 <view class="container" wx:if="{{record}}">
 
 
@@ -120,4 +122,6 @@
     </view>
     <switch checked="{{autoSaveEditAlbum}}" bindchange="onToggleAutoSaveEdit" color="#07c160"/>
   </view>
+</view>
+
 </view>

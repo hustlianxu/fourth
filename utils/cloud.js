@@ -450,6 +450,8 @@ function _doSyncFromCloud(openid) {
           values: r.values || {},
           imagePath: '',
           originalPath: '',
+          _cloudFileId: r.imageFileID || '',
+          _originalCloudFileId: r.originalFileID || '',
           width: r.width,
           height: r.height,
           folderId: r.folderId,
@@ -476,13 +478,20 @@ function _doSyncFromCloud(openid) {
           values: r.values || {},
           folderId: r.folderId,
           customName: r.customName || '',
-          _syncStatus: 'synced'
+          _syncStatus: 'synced',
+          _cloudFileId: r.imageFileID || '',
+          _originalCloudFileId: r.originalFileID || ''
         });
         mergedCount++;
         needsReload = true;
 
-        // 本地无水印图或云端有更新 → 下载
-        if (!localRec.imagePath && r.imageFileID) {
+        // 图片下载逻辑：云端有图片ID 且本地缺失或 fileID 变更 → 下载
+        var downloadNeeded = r.imageFileID && (
+          !localRec.imagePath ||
+          !localRec._cloudFileId ||
+          localRec._cloudFileId !== r.imageFileID
+        );
+        if (downloadNeeded) {
           downloadTasks.push(
             _downloadAndUpdate(r.recordId, r.imageFileID, r.originalFileID)
           );
@@ -584,9 +593,23 @@ function _doSyncFromCloud(openid) {
  */
 function _downloadAndUpdate(recordId, imageFileID, originalFileID) {
   var storage = require('./storage.js');
+  var localRec = storage.getById(recordId);
+  // 本地文件已存在且 cloudFileId 匹配 → 跳过下载
+  if (localRec && localRec.imagePath && localRec._cloudFileId === imageFileID) {
+    try {
+      wx.getFileSystemManager().accessSync(localRec.imagePath);
+      return Promise.resolve(true);
+    } catch (e) {
+      console.log('[Cloud] 本地文件已丢失，重新从云下载:', imageFileID);
+    }
+  }
   return downloadFile(imageFileID).then(function (localPath) {
     if (localPath) {
-      storage.update(recordId, { imagePath: localPath });
+      storage.update(recordId, {
+        imagePath: localPath,
+        _cloudFileId: imageFileID,
+        _originalCloudFileId: originalFileID || ''
+      });
       if (originalFileID) {
         return downloadFile(originalFileID).then(function (origPath) {
           if (origPath) {

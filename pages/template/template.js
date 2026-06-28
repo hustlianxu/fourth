@@ -49,6 +49,7 @@ Page({
     FIELD_TYPES: FIELD_TYPES,
     showDeleteConfirm: false,
     deleteName: '',
+    navTotalHeight: 0,
     deleteId: ''
   },
 
@@ -274,5 +275,10 @@ Page({
   // 关闭弹窗
   closeModal() {
     this.setData({ showModal: false, hasModal: false, editingId: null });
-  }
+  },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });

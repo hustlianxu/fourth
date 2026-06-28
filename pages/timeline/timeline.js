@@ -8,6 +8,7 @@ Page({
     recordId: '',
     history: [],
     loading: true,
+    navTotalHeight: 0,
     currentVersion: 0
   },
 
@@ -93,5 +94,10 @@ Page({
         }
       }
     });
-  }
+  },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });

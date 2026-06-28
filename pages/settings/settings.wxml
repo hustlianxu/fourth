@@ -1,3 +1,5 @@
+<custom-nav title="设置" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
 <!-- pages/settings/settings.wxml -->
 <view class="page">
 
@@ -74,4 +76,6 @@
       </view>
     </view>
   </view>
+</view>
+
 </view>

@@ -31,6 +31,7 @@ Page({
     showActionMenu: false,
     autoSaveEditAlbum: false,
     _syncStatus: 'off',
+    navTotalHeight: 0,
     authorizedCount: 0
   },
 
@@ -747,5 +748,10 @@ Page({
       title: '水印相机 · ' + (this.data.record ? this.data.record.templateName : ''),
       path: '/pages/index/index'
     }
-  }
+  },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });

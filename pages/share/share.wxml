@@ -1,3 +1,5 @@
+<custom-nav title="授权管理" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
 <!-- pages/share/share.wxml -->
 <view class="page">
 
@@ -71,4 +73,6 @@
       </view>
     </view>
   </view>
+</view>
+
 </view>

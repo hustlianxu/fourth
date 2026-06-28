@@ -6,6 +6,61 @@ const cloud = require('../../utils/cloud.js');
 
 const MAX_FOLDERS = 30;
 
+/**
+ * 检查本地文件是否存在
+ */
+function _checkFileExists(filePath) {
+  if (!filePath) return false;
+  try {
+    wx.getFileSystemManager().accessSync(filePath);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 从云端下载图片并更新列表记录
+ * @param {Object} pc - {count: N} 可变的 pending 计数器引用
+ */
+function _downloadCloudImage(item, listIdx, pending, pc, that, token, flush) {
+  if (token !== that._fillToken) { if (pc) pc.count--; return; }
+  const cloud = require('../../utils/cloud.js');
+  cloud.downloadFile(item._cloudFileId).then(function (localPath) {
+    if (token !== that._fillToken) { if (pc) pc.count--; return; }
+    if (localPath) {
+      storage.update(item.id, { imagePath: localPath });
+      pending['list[' + listIdx + '].imagePath'] = localPath;
+      const fs = wx.getFileSystemManager();
+      fs.getFileInfo({
+        filePath: localPath,
+        success: function (res) {
+          if (token !== that._fillToken) return;
+          var size = res.size || 0;
+          var kb;
+          if (size >= 1048576) {
+            kb = (size / 1048576).toFixed(1) + 'MB';
+          } else if (size > 1024) {
+            kb = (size / 1024).toFixed(0) + 'KB';
+          } else {
+            kb = size + 'B';
+          }
+          pending['list[' + listIdx + '].sizeText'] = item.metaText ? (item.metaText + ' · ' + kb) : ('· ' + kb);
+          if (--pc.count <= 0) flush();
+        },
+        fail: function () {
+          if (token !== that._fillToken) return;
+          if (item.metaText) pending['list[' + listIdx + '].sizeText'] = item.metaText;
+          if (--pc.count <= 0) flush();
+        }
+      });
+      return;
+    }
+    if (item.metaText) pending['list[' + listIdx + '].sizeText'] = item.metaText;
+    if (--pc.count <= 0) flush();
+  });
+}
+
 // 左滑操作按钮总宽度（4个按钮 × 70px ≈ 280px）
 const SWIPE_ACTION_WIDTH = 280;
 // 右滑选中触发阈值（px）
@@ -66,6 +121,7 @@ Page({
     // 回收站
     trashMode: false,
     trashList: [],
+    navTotalHeight: 0,
     trashCount: 0,
   },
 
@@ -476,16 +532,21 @@ Page({
     const offset = startIdx || 0;
     // 收集结果一次性 setData，避免每条记录单独 setData 造成 N 次跨层通信
     const pending = {};
-    let pendingCount = 0;
+    const pc = { count: 0 }; // 可变的计数器引用，供异步回调共用
     const flush = function () {
-      if (pendingCount === 0 && token === that._fillToken) {
+      if (pc.count === 0 && token === that._fillToken) {
         that.setData(pending);
       }
     };
     list.forEach((item, idx) => {
-      if (!item.imagePath) return;
-      pendingCount++;
+      if (!item.imagePath && !item._cloudFileId) return;
+      pc.count++;
       const listIdx = offset + idx;
+      // 本地文件缺失但有云端备份 → 尝试下载
+      if ((!item.imagePath || !_checkFileExists(item.imagePath)) && item._cloudFileId) {
+        _downloadCloudImage(item, listIdx, pending, pc, that, token, flush);
+        return;
+      }
       fs.getFileInfo({
         filePath: item.imagePath,
         success: function (res) {
@@ -501,14 +562,14 @@ Page({
           }
           const sizeText = item.metaText ? (item.metaText + ' · ' + kb) : ('· ' + kb);
           pending['list[' + listIdx + '].sizeText'] = sizeText;
-          if (--pendingCount === 0) flush();
+          if (--pc.count === 0) flush();
         },
         fail: function () {
           if (token !== that._fillToken) return;
           if (item.metaText) {
             pending['list[' + listIdx + '].sizeText'] = item.metaText;
           }
-          if (--pendingCount === 0) flush();
+          if (--pc.count === 0) flush();
         }
       });
     });
@@ -1486,7 +1547,7 @@ Page({
     const that = this;
     wx.showModal({
       title: '清空确认',
-      content: '将删除本地所有记录和文件夹（仅删除数据库记录，已保存到相册的照片不受影响）。',
+      content: '将删除本地所有未同步到云端的记录和文件夹。已同步到云端的记录仍在云存储中，重新开启同步后会再次下载到本地。\n\n注意：已保存到系统相册的照片不受影响。',
       success(res) {
         if (res.confirm) {
           storage.clearAll();
@@ -1496,5 +1557,10 @@ Page({
         }
       }
     });
-  }
+  },
+
+  onNavReady(e) {
+    this.setData({ navTotalHeight: e.detail.totalNavBarHeight });
+  },
+
 });
