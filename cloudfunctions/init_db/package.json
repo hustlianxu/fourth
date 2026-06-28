@@ -1,0 +1,9 @@
+{
+  "name": "init_db",
+  "version": "1.0.0",
+  "description": "Initialize database collections and indexes",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

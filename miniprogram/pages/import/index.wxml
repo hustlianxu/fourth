@@ -1,0 +1,64 @@
+<!-- 批量导入持仓 -->
+<view class="page">
+  <view class="card">
+    <text class="page-title">📥 批量导入持仓</text>
+    <text class="page-desc">下载 CSV 模板，填写完成后上传导入</text>
+  </view>
+
+  <view class="card">
+    <text class="section-title">第一步：下载模板</text>
+    <text class="step-desc">模板包含示例数据，按格式填写即可</text>
+    <button class="btn-primary" bindtap="onDownloadTemplate">📄 下载导入模板</button>
+  </view>
+
+  <view class="card">
+    <text class="section-title">模板说明</text>
+    <view class="field-desc" wx:for="{{fieldDescriptions}}" wx:key="field">
+      <text class="field-name">{{item.field}}</text>
+      <text class="field-required">{{item.required ? '*必填' : '可选'}}</text>
+      <text class="field-detail">{{item.desc}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="section-title">第二步：上传 CSV 文件</text>
+    <button class="btn-secondary" bindtap="onUploadFile">📂 选择 CSV 文件</button>
+  </view>
+
+  <view class="card manual-entry">
+    <view class="manual-divider">
+      <text class="divider-line"></text>
+      <text class="divider-text">或者</text>
+      <text class="divider-line"></text>
+    </view>
+    <text class="section-title">逐个添加持仓</text>
+    <text class="step-desc">少量数据或补充单条记录，手动录入更方便</text>
+    <button class="btn-outline" bindtap="onAddSingle">✏️ 手动添加一条持仓</button>
+  </view>
+
+  <!-- 导入结果 -->
+  <view class="card" wx:if="{{importResult.show}}">
+    <text class="section-title">导入结果</text>
+    <view class="result-row">
+      <text>总行数:</text>
+      <text>{{importResult.total}}</text>
+    </view>
+    <view class="result-row">
+      <text>成功:</text>
+      <text class="result-success">{{importResult.imported}}</text>
+    </view>
+    <view class="result-row" wx:if="{{importResult.errorCount > 0}}">
+      <text>失败:</text>
+      <text class="result-error">{{importResult.errorCount}}</text>
+    </view>
+
+    <view class="error-list" wx:if="{{importResult.errors && importResult.errors.length > 0}}">
+      <text class="error-title">错误详情：</text>
+      <text wx:for="{{importResult.errors}}" wx:for-item="err" wx:key="*this" class="error-item">{{err}}</text>
+    </view>
+  </view>
+
+  <view class="loading-container" wx:if="{{loading}}">
+    <loading />
+  </view>
+</view>

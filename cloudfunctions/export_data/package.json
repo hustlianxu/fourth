@@ -1,0 +1,9 @@
+{
+  "name": "export_data",
+  "version": "1.0.0",
+  "description": "Export user portfolio data",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

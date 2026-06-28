@@ -1,0 +1,44 @@
+/* 持仓详情 */
+.page { padding-bottom: 40rpx; }
+
+.holding-header { text-align: center; margin-bottom: 24rpx; }
+.holding-name { font-size: 36rpx; font-weight: 700; display: block; }
+.holding-code { font-size: 26rpx; color: #8e8e93; display: block; margin: 8rpx 0; }
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+.price-item { text-align: center; flex: 1; }
+.price-label { font-size: 22rpx; color: #8e8e93; display: block; }
+.price-value { font-size: 32rpx; font-weight: 700; display: block; margin-top: 4rpx; }
+
+.info-grid { margin-bottom: 24rpx; }
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.info-label { font-size: 26rpx; color: #8e8e93; }
+.info-value { font-size: 26rpx; font-weight: 500; }
+
+.action-buttons { display: flex; gap: 20rpx; }
+.btn-edit {
+  flex: 1;
+  background: #6c63ff;
+  color: #fff;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  text-align: center;
+}
+.btn-delete {
+  flex: 1;
+  background: transparent;
+  color: #f5222d;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  text-align: center;
+  border: 2rpx solid #f5222d;
+}

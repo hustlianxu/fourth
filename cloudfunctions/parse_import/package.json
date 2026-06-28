@@ -1,0 +1,9 @@
+{
+  "name": "parse_import",
+  "version": "1.0.0",
+  "description": "Parse CSV import for holdings",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

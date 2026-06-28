@@ -1,0 +1,45 @@
+/* 我的页样式 */
+.page { padding-bottom: 40rpx; }
+
+/* 用户卡片 */
+.user-card {
+  display: flex;
+  align-items: center;
+}
+.user-avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 24rpx;
+}
+.avatar-text { font-size: 40rpx; }
+.user-info { flex: 1; }
+.user-name { font-size: 32rpx; font-weight: 600; display: block; }
+.user-desc { font-size: 24rpx; color: #8e8e93; margin-top: 4rpx; display: block; }
+
+/* 菜单 */
+.menu-section { padding: 20rpx 30rpx; }
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.menu-item:last-child { border-bottom: none; }
+.menu-left {
+  display: flex;
+  align-items: center;
+}
+.menu-icon { font-size: 32rpx; margin-right: 16rpx; }
+.menu-left text:last-child { font-size: 28rpx; }
+.menu-right { display: flex; align-items: center; }
+.menu-status { font-size: 22rpx; margin-right: 8rpx; }
+.menu-status.ok { color: #52c41a; }
+.menu-status.warn { color: #fa8c16; }
+.menu-desc { font-size: 22rpx; color: #aeaeb2; margin-right: 8rpx; }
+.menu-arrow { font-size: 32rpx; color: #aeaeb2; }

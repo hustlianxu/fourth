@@ -1,0 +1,154 @@
+/* 个人资产管家 - 全局样式 */
+
+@import './styles/theme.wxss';
+
+page {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+/* 通用容器 */
+.container {
+  padding: 20rpx 30rpx;
+}
+
+/* 卡片组件 */
+.card {
+  background: var(--bg-card);
+  border-radius: 20rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+/* 行布局 */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 列表项 */
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--border-color);
+}
+.list-item:last-child {
+  border-bottom: none;
+}
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  margin-right: 8rpx;
+}
+.tag-stock { background: var(--tag-stock); color: #fff; }
+.tag-etf { background: var(--tag-etf); color: #fff; }
+.tag-lof { background: var(--tag-lof); color: #fff; }
+.tag-fund { background: var(--tag-fund); color: #fff; }
+.tag-money { background: var(--tag-money); color: #fff; }
+
+/* 按钮 */
+.btn-primary {
+  background: var(--primary-color);
+  color: #fff;
+  padding: 20rpx 40rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  text-align: center;
+  border: none;
+  width: 100%;
+}
+.btn-primary:active {
+  opacity: 0.8;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--primary-color);
+  padding: 16rpx 32rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  text-align: center;
+  border: 2rpx solid var(--primary-color);
+}
+
+/* 输入框 */
+.input-field {
+  width: 100%;
+  padding: 20rpx 24rpx;
+  background: var(--bg-input);
+  border-radius: 12rpx;
+  border: 2rpx solid var(--border-color);
+  font-size: 28rpx;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+.input-field:focus {
+  border-color: var(--primary-color);
+}
+
+/* 价格颜色 */
+.price-up { color: var(--color-up); }
+.price-down { color: var(--color-down); }
+.price-flat { color: var(--text-secondary); }
+
+/* 标题 */
+.page-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  margin-bottom: 24rpx;
+}
+.section-title {
+  font-size: 32rpx;
+  font-weight: 500;
+  margin-bottom: 16rpx;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100rpx 0;
+  color: var(--text-tertiary);
+}
+.empty-state text {
+  margin-top: 20rpx;
+  font-size: 28rpx;
+}
+
+/* 加载 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60rpx 0;
+}
+
+/* 遮罩 */
+.mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+}
+
+/* 暗色模式输入框占位符 */
+.input-field::-webkit-input-placeholder {
+  color: var(--text-tertiary);
+}
+.picker-row text:first-child {
+  color: var(--text-primary);
+}

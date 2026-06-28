@@ -1,0 +1,9 @@
+{
+  "name": "sync_prices",
+  "version": "1.0.0",
+  "description": "Daily price sync from Tencent and TianTianFund APIs",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

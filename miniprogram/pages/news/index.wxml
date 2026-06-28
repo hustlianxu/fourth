@@ -1,0 +1,57 @@
+<!-- 财经资讯 -->
+<view class="page">
+  <view class="card">
+    <view class="page-header">
+      <text class="page-title">📰 今日财经</text>
+      <text class="page-date">{{todayDate}}</text>
+    </view>
+  </view>
+
+  <!-- 分类 Tab -->
+  <view class="category-tabs">
+    <scroll-view scroll-x class="tab-scroll">
+      <view
+        class="tab-item {{currentCategory === item.key ? 'active' : ''}}"
+        wx:for="{{categories}}"
+        wx:key="key"
+        bindtap="onCategoryChange"
+        data-key="{{item.key}}"
+      >
+        <text>{{item.name}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 资讯列表 -->
+  <view wx:if="{{newsList.length > 0}}">
+    <view
+      class="news-card"
+      wx:for="{{newsList}}"
+      wx:key="_id"
+      bindtap="onNewsTap"
+      data-url="{{item.source_url}}"
+    >
+      <view class="news-header">
+        <text class="news-category tag-{{item.category}}">{{categoryName(item.category)}}</text>
+        <text class="news-source">{{item.source || '财经'}}</text>
+        <text class="news-time">{{formatTime(item.publish_time)}}</text>
+      </view>
+      <text class="news-title">{{item.title}}</text>
+      <text class="news-summary" wx:if="{{item.summary}}">{{item.summary}}</text>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:else>
+    <view class="empty-content">
+      <text class="empty-icon">📰</text>
+      <text>暂无资讯</text>
+      <text class="empty-desc">资讯将在每日 08:00 和 17:00 自动更新</text>
+      <button class="btn-secondary" bindtap="onManualFetch">手动刷新</button>
+    </view>
+  </view>
+
+  <view class="loading-container" wx:if="{{loading}}">
+    <loading />
+  </view>
+</view>

@@ -1,0 +1,9 @@
+{
+  "name": "lookup_product",
+  "version": "1.0.0",
+  "description": "Lookup stock/fund info by code or name",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

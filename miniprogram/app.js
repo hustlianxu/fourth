@@ -1,0 +1,72 @@
+/**
+ * 个人资产管家 - 微信小程序
+ * 统一管理多平台投资资产（股票/ETF/LOF/场外基金）
+ */
+App({
+  onLaunch() {
+    // 初始化云开发环境
+    if (!wx.cloud) {
+      console.error('请使用 2.2.3 或以上的基础库以使用云能力');
+    } else {
+      wx.cloud.init({
+        env: 'cloud1-d6geurbo125795334',  // 替换为实际云环境 ID
+        traceUser: true
+      });
+    }
+
+    // 获取系统信息
+    const systemInfo = wx.getSystemInfoSync();
+    this.globalData.systemInfo = systemInfo;
+    this.globalData.statusBarHeight = systemInfo.statusBarHeight;
+
+    // 检查是否有缓存的行情数据
+    this.checkDailyUpdate();
+  },
+
+  globalData: {
+    // 系统信息
+    systemInfo: null,
+    statusBarHeight: 20,
+
+    // 全局状态
+    accounts: [],         // 账户列表缓存
+    holdings: [],         // 持仓列表缓存
+    totalAssets: 0,       // 总资产
+    totalPnL: 0,          // 总盈亏
+    totalPnLPercent: 0,   // 总盈亏百分比
+
+    // 刷新回调
+    refreshCallbacks: [],
+
+    // 默认模型配置
+    defaultLLMProvider: 'deepseek',
+  },
+
+  /**
+   * 注册数据刷新回调
+   */
+  onRefresh(callback) {
+    this.globalData.refreshCallbacks.push(callback);
+  },
+
+  /**
+   * 触发全局刷新
+   */
+  triggerRefresh() {
+    this.globalData.refreshCallbacks.forEach(cb => {
+      typeof cb === 'function' && cb();
+    });
+  },
+
+  /**
+   * 检查每日更新
+   */
+  checkDailyUpdate() {
+    const lastUpdate = wx.getStorageSync('last_price_update');
+    const today = new Date().toDateString();
+    if (lastUpdate !== today) {
+      // 标记需要更新，进入首页时自动刷新
+      wx.setStorageSync('need_price_update', true);
+    }
+  }
+});

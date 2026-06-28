@@ -1,0 +1,9 @@
+{
+  "name": "push_news",
+  "version": "1.0.0",
+  "description": "Push financial news via WeChat subscribe message",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

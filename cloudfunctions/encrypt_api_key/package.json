@@ -1,0 +1,9 @@
+{
+  "name": "encrypt_api_key",
+  "version": "1.0.0",
+  "description": "AES encrypt and store LLM API keys",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -1,0 +1,66 @@
+/* 账户详情 */
+.page { padding-bottom: 40rpx; }
+
+.account-header-section { text-align: center; margin-bottom: 20rpx; }
+.account-name { font-size: 36rpx; font-weight: 700; display: block; }
+.account-platform { font-size: 24rpx; color: #8e8e93; display: block; margin-top: 4rpx; }
+
+.account-total { text-align: center; margin-bottom: 16rpx; }
+.total-label { font-size: 24rpx; color: #8e8e93; display: block; }
+.total-value { font-size: 48rpx; font-weight: 700; display: block; margin: 8rpx 0; }
+.total-pnl { font-size: 28rpx; display: block; }
+
+.balance-row {
+  font-size: 24rpx;
+  color: #8e8e93;
+  text-align: center;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+  margin-bottom: 20rpx;
+}
+
+.section-title { font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; }
+
+.holding-item {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.holding-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+.h-name { font-size: 28rpx; font-weight: 500; }
+.h-pnl { font-size: 26rpx; font-weight: 500; }
+.holding-bottom {
+  display: flex;
+  gap: 20rpx;
+  flex-wrap: wrap;
+}
+.holding-bottom text { font-size: 22rpx; color: #aeaeb2; }
+
+.action-bar {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+.btn-edit {
+  flex: 1;
+  background: transparent;
+  color: #6c63ff;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  text-align: center;
+  border: 2rpx solid #6c63ff;
+  font-size: 28rpx;
+}
+.btn-add {
+  flex: 1;
+  background: #6c63ff;
+  color: #fff;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  text-align: center;
+  border: none;
+  font-size: 28rpx;
+}

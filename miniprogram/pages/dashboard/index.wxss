@@ -1,0 +1,272 @@
+/* 资产看板样式 */
+.page {
+  padding-bottom: 40rpx;
+}
+
+/* 总资产头部卡片 */
+.header-card {
+  background: linear-gradient(135deg, #6c63ff 0%, #4a42d6 100%);
+  padding: 40rpx 30rpx;
+  margin: 20rpx;
+  border-radius: 24rpx;
+  color: #fff;
+}
+.header-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-label {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+.header-pnl {
+  font-size: 26rpx;
+  padding: 6rpx 16rpx;
+  background: rgba(255,255,255,0.2);
+  border-radius: 20rpx;
+}
+.header-amount {
+  font-size: 60rpx;
+  font-weight: 700;
+  margin: 16rpx 0;
+  letter-spacing: 2rpx;
+}
+.header-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.2);
+}
+.stat-item {
+  flex: 1;
+  text-align: center;
+}
+.stat-label {
+  font-size: 22rpx;
+  opacity: 0.8;
+  display: block;
+}
+.stat-value {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-top: 6rpx;
+  display: block;
+}
+.stat-divider {
+  width: 1rpx;
+  background: rgba(255,255,255,0.2);
+}
+
+/* 刷新栏 */
+.refresh-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid rgba(255,255,255,0.15);
+}
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  font-size: 24rpx;
+  opacity: 0.9;
+  padding: 8rpx 16rpx;
+  background: rgba(255,255,255,0.15);
+  border-radius: 12rpx;
+}
+.refresh-icon {
+  margin-right: 8rpx;
+  font-size: 28rpx;
+}
+.last-update {
+  font-size: 22rpx;
+  opacity: 0.7;
+}
+
+/* 卡片 */
+.card {
+  background: #fff;
+  margin: 0 20rpx 20rpx;
+  border-radius: 20rpx;
+  padding: 30rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.06);
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.add-btn {
+  font-size: 24rpx;
+  color: #6c63ff;
+  padding: 8rpx 16rpx;
+  border: 2rpx solid #6c63ff;
+  border-radius: 12rpx;
+}
+
+/* 饼图 */
+.pie-chart-container {
+  height: 300rpx;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20rpx;
+}
+.pie-canvas {
+  width: 300rpx;
+  height: 300rpx;
+}
+.legend-list {
+  padding: 0 20rpx;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+}
+.legend-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+}
+.legend-name {
+  flex: 1;
+  font-size: 26rpx;
+}
+.legend-value {
+  font-size: 26rpx;
+  font-weight: 500;
+  margin-right: 20rpx;
+}
+.legend-percent {
+  font-size: 24rpx;
+  color: #8e8e93;
+  width: 80rpx;
+  text-align: right;
+}
+
+/* 账户卡片列表 */
+.account-card {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+.account-card:last-of-type {
+  border-bottom: none;
+}
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.account-info {
+  display: flex;
+  align-items: center;
+}
+.account-name {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.account-type-tag {
+  font-size: 22rpx;
+  color: #8e8e93;
+  background: #f0f0f5;
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
+}
+.account-pnl {
+  font-size: 26rpx;
+  font-weight: 500;
+  text-align: right;
+}
+.pnl-percent {
+  font-size: 22rpx;
+  margin-left: 4rpx;
+}
+.account-body {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+.account-value {
+  font-size: 32rpx;
+  font-weight: 700;
+}
+.account-holdings {
+  font-size: 24rpx;
+  color: #8e8e93;
+}
+.account-footer {
+  margin-top: 8rpx;
+}
+.account-cash {
+  font-size: 22rpx;
+  color: #8e8e93;
+}
+
+/* AI 快捷入口 */
+.ai-entry {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  margin: 0 20rpx 20rpx;
+}
+.ai-entry-content {
+  display: flex;
+  align-items: center;
+}
+.ai-emoji {
+  font-size: 56rpx;
+  margin-right: 24rpx;
+}
+.ai-text {
+  flex: 1;
+}
+.ai-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #fff;
+}
+.ai-desc {
+  font-size: 24rpx;
+  color: rgba(255,255,255,0.8);
+}
+.ai-arrow {
+  font-size: 48rpx;
+  color: rgba(255,255,255,0.6);
+}
+
+/* 导入入口 */
+.import-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx;
+}
+.import-icon { font-size: 40rpx; margin-right: 16rpx; }
+.import-text { font-size: 28rpx; color: #6c63ff; }
+.import-arrow { font-size: 40rpx; color: #6c63ff; margin-left: 8rpx; }
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 40rpx 0;
+  color: #aeaeb2;
+  font-size: 26rpx;
+}
+
+/* 快捷操作入口 */
+.quick-actions {
+  padding: 0;
+}
+.quick-divider {
+  height: 2rpx;
+  background: #f0f0f0;
+  margin: 0 30rpx;
+}

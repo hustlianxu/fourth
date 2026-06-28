@@ -1,0 +1,69 @@
+<!-- AI 模型设置 -->
+<view class="page">
+  <view class="card">
+    <text class="page-title">AI 模型设置</text>
+    <text class="page-desc">配置您的 API Key 后即可使用 AI 分析持仓。Key 经 AES 加密后存储，仅云函数可解密，安全可靠。</text>
+  </view>
+
+  <view class="card" wx:for="{{providers}}" wx:key="key">
+    <view class="provider-header">
+      <image class="provider-icon" src="../../images/providers/provider_{{item.key}}.png" mode="aspectFit"></image>
+      <text class="provider-name">{{item.name}}</text>
+      <switch
+        checked="{{item.enabled}}"
+        bindchange="onToggleProvider"
+        data-key="{{item.key}}"
+        color="#6c63ff"
+      />
+    </view>
+
+    <view class="form-group" wx:if="{{item.enabled}}">
+      <text class="form-label">API Key</text>
+      <input
+        class="input-field tall"
+        type="text"
+        placeholder="sk-..."
+        value="{{item.api_key}}"
+        bindinput="onKeyInput"
+        data-key="{{item.key}}"
+      />
+    </view>
+
+    <view class="form-group" wx:if="{{item.enabled}}">
+      <text class="form-label">模型名称</text>
+      <picker bindchange="onModelPicker" data-key="{{item.key}}" value="{{item.pickerIndex}}" range="{{item.modelPickerList}}">
+        <view class="picker-row">
+          <text class="picker-value">{{item.modelPickerList[item.pickerIndex] || '请选择模型'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+      <input
+        class="input-field tall" wx:if="{{item.customModel}}"
+        placeholder="输入自定义模型名称"
+        value="{{item.customModelValue}}"
+        bindinput="onCustomModelInput"
+        data-key="{{item.key}}"
+      />
+    </view>
+
+    <view class="form-group" wx:if="{{item.enabled}}">
+      <text class="form-label">接口地址 (API Base URL)</text>
+      <input
+        class="input-field tall"
+        placeholder="{{item.defaultBaseURL}}"
+        value="{{item.base_url}}"
+        bindinput="onBaseURLInput"
+        data-key="{{item.key}}"
+      />
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="btn-primary" bindtap="onSave">保存配置</button>
+  </view>
+
+  <view class="card security-note">
+    <text class="note-icon">&#x1f512;</text>
+    <text class="note-text">您的 API Key 经过 AES-256 加密存储在云数据库中，仅在 AI 分析请求时在云函数内存中解密使用。小程序前端无法读取明文 Key。</text>
+  </view>
+</view>

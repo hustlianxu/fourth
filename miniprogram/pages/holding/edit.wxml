@@ -1,0 +1,97 @@
+<!-- 添加/编辑持仓 -->
+<view class="page">
+  <view class="card">
+    <text class="page-title">{{isEdit ? '编辑持仓' : '添加持仓'}}</text>
+  </view>
+
+  <view class="card">
+    <view class="form-group">
+      <text class="form-label">所属账户 *</text>
+      <picker bindchange="onAccountChange" value="{{accountIndex}}" range="{{accountNames}}">
+        <view class="picker-row">
+          <text>{{accountNames[accountIndex] || '请选择账户'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">产品代码 *</text>
+      <input class="input-field" placeholder="如：600036" model:value="{{form.product_code}}" bindinput="onCodeInput" />
+      <view class="lookup-hint" wx:if="{{codeLookupHint}}">{{codeLookupHint}}</view>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">产品名称</text>
+      <input class="input-field" placeholder="如：招商银行" model:value="{{form.product_name}}" bindinput="onNameInput" />
+      <!-- 名称搜索建议 -->
+      <view class="suggestions" wx:if="{{suggestions.length > 0}}">
+        <view
+          class="suggestion-item"
+          wx:for="{{suggestions}}"
+          wx:key="code"
+          bindtap="onSelectSuggestion"
+          data-code="{{item.code}}"
+          data-name="{{item.name}}"
+          data-type="{{item.type}}"
+          data-exchange="{{item.exchange}}"
+        >
+          <view class="suggestion-left">
+            <text class="suggestion-name">{{item.name}}</text>
+            <text class="suggestion-code">{{item.code}}</text>
+          </view>
+          <text class="suggestion-type tag-{{item.type}}">{{typeLabel(item.type)}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">产品类型</text>
+      <picker bindchange="onTypeChange" value="{{typeIndex}}" range="{{typeNames}}">
+        <view class="picker-row">
+          <text>{{typeNames[typeIndex] || '请选择'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">交易所</text>
+      <picker bindchange="onExchangeChange" value="{{exchangeIndex}}" range="{{['上海','深圳','港股','美股']}}">
+        <view class="picker-row">
+          <text>{{['上海','深圳','港股','美股'][exchangeIndex]}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">持有份额 *</text>
+      <input class="input-field" type="digit" placeholder="0" model:value="{{form.shares}}" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">成本单价 *</text>
+      <input class="input-field" type="digit" placeholder="0.00" model:value="{{form.cost_price}}" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">买入日期</text>
+      <picker mode="date" value="{{form.buy_date || today}}" bindchange="onDateChange">
+        <view class="picker-row">
+          <text>{{form.buy_date || '请选择日期'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">备注</text>
+      <input class="input-field" placeholder="可选" model:value="{{form.note}}" />
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="btn-primary" bindtap="onSave">保存</button>
+  </view>
+</view>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "triggers": [
+    {
+      "name": "dailySyncTrigger",
+      "type": "timer",
+      "config": "30 8 * * 1-5"
+    }
+  ],
+  "env": "your-env-id"
+}

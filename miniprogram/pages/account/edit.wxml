@@ -1,0 +1,48 @@
+<!-- 添加/编辑账户 -->
+<view class="page">
+  <view class="card">
+    <text class="page-title">{{isEdit ? '编辑账户' : '添加账户'}}</text>
+  </view>
+
+  <view class="card">
+    <view class="form-group">
+      <text class="form-label">账户名称 *</text>
+      <input class="input-field" placeholder="如：华泰证券、且慢" model:value="{{form.name}}" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">账户类型 *</text>
+      <picker bindchange="onTypeChange" value="{{typeIndex}}" range="{{typeOptions}}">
+        <view class="picker-row">
+          <text>{{typeOptions[typeIndex] || '请选择'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">具体平台</text>
+      <picker bindchange="onPlatformChange" value="{{platformIndex}}" range="{{platformOptions}}" wx:if="{{platformOptions.length > 0}}">
+        <view class="picker-row">
+          <text>{{platformOptions[platformIndex] || '请选择'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">账户余额</text>
+      <input class="input-field" placeholder="0.00" type="digit" model:value="{{form.cash_balance}}" />
+    </view>
+
+    <view class="form-group">
+      <text class="form-label">备注</text>
+      <input class="input-field" placeholder="可选" model:value="{{form.note}}" />
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="btn-primary" bindtap="onSave">保存</button>
+    <button class="btn-delete" wx:if="{{isEdit}}" bindtap="onDelete">删除此账户</button>
+  </view>
+</view>

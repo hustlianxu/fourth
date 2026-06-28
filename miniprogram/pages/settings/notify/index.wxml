@@ -1,0 +1,45 @@
+<!-- 推送设置 -->
+<view class="page">
+  <view class="card">
+    <text class="page-title">🔔 推送设置</text>
+  </view>
+
+  <view class="card">
+    <view class="setting-row">
+      <view class="setting-info">
+        <text class="setting-label">每日早报推送</text>
+        <text class="setting-desc">早 8:00 推送当日要闻</text>
+      </view>
+      <switch checked="{{morningNews}}" bindchange="onToggleMorning" color="#6c63ff" />
+    </view>
+    <view class="setting-row">
+      <view class="setting-info">
+        <text class="setting-label">收盘晚报推送</text>
+        <text class="setting-desc">下午 5:00 推送收盘速览</text>
+      </view>
+      <switch checked="{{eveningNews}}" bindchange="onToggleEvening" color="#6c63ff" />
+    </view>
+    <view class="setting-row">
+      <view class="setting-info">
+        <text class="setting-label">涨跌提醒</text>
+        <text class="setting-desc">持仓产品涨跌幅超过阈值时通知</text>
+      </view>
+      <switch checked="{{priceAlert}}" bindchange="onToggleAlert" color="#6c63ff" />
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{priceAlert}}">
+    <view class="form-group">
+      <text class="form-label">涨跌幅阈值 (%)</text>
+      <input class="input-field" type="digit" placeholder="3" model:value="{{alertThreshold}}" />
+    </view>
+  </view>
+
+  <view class="card">
+    <button class="btn-primary" bindtap="onSave">保存设置</button>
+  </view>
+
+  <view class="card notice">
+    <text class="notice-text">提示：推送功能依赖微信订阅消息，您需要在收到推送时点击「允许」以开启推送权限。</text>
+  </view>
+</view>

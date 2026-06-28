@@ -1,0 +1,121 @@
+<!-- 资产看板首页 -->
+<view class="page">
+  <!-- 总资产头部 -->
+  <view class="header-card">
+    <view class="header-total">
+      <text class="header-label">总资产</text>
+      <text class="header-pnl {{pnlColor}}">{{pnlArrow}} {{summary.totalPnLPercent}}</text>
+    </view>
+    <text class="header-amount">¥ {{formatMoney(summary.totalAssets)}}</text>
+    <view class="header-stats">
+      <view class="stat-item">
+        <text class="stat-label">今日收益</text>
+        <text class="stat-value {{todayPnlColor}}">{{formatMoney(summary.todayPnL)}}</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item">
+        <text class="stat-label">累计收益</text>
+        <text class="stat-value {{pnlColor}}">{{formatMoney(summary.totalPnL)}}</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item">
+        <text class="stat-label">持仓产品</text>
+        <text class="stat-value">{{summary.holdingCount || 0}}</text>
+      </view>
+    </view>
+
+    <!-- 刷新按钮 -->
+    <view class="refresh-bar">
+      <view class="refresh-btn" bindtap="onRefresh">
+        <text class="refresh-icon">↻</text>
+        <text>刷新净值</text>
+      </view>
+      <view class="last-update" wx:if="{{lastUpdate}}">
+        更新: {{lastUpdate}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 资产分布 -->
+  <view class="card">
+    <view class="card-header">
+      <text class="section-title">资产分布</text>
+    </view>
+    <view class="pie-chart-container" wx:if="{{summary.accounts && summary.accounts.length > 0}}">
+      <canvas type="2d" id="pieCanvas" class="pie-canvas"></canvas>
+    </view>
+    <view class="legend-list" wx:if="{{summary.accounts && summary.accounts.length > 0}}">
+      <view class="legend-item" wx:for="{{distributionList}}" wx:key="name">
+        <view class="legend-dot" style="background: {{item.color}}"></view>
+        <text class="legend-name">{{item.name}}</text>
+        <text class="legend-value">¥{{formatMoney(item.value)}}</text>
+        <text class="legend-percent">{{item.percent}}%</text>
+      </view>
+    </view>
+    <view class="empty-state" wx:if="{{!summary.accounts || summary.accounts.length === 0}}">
+      <text>暂无持仓数据</text>
+    </view>
+  </view>
+
+  <!-- 账户列表 -->
+  <view class="card">
+    <view class="card-header">
+      <text class="section-title">账户资产</text>
+      <view class="add-btn" bindtap="onAddAccount">+ 添加账户</view>
+    </view>
+    <view wx:for="{{summary.accounts}}" wx:key="_id" class="account-card" bindtap="onAccountTap" data-account="{{item}}">
+      <view class="account-header">
+        <view class="account-info">
+          <text class="account-name">{{item.name}}</text>
+          <text class="account-type-tag">{{platformName(item.platform || item.type)}}</text>
+        </view>
+        <view class="account-pnl {{item.pnl > 0 ? 'price-up' : (item.pnl < 0 ? 'price-down' : '')}}">
+          <text>{{item.pnl > 0 ? '+' : ''}}{{formatMoney(item.pnl)}}</text>
+          <text class="pnl-percent">({{item.pnl_percent.toFixed(2)}}%)</text>
+        </view>
+      </view>
+      <view class="account-body">
+        <text class="account-value">¥{{formatMoney(item.total_value)}}</text>
+        <text class="account-holdings">持仓 {{item.holdingCount || 0}} 只</text>
+      </view>
+      <view class="account-footer" wx:if="{{item.cash_balance}}">
+        <text class="account-cash">含余额: ¥{{formatMoney(item.cash_balance)}}</text>
+      </view>
+    </view>
+    <view class="empty-state" wx:if="{{!summary.accounts || summary.accounts.length === 0}}">
+      <text>点击右上角 + 添加您的第一个账户</text>
+    </view>
+  </view>
+
+  <!-- AI 分析快捷入口 -->
+  <view class="card ai-entry" bindtap="onGoToAI">
+    <view class="ai-entry-content">
+      <text class="ai-emoji">🤖</text>
+      <view class="ai-text">
+        <text class="ai-title">AI 分析持仓</text>
+        <text class="ai-desc">智能分析您的持仓健康度和风险</text>
+      </view>
+      <text class="ai-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 导入 & 录入快捷入口 -->
+  <view class="card quick-actions" wx:if="{{!summary.accounts || summary.accounts.length === 0}}">
+    <view class="import-entry" bindtap="onGoToImport">
+      <text class="import-icon">📥</text>
+      <text class="import-text">批量导入持仓数据</text>
+      <text class="import-arrow">›</text>
+    </view>
+    <view class="quick-divider"></view>
+    <view class="import-entry" bindtap="onAddHolding">
+      <text class="import-icon">✏️</text>
+      <text class="import-text">手动添加一条持仓</text>
+      <text class="import-arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 加载 -->
+  <view class="loading-container" wx:if="{{loading}}">
+    <loading />
+  </view>
+</view>

@@ -1,0 +1,50 @@
+/* 个人资产管家 - 主题变量 */
+
+page {
+  /* 主色 - 科技紫 */
+  --primary-color: #6c63ff;
+  --primary-light: #8b83ff;
+  --primary-dark: #4a42d6;
+
+  /* 涨跌色 */
+  --color-up: #f5222d;
+  --color-down: #52c41a;
+  --color-flat: #8e8e93;
+
+  /* 背景 */
+  --bg-primary: #f5f5f7;
+  --bg-card: #ffffff;
+  --bg-input: #f8f8fa;
+
+  /* 文字 */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #aeaeb2;
+
+  /* 边框 */
+  --border-color: #e5e5ea;
+
+  /* 产品标签色 */
+  --tag-stock: #6c63ff;
+  --tag-etf: #1890ff;
+  --tag-lof: #52c41a;
+  --tag-fund: #fa8c16;
+  --tag-money: #13c2c2;
+
+  /* 卡片阴影 */
+  --shadow-sm: 0 2rpx 8rpx rgba(0,0,0,0.08);
+  --shadow-md: 0 4rpx 16rpx rgba(0,0,0,0.12);
+}
+
+/* 暗色模式 - 预留 */
+@media (prefers-color-scheme: dark) {
+  page {
+    --bg-primary: #1c1c1e;
+    --bg-card: #2c2c2e;
+    --bg-input: #3a3a3c;
+    --text-primary: #f5f5f7;
+    --text-secondary: #aeaeb2;
+    --text-tertiary: #636366;
+    --border-color: #38383a;
+  }
+}
