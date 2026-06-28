@@ -1,6 +1,14 @@
 /* ===== 整体布局 ===== */
+/* 在固定导航栏下方撑满视口，不滚动 */
+.page-content {
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 .camera-wrap {
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #000;
