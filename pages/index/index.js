@@ -3,6 +3,10 @@ const templates = require('../../utils/templates.js');
 const storage = require('../../utils/storage.js');
 const cloud = require('../../utils/cloud.js');
 
+const SWIPE_THRESHOLD = 60;   // 触发滑动的最小 px
+const MAX_DRAG = 150;          // 跟随手指的最大偏移 px
+const NAV_DELAY = 200;         // 放手后动画时长 ms
+
 Page({
   data: {
     templates: [],
@@ -11,7 +15,11 @@ Page({
     autoSaveAlbum: false,
     syncEnabled: false,
     configSyncEnabled: false,
-    slideOutStyle: ''
+    // 滑动状态
+    slideStyle: '',
+    slideTransition: 'transition: transform 0s',
+    previewOpacity: 0,
+    dragDir: ''   // 'left' | 'right' | ''
   },
 
   onLoad() {
@@ -88,7 +96,7 @@ Page({
     this.setData({ selectedId: id });
   },
 
-  // ===== 左右滑动手势 =====
+  // ===== 左右滑动手势（实时跟随手指） =====
   _touchStartX: 0,
   _touchStartY: 0,
   _touchStartT: 0,
@@ -97,25 +105,75 @@ Page({
     this._touchStartX = e.touches[0].clientX;
     this._touchStartY = e.touches[0].clientY;
     this._touchStartT = Date.now();
+    this.setData({
+      slideTransition: 'transition: transform 0s',
+      previewOpacity: 0,
+      dragDir: ''
+    });
+  },
+
+  onTouchMove(e) {
+    var dx = e.touches[0].clientX - this._touchStartX;
+    var dy = e.touches[0].clientY - this._touchStartY;
+
+    // 过滤垂直滑动为主的情况
+    if (Math.abs(dx) < Math.abs(dy)) return;
+    // 太小不响应
+    if (Math.abs(dx) < 10) return;
+
+    // 限制最大偏移
+    var tx = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, dx));
+
+    // 计算预览层透明度（0~1 线性映射到 0~MAX_DRAG）
+    var opacity = Math.min(1, Math.abs(tx) / MAX_DRAG);
+
+    this.setData({
+      slideStyle: 'transform: translateX(' + tx + 'px)',
+      previewOpacity: opacity,
+      dragDir: tx > 0 ? 'right' : 'left'
+    });
   },
 
   onTouchEnd(e) {
-    const dx = e.changedTouches[0].clientX - this._touchStartX;
-    const dy = e.changedTouches[0].clientY - this._touchStartY;
-    const dt = Date.now() - this._touchStartT;
-    // 阈值：水平滑动 > 60px、手势快于 500ms、水平幅度大于垂直幅度
-    if (Math.abs(dx) > 60 && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (dx > 0) {
-        // 右滑 → 首页向左滑出，再用无动画 navigateTo 展示列表页
-        this.setData({ slideOutStyle: 'transform: translateX(-25%); opacity: 0.5;' });
-        setTimeout(function () {
-          wx.navigateTo({ url: '/pages/list/list', routeType: 'none' });
-        }, 150);
-      } else {
-        // 左滑 → 拍照（默认 slide-in-right 动画，跟随手指方向）
-        const id = this.data.selectedId;
-        wx.navigateTo({ url: '/pages/camera/camera?templateId=' + id });
-      }
+    var dx = e.changedTouches[0].clientX - this._touchStartX;
+    var dy = e.changedTouches[0].clientY - this._touchStartY;
+    var dt = Date.now() - this._touchStartT;
+
+    // 重置预览
+    this.setData({ dragDir: '', previewOpacity: 0 });
+
+    // 判断是否为有效滑动：距离 > 阈值、时间 < 500ms、水平为主
+    if (Math.abs(dx) > SWIPE_THRESHOLD && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      this._doSwipe(dx);
+    } else {
+      // 无效滑动 → 弹回
+      this.setData({
+        slideStyle: 'transform: translateX(0px)',
+        slideTransition: 'transition: transform ' + NAV_DELAY + 'ms ease-out'
+      });
+    }
+  },
+
+  _doSwipe(dx) {
+    if (dx > 0) {
+      // 右滑 → 首页向右滑出，列表页从左侧推入
+      this.setData({
+        slideStyle: 'transform: translateX(100%)',
+        slideTransition: 'transition: transform ' + NAV_DELAY + 'ms ease-out'
+      });
+      setTimeout(function () {
+        wx.navigateTo({ url: '/pages/list/list', routeType: 'none' });
+      }, NAV_DELAY);
+    } else {
+      // 左滑 → 首页向左滑出，拍照页从右侧推入
+      this.setData({
+        slideStyle: 'transform: translateX(-100%)',
+        slideTransition: 'transition: transform ' + NAV_DELAY + 'ms ease-out'
+      });
+      var id = this.data.selectedId;
+      setTimeout(function () {
+        wx.navigateTo({ url: '/pages/camera/camera?templateId=' + id, routeType: 'none' });
+      }, NAV_DELAY);
     }
   },
 
@@ -147,6 +205,13 @@ Page({
   },
 
   onShow() {
+    // 回到首页时清除滑动偏移
+    this.setData({
+      slideStyle: '',
+      slideTransition: 'transition: transform 0s',
+      previewOpacity: 0,
+      dragDir: ''
+    });
     const list = storage.getAll();
     this.setData({
       total: list.length,
