@@ -3,10 +3,9 @@ const templates = require('../../utils/templates.js');
 const storage = require('../../utils/storage.js');
 const cloud = require('../../utils/cloud.js');
 
-const SWIPE_RATIO = 0.18;      // 触发滑动的距离占比（屏幕宽度的百分比）
-const MAX_DRAG_RATIO = 0.28;   // 跟随手指的最大偏移占比
-const NAV_DELAY = 200;         // 放手后动画时长 ms
-const EDGE_WIDTH = 30;         // 右滑触发边缘宽度（px）
+const SWIPE_THRESHOLD_PX = 50;   // 触发滑动的最小 px
+const MAX_DRAG_PX = 120;          // 跟随手指的最大偏移 px
+const NAV_DELAY = 200;            // 放手后动画时长 ms
 
 Page({
   data: {
@@ -24,7 +23,6 @@ Page({
   },
 
   onLoad() {
-    this._screenW = wx.getSystemInfoSync().windowWidth;
     this.loadTemplates();
     this.setData({
       autoSaveAlbum: storage.getAutoSaveAlbum(),
@@ -102,19 +100,14 @@ Page({
   _touchStartX: 0,
   _touchStartY: 0,
   _touchStartT: 0,
-  _directionLocked: false,
   _swipeDir: '',   // 'left' | 'right' | ''
-  _screenW: 375,
 
   onTouchStart(e) {
     var touch = e.touches[0];
     this._touchStartX = touch.clientX;
     this._touchStartY = touch.clientY;
     this._touchStartT = Date.now();
-    this._directionLocked = false;
     this._swipeDir = '';
-    // 右滑必须从左侧边缘触发；左滑可从任意位置
-    // 但都需要水平手势，后续在 touchmove 判断
     this.setData({
       slideTransition: 'transition: transform 0s',
       previewOpacity: 0,
@@ -123,74 +116,40 @@ Page({
   },
 
   onTouchMove(e) {
-    if (this._directionLocked && !this._swipeDir) return; // 已锁定为垂直，忽略
+    var dx = e.touches[0].clientX - this._touchStartX;
+    var dy = e.touches[0].clientY - this._touchStartY;
 
-    var touch = e.touches[0];
-    var dx = touch.clientX - this._touchStartX;
-    var dy = touch.clientY - this._touchStartY;
+    // 水平滑动幅度太小或垂直为主 → 忽略
+    if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return;
 
-    // 首次移动：锁定滑动方向
-    if (!this._directionLocked) {
-      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return; // 太小的移动忽略
-      this._directionLocked = true;
-      if (Math.abs(dy) > Math.abs(dx)) {
-        // 垂直滑动 → 放弃，交给页面默认滚动
-        this._swipeDir = '';
-        return;
-      }
-      // 横向滑动：确定方向
-      if (dx > 0) {
-        // 右滑：必须从屏幕左侧边缘触发
-        if (this._touchStartX > EDGE_WIDTH) {
-          this._swipeDir = '';
-          return;
-        }
-        this._swipeDir = 'right';
-      } else {
-        this._swipeDir = 'left';
-      }
-      return; // 锁定方向本次不处理，下次 touchmove 开始跟手
-    }
+    // 限制最大偏移
+    var tx = Math.max(-MAX_DRAG_PX, Math.min(MAX_DRAG_PX, dx));
 
-    if (!this._swipeDir) return; // 已确认为垂直滑动
-
-    // 基于屏幕宽度计算百分比偏移
-    var screenW = this._screenW;
-    var pct = (dx / screenW) * 100;
-    // 限制范围
-    var maxPct = MAX_DRAG_RATIO * 100;
-    pct = Math.max(-maxPct, Math.min(maxPct, pct));
-
-    // 预览透明度：偏移量越大越透明
-    var opacity = Math.min(0.9, Math.abs(pct) / maxPct);
+    // 预览层透明度
+    var opacity = Math.min(0.9, Math.abs(tx) / MAX_DRAG_PX);
 
     this.setData({
-      slideStyle: 'transform: translateX(' + pct + '%)',
+      slideStyle: 'transform: translateX(' + tx + 'px)',
       previewOpacity: opacity,
-      dragDir: this._swipeDir
+      dragDir: tx > 0 ? 'right' : 'left'
     });
   },
 
   onTouchEnd(e) {
-    if (!this._directionLocked || !this._swipeDir) {
-      // 没有触发横向滑动 → 复位
-      this.setData({ dragDir: '', previewOpacity: 0 });
-      return;
-    }
-
-    var touch = e.changedTouches[0];
-    var dx = touch.clientX - this._touchStartX;
+    var dx = e.changedTouches[0].clientX - this._touchStartX;
+    var dy = e.changedTouches[0].clientY - this._touchStartY;
     var dt = Date.now() - this._touchStartT;
-    var screenW = this._screenW;
-    var thresholdPx = screenW * SWIPE_RATIO;
 
-    // 重置预览
     this.setData({ dragDir: '', previewOpacity: 0 });
 
-    if (Math.abs(dx) > thresholdPx && dt < 500) {
-      this._doSwipe(this._swipeDir);
+    // 有效滑动：距离 > 阈值、< 500ms、水平为主
+    if (Math.abs(dx) > SWIPE_THRESHOLD_PX && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) {
+        this._doSwipe('right');
+      } else {
+        this._doSwipe('left');
+      }
     } else {
-      // 弹回
       this.setData({
         slideStyle: 'transform: translateX(0px)',
         slideTransition: 'transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)'

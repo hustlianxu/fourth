@@ -16,9 +16,8 @@
   <view class="container"
     style="{{slideStyle}}; {{slideTransition}}"
     bindtouchstart="onTouchStart"
-    bindtouchmove="onTouchMove"
-    bindtouchend="onTouchEnd"
     catchtouchmove="onTouchMove"
+    bindtouchend="onTouchEnd"
   >
     <view class="hero">
       <view class="hero-title">外贸水印相机</view>
