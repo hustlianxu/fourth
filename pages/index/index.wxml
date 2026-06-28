@@ -1,4 +1,6 @@
-<view class="container">
+<view class="container"
+  bindtouchstart="onTouchStart"
+  bindtouchend="onTouchEnd">
   <view class="hero">
     <view class="hero-title">外贸水印相机</view>
     <view class="hero-sub">Product / Packaging / Loading · 拍照即带水印并入库</view>

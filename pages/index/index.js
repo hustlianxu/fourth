@@ -87,6 +87,34 @@ Page({
     this.setData({ selectedId: id });
   },
 
+  // ===== 左右滑动手势 =====
+  _touchStartX: 0,
+  _touchStartY: 0,
+  _touchStartT: 0,
+
+  onTouchStart(e) {
+    this._touchStartX = e.touches[0].clientX;
+    this._touchStartY = e.touches[0].clientY;
+    this._touchStartT = Date.now();
+  },
+
+  onTouchEnd(e) {
+    const dx = e.changedTouches[0].clientX - this._touchStartX;
+    const dy = e.changedTouches[0].clientY - this._touchStartY;
+    const dt = Date.now() - this._touchStartT;
+    // 阈值：水平滑动 > 60px、手势快于 500ms、水平幅度大于垂直幅度
+    if (Math.abs(dx) > 60 && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) {
+        // 右滑 → 我的记录
+        wx.navigateTo({ url: '/pages/list/list' });
+      } else {
+        // 左滑 → 拍照
+        const id = this.data.selectedId;
+        wx.navigateTo({ url: '/pages/camera/camera?templateId=' + id });
+      }
+    }
+  },
+
   goCamera() {
     const id = this.data.selectedId;
     wx.navigateTo({
