@@ -16,7 +16,7 @@
   <view class="container"
     style="{{slideStyle}}; {{slideTransition}}"
     bindtouchstart="onTouchStart"
-    catchtouchmove="onTouchMove"
+    bindtouchmove="onTouchMove"
     bindtouchend="onTouchEnd"
   >
     <view class="hero">
