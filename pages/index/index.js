@@ -106,11 +106,11 @@ Page({
     // 阈值：水平滑动 > 60px、手势快于 500ms、水平幅度大于垂直幅度
     if (Math.abs(dx) > 60 && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (dx > 0) {
-        // 右滑 → 先让首页向左滑出，营造「列表页从左侧推入」的错觉
+        // 右滑 → 首页向左滑出，再用无动画 navigateTo 展示列表页
         this.setData({ slideOutStyle: 'transform: translateX(-25%); opacity: 0.5;' });
         setTimeout(function () {
-          wx.navigateTo({ url: '/pages/list/list' });
-        }, 180);
+          wx.navigateTo({ url: '/pages/list/list', routeType: 'none' });
+        }, 150);
       } else {
         // 左滑 → 拍照（默认 slide-in-right 动画，跟随手指方向）
         const id = this.data.selectedId;
