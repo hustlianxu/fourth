@@ -820,8 +820,9 @@ function pullConfigFromCloud(openid) {
         // 基本设置
         if (cloudConfig.autoSaveAlbum != null) storage.setAutoSaveAlbum(cloudConfig.autoSaveAlbum);
         if (cloudConfig.autoSaveEditAlbum != null) storage.setAutoSaveEditAlbum(cloudConfig.autoSaveEditAlbum);
-        if (cloudConfig.customTemplates && cloudConfig.customTemplates.length > 0) {
-          cloudConfig.customTemplates.forEach(function (ct) { storage.saveCustomTemplate(ct); });
+        // 全量替换自定义模板（非增量添加），确保云端删除的模板本地也被移除
+        if (cloudConfig.customTemplates) {
+          storage.setCustomTemplates(cloudConfig.customTemplates);
         }
         // 翻译引擎配置
         if (cloudConfig.translatorConfig != null) {

@@ -223,6 +223,14 @@ function deleteCustomTemplate(id) {
 }
 
 /**
+ * 用云端列表全量替换自定义模板（替代增量 saveCustomTemplate）
+ * 保证云端删除的模板在本地也被删除
+ */
+function setCustomTemplates(list) {
+  wx.setStorageSync(KEY_TEMPLATES, Array.isArray(list) ? list : []);
+}
+
+/**
  * 生成唯一 id
  */
 function genId() {
@@ -351,6 +359,7 @@ module.exports = {
   getCustomTemplates,
   saveCustomTemplate,
   deleteCustomTemplate,
+  setCustomTemplates,
   // 自动保存相册
   getAutoSaveAlbum,
   setAutoSaveAlbum,

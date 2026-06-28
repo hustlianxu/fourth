@@ -57,6 +57,17 @@ Page({
 
   onLoad() {
     this.loadTemplates();
+    // 配置同步开启时拉取云端最新模板（异步，拉取后刷新列表）
+    var that = this;
+    if (storage.getConfigSyncEnabled()) {
+      cloud.getOpenid().then(function (oid) {
+        if (oid) {
+          cloud.pullConfigFromCloud(oid).then(function (changed) {
+            if (changed) that.loadTemplates();
+          });
+        }
+      });
+    }
   },
 
   // 加载模板（内置 + 自定义）
