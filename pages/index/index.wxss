@@ -45,6 +45,7 @@
   z-index: 1;
   background: #f5f6fa;
   min-height: 100vh;
+  will-change: transform;
 }
 
 .hero {
