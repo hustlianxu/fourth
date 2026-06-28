@@ -32,6 +32,10 @@ Page({
     wx.navigateTo({ url: '/pages/holdings/index' });
   },
 
+  onGoToTransactions() {
+    wx.navigateTo({ url: '/pages/transactions/index' });
+  },
+
   onGoToImport() {
     wx.navigateTo({ url: '/pages/import/index' });
   },

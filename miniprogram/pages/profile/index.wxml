@@ -21,6 +21,13 @@
       </view>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onGoToTransactions">
+      <view class="menu-left">
+        <text class="menu-icon">📒</text>
+        <text>交易流水记录</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
     <view class="menu-item" bindtap="onGoToImport">
       <view class="menu-left">
         <text class="menu-icon">📥</text>
