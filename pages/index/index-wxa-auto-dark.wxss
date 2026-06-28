@@ -43,7 +43,7 @@
     .btn.outline {
         background: rgb(17, 17, 17);
         color: rgb(0, 105, 12);
-        border: rgb(0, 0, 0);
+        border: 2rpx solid rgb(0, 0, 0);
     }
 
     .footer {

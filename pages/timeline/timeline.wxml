@@ -48,9 +48,9 @@
 
         <!-- 字段值预览 -->
         <view wx:if="{{item.snapshot && item.snapshot.values}}" class="tl-values">
-          <view wx:for="{{Object.keys(item.snapshot.values)}}" wx:key="*this" class="tl-value-row">
-            <text class="tl-vk">{{item}}</text>
-            <text class="tl-vv">{{item.snapshot.values[item]}}</text>
+          <view wx:for="{{Object.keys(item.snapshot.values)}}" wx:for-item="key" wx:key="*this" class="tl-value-row">
+            <text class="tl-vk">{{key}}</text>
+            <text class="tl-vv">{{item.snapshot.values[key]}}</text>
           </view>
         </view>
 
