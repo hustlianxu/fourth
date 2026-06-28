@@ -5,7 +5,6 @@ const cloud = require('../../utils/cloud.js');
 
 const SWIPE_THRESHOLD = 60;   // 触发滑动的最小 px
 const MAX_DRAG = 150;          // 跟随手指的最大偏移 px
-const NAV_DELAY = 200;         // 放手后动画时长 ms
 
 Page({
   data: {
@@ -15,16 +14,35 @@ Page({
     autoSaveAlbum: false,
     syncEnabled: false,
     configSyncEnabled: false,
-    // 滑动状态
+    recentRecords: [],
+    // 滑动偏移
     slideStyle: '',
     slideTransition: 'transition: transform 0s',
-    previewOpacity: 0,
-    dragDir: ''   // 'left' | 'right' | ''
+    // 面板状态：初始在屏幕外，由 CSS 控制
+    listPanelStyle: 'transform: translateX(-100%)',
+    cameraPanelStyle: 'transform: translateX(100%)',
+    panelTransition: 'transition: transform 0.25s ease-out'
   },
 
   onLoad() {
     this.loadTemplates();
+    this._loadData();
+  },
+
+  _loadData() {
+    var list = storage.getAll();
+    var recent = list.slice(0, 10);
     this.setData({
+      total: list.length,
+      recentRecords: recent.map(function (r) {
+        return {
+          id: r.id,
+          imagePath: r.imagePath,
+          customName: r.customName,
+          templateName: r.templateName,
+          timeText: r.timeText || ''
+        };
+      }),
       autoSaveAlbum: storage.getAutoSaveAlbum(),
       syncEnabled: storage.getSyncEnabled(),
       configSyncEnabled: storage.getConfigSyncEnabled()
@@ -62,6 +80,7 @@ Page({
   },
 
   onToggleConfigSync(e) {
+    // ... unchanged from before
     const enabled = e.detail.value;
     storage.setConfigSyncEnabled(enabled);
     this.setData({ configSyncEnabled: enabled });
@@ -96,85 +115,115 @@ Page({
     this.setData({ selectedId: id });
   },
 
-  // ===== 左右滑动手势（实时跟随手指） =====
+  // ===== 滑动手势 =====
   _touchStartX: 0,
   _touchStartY: 0,
   _touchStartT: 0,
+  _swipeConsumed: false,
 
   onTouchStart(e) {
     this._touchStartX = e.touches[0].clientX;
     this._touchStartY = e.touches[0].clientY;
     this._touchStartT = Date.now();
+    this._swipeConsumed = false;
     this.setData({
-      slideTransition: 'transition: transform 0s',
-      previewOpacity: 0,
-      dragDir: ''
+      slideTransition: 'transition: transform 0s'
     });
   },
 
   onTouchMove(e) {
+    if (this._swipeConsumed) return;
     var dx = e.touches[0].clientX - this._touchStartX;
     var dy = e.touches[0].clientY - this._touchStartY;
 
     // 过滤垂直滑动为主的情况
-    if (Math.abs(dx) < Math.abs(dy)) return;
-    // 太小不响应
-    if (Math.abs(dx) < 10) return;
+    if (Math.abs(dx) < Math.abs(dy) || Math.abs(dx) < 10) return;
 
     // 限制最大偏移
     var tx = Math.max(-MAX_DRAG, Math.min(MAX_DRAG, dx));
 
-    // 计算预览层透明度（0~1 线性映射到 0~MAX_DRAG）
-    var opacity = Math.min(1, Math.abs(tx) / MAX_DRAG);
-
     this.setData({
-      slideStyle: 'transform: translateX(' + tx + 'px)',
-      previewOpacity: opacity,
-      dragDir: tx > 0 ? 'right' : 'left'
+      slideStyle: 'transform: translateX(' + tx + 'px)'
     });
   },
 
   onTouchEnd(e) {
+    if (this._swipeConsumed) return;
     var dx = e.changedTouches[0].clientX - this._touchStartX;
     var dy = e.changedTouches[0].clientY - this._touchStartY;
     var dt = Date.now() - this._touchStartT;
 
-    // 重置预览
-    this.setData({ dragDir: '', previewOpacity: 0 });
-
-    // 判断是否为有效滑动：距离 > 阈值、时间 < 500ms、水平为主
+    // 判断是否为有效滑动
     if (Math.abs(dx) > SWIPE_THRESHOLD && dt < 500 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      this._doSwipe(dx);
+      this._swipeConsumed = true;
+      if (dx > 0) {
+        this._showListPanel();
+      } else {
+        this._showCameraPanel();
+      }
     } else {
-      // 无效滑动 → 弹回
+      // 弹回
       this.setData({
         slideStyle: 'transform: translateX(0px)',
-        slideTransition: 'transition: transform ' + NAV_DELAY + 'ms ease-out'
+        slideTransition: 'transition: transform 0.2s ease-out'
       });
     }
   },
 
-  _doSwipe(dx) {
-    if (dx > 0) {
-      // 右滑 → 首页向右滑出，列表页从左侧推入
-      this.setData({
-        slideStyle: 'transform: translateX(100%)',
-        slideTransition: 'transition: transform ' + NAV_DELAY + 'ms ease-out'
-      });
-      setTimeout(function () {
-        wx.navigateTo({ url: '/pages/list/list', routeType: 'none' });
-      }, NAV_DELAY);
-    } else {
-      // 左滑 → 首页向左滑出，拍照页从右侧推入
-      this.setData({
-        slideStyle: 'transform: translateX(-100%)',
-        slideTransition: 'transition: transform ' + NAV_DELAY + 'ms ease-out'
-      });
-      var id = this.data.selectedId;
-      setTimeout(function () {
-        wx.navigateTo({ url: '/pages/camera/camera?templateId=' + id, routeType: 'none' });
-      }, NAV_DELAY);
-    }
+  // ===== 面板控制 =====
+  _showListPanel() {
+    // 刷新数据
+    var list = storage.getAll();
+    var recent = list.slice(0, 10);
+    this.setData({
+      total: list.length,
+      recentRecords: recent.map(function (r) {
+        return {
+          id: r.id,
+          imagePath: r.imagePath,
+          customName: r.customName,
+          templateName: r.templateName,
+          timeText: r.timeText || ''
+        };
+      }),
+      // 预览"手指推动"的动画：首页向右80%，列表面板从左侧滑入
+      slideStyle: 'transform: translateX(80%)',
+      slideTransition: 'transition: transform 0.25s ease-out',
+      listPanelStyle: 'transform: translateX(0)',
+      panelTransition: 'transition: transform 0.25s ease-out'
+    });
+  },
+
+  _showCameraPanel() {
+    this.setData({
+      slideStyle: 'transform: translateX(-80%)',
+      slideTransition: 'transition: transform 0.25s ease-out',
+      cameraPanelStyle: 'transform: translateX(0)',
+      panelTransition: 'transition: transform 0.25s ease-out'
+    });
+  },
+
+  hideListPanel() {
+    this.setData({
+      listPanelStyle: 'transform: translateX(-100%)',
+      panelTransition: 'transition: transform 0.25s ease-out',
+      slideStyle: '',
+      slideTransition: 'transition: transform 0.25s ease-out'
+    });
+  },
+
+  hideCameraPanel() {
+    this.setData({
+      cameraPanelStyle: 'transform: translateX(100%)',
+      panelTransition: 'transition: transform 0.25s ease-out',
+      slideStyle: '',
+      slideTransition: 'transition: transform 0.25s ease-out'
+    });
+  },
+
+  goDetail(e) {
+    var id = e.currentTarget.dataset.id;
+    wx.navigateTo({ url: '/pages/detail/detail?id=' + id });
   },
 
   goCamera() {
@@ -205,20 +254,15 @@ Page({
   },
 
   onShow() {
-    // 回到首页时清除滑动偏移
+    // 回到首页时重置所有状态
     this.setData({
       slideStyle: '',
       slideTransition: 'transition: transform 0s',
-      previewOpacity: 0,
-      dragDir: ''
+      listPanelStyle: 'transform: translateX(-100%)',
+      cameraPanelStyle: 'transform: translateX(100%)',
+      panelTransition: 'transition: transform 0s'
     });
-    const list = storage.getAll();
-    this.setData({
-      total: list.length,
-      autoSaveAlbum: storage.getAutoSaveAlbum(),
-      syncEnabled: storage.getSyncEnabled(),
-      configSyncEnabled: storage.getConfigSyncEnabled()
-    });
+    this._loadData();
     this.loadTemplates();
   }
 });

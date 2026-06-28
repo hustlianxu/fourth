@@ -1,15 +1,35 @@
 <view class="page-wrap">
 
-  <!-- 左预览层（右滑时露出 → 我的记录） -->
-  <view class="preview-layer left-preview {{dragDir === 'right' ? 'active' : ''}}" style="opacity: {{previewOpacity}};">
-    <view class="preview-icon">📋</view>
-    <view class="preview-label">我的记录</view>
+  <!-- 列表浮层（右滑从左侧推入） -->
+  <view class="slide-panel list-panel" style="{{listPanelStyle}}; {{panelTransition}}">
+    <view class="panel-header">
+      <text class="panel-title">📋 我的记录</text>
+      <text class="panel-close" bindtap="hideListPanel">✕</text>
+    </view>
+    <scroll-view class="panel-body" scroll-y wx:if="{{recentRecords.length > 0}}">
+      <view wx:for="{{recentRecords}}" wx:key="id" class="panel-record" bindtap="goDetail" data-id="{{item.id}}">
+        <image class="panel-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
+        <view class="panel-info">
+          <text class="panel-name">{{item.customName || item.templateName}}</text>
+          <text class="panel-meta">{{item.timeText || ''}}</text>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="panel-empty" wx:else>暂无记录</view>
+    <view class="panel-footer" bindtap="goList">查看全部 {{total}} 条 →</view>
   </view>
 
-  <!-- 右预览层（左滑时露出 → 拍照） -->
-  <view class="preview-layer right-preview {{dragDir === 'left' ? 'active' : ''}}" style="opacity: {{previewOpacity}};">
-    <view class="preview-icon">📷</view>
-    <view class="preview-label">拍照</view>
+  <!-- 拍照浮层（左滑从右侧推入） -->
+  <view class="slide-panel camera-panel" style="{{cameraPanelStyle}}; {{panelTransition}}">
+    <view class="panel-header">
+      <text class="panel-title">📷 拍照</text>
+      <text class="panel-close" bindtap="hideCameraPanel">✕</text>
+    </view>
+    <view class="camera-preview-area">
+      <image class="camera-preview-icon" src="/images/icons/home.svg" mode="aspectFit"></image>
+      <text class="camera-preview-text">选择模板后开始拍照</text>
+    </view>
+    <view class="panel-footer" bindtap="goCamera">开始拍照 →</view>
   </view>
 
   <!-- 首页内容（可拖拽） -->
