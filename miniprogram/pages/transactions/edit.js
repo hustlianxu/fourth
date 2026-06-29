@@ -25,6 +25,7 @@ Page({
       shares: '',
       price: '',
       amount: '',
+      fee: '',
       trade_date: '',
       note: '',
     },
@@ -118,6 +119,7 @@ Page({
           shares: t.shares != null ? String(t.shares) : '',
           price: t.price != null ? String(t.price) : '',
           amount: t.amount != null ? String(t.amount) : '',
+          fee: t.fee != null ? String(t.fee) : '',
           trade_date: t.trade_date || '',
           note: t.note || '',
         },
@@ -251,6 +253,10 @@ Page({
     this.setData({ 'form.amount': e.detail.value });
   },
 
+  onFeeInput(e) {
+    this.setData({ 'form.fee': e.detail.value });
+  },
+
   onNoteInput(e) {
     this.setData({ 'form.note': e.detail.value });
   },
@@ -298,6 +304,7 @@ Page({
 
     const shares = form.shares ? parseFloat(form.shares) : 0;
     const price = form.price ? parseFloat(form.price) : 0;
+    const fee = form.fee ? parseFloat(form.fee) : 0;
 
     wx.showLoading({ title: '保存中...' });
     try {
@@ -309,6 +316,7 @@ Page({
         shares,
         price,
         amount,
+        fee: isNaN(fee) ? 0 : Number(fee.toFixed(2)),
         trade_date: form.trade_date,
         note: form.note || '',
         updated_at: db.serverDate(),

@@ -43,9 +43,23 @@ Page({
     try {
       const res = await db.collection('holdings').doc(this.data.holdingId).get();
       const holding = res.data || {};
+      // 实时重算盈亏，避免行情刷新/编辑持仓后仍使用旧快照导致与同花顺偏差
+      // 口径：盈亏 = 当前市值 - 持仓成本；持仓成本优先用 cost_value，缺失时回退 shares × cost_price
+      const shares = Number(holding.shares) || 0;
+      const currentPrice = Number(holding.current_price) || 0;
+      const costValue = Number(holding.cost_value) || (shares * Number(holding.cost_price || 0));
+      const marketValue = shares * currentPrice;
+      const pnl = marketValue - costValue;
+      const pnlPercent = costValue > 0 ? (pnl / costValue) * 100 : 0;
+      const recomputed = Object.assign({}, holding, {
+        market_value: marketValue,
+        cost_value: costValue,
+        pnl,
+        pnl_percent: pnlPercent,
+      });
       this.setData({
-        holding,
-        priceColor: getPriceColor(holding.pnl),
+        holding: recomputed,
+        priceColor: getPriceColor(pnl),
       });
     } catch (err) {
       console.error('[Holding Detail] load error:', err);
@@ -267,6 +281,7 @@ Page({
 
       const shares = Number(txn.shares) || 0;
       const price = Number(txn.price) || 0;
+      const fee = Number(txn.fee) || 0;   // 与 apply_transaction 对齐：买入手续费需一并回退
       const curShares = Number(holding.shares) || 0;
       const curPrice = Number(holding.current_price) || 0;
 
@@ -278,7 +293,8 @@ Page({
           });
         } else {
           const oldCostValue = Number(holding.cost_value) || 0;
-          const buyCost = shares * price;
+          // 买入成本含手续费，回退时也按 buyCost = shares*price + fee 扣减
+          const buyCost = shares * price + fee;
           const newCostValue = Math.max(0, oldCostValue - buyCost);
           const newCostPrice = newCostValue / newShares;
           const newMarketValue = newShares * curPrice;

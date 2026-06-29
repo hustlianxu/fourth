@@ -239,6 +239,22 @@ async function getPortfolioSummary() {
   }
 }
 
+/**
+ * 用自然语言/JSON 批量解析交易（语音录入入口）
+ * @param {object} params - { mode, text, json, account_id, provider, dry_run }
+ *   mode: 'text' | 'json'（默认 text）
+ *   text: 自然语言交易描述（mode=text 时必填）
+ *   json: 已解析的 ParsedTrade[] 或字符串（mode=json 时必填）
+ *   account_id: 目标账户 ID（必填）
+ *   provider?: LLM 提供商，默认取用户已配置且启用的第一个
+ *   dry_run?: true=仅解析不写入（默认 true）
+ * @returns {Promise<{success, trades, warnings, imported, message?}>}
+ * 详见 docs/06-大模型语音导入指南.md
+ */
+async function parseTradesByText(params) {
+  return callCloudFunction(CLOUD_FUNCTIONS.PARSE_TRADES_BY_TEXT, params);
+}
+
 module.exports = {
   callCloudFunction,
   refreshPrices,
@@ -252,4 +268,5 @@ module.exports = {
   getAccounts,
   getHoldings,
   getPortfolioSummary,
+  parseTradesByText,
 };

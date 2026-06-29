@@ -87,6 +87,11 @@
       <input class="input-field" type="digit" placeholder="0.00（份额×单价自动计算）" value="{{form.amount}}" bindinput="onAmountInput" />
     </view>
 
+    <view class="form-group" wx:if="{{form.type === 'buy' || form.type === 'sell'}}">
+      <text class="form-label">手续费</text>
+      <input class="input-field" type="digit" placeholder="0.00（选填，买入计入成本，与同花顺口径一致）" value="{{form.fee}}" bindinput="onFeeInput" />
+    </view>
+
     <view class="form-group">
       <text class="form-label">交易日期 *</text>
       <picker mode="date" value="{{form.trade_date || today}}" bindchange="onDateChange">

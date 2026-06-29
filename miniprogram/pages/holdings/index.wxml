@@ -7,14 +7,19 @@
   </view>
 
   <!-- ═══════ 策略汇总卡片 ═══════ -->
-  <view class="strategy-section" wx:if="{{strategyList.length > 0}}">
+  <view class="strategy-section" wx:if="{{allSummary.holdingCount > 0}}">
     <scroll-view class="strategy-scroll" scroll-x enhanced show-scrollbar="{{false}}">
       <view
         class="strategy-card {{selectedStrategy === '' ? 'active' : ''}}"
         bindtap="onStrategyFilter" data-name=""
       >
         <text class="strategy-name">📊 全部</text>
-        <text class="strategy-value">¥{{fmt.formatMoney(0)}}</text>
+        <text class="strategy-value">¥{{fmt.formatMoney(allSummary.marketValue)}}</text>
+        <view class="strategy-pnl {{fmt.pnlClass(allSummary.pnl)}}">
+          <text>{{fmt.pnlSign(allSummary.pnl)}}{{fmt.formatMoney(allSummary.pnl)}}</text>
+          <text class="strategy-pnl-pct">({{fmt.formatPercent(allSummary.pnlPercent)}})</text>
+        </view>
+        <text class="strategy-count">{{allSummary.holdingCount}} 只</text>
       </view>
       <view
         class="strategy-card {{selectedStrategy === item.name ? 'active' : ''}}"
@@ -25,7 +30,7 @@
         <text class="strategy-value">¥{{fmt.formatMoney(item.marketValue)}}</text>
         <view class="strategy-pnl {{fmt.pnlClass(item.pnl)}}">
           <text>{{fmt.pnlSign(item.pnl)}}{{fmt.formatMoney(item.pnl)}}</text>
-          <text class="strategy-pnl-pct">({{fmt.pnlSign(item.pnl)}}{{item.pnlPercent.toFixed(1)}}%)</text>
+          <text class="strategy-pnl-pct">({{fmt.formatPercent(item.pnlPercent)}})</text>
         </view>
         <text class="strategy-count">{{item.holdingCount}} 只</text>
       </view>

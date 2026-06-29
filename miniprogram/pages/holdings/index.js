@@ -9,6 +9,12 @@ Page({
   data: {
     accountList: [],
     strategyList: [],         // 策略汇总 [{ name, holdingCount, marketValue, costValue, pnl, pnlPercent }]
+    allSummary: {             // 「全部」策略卡的汇总数据（避免硬编码 0 导致显示错位）
+      marketValue: 0,
+      pnl: 0,
+      pnlPercent: 0,
+      holdingCount: 0,
+    },
     selectedStrategy: '',     // 当前筛选的策略名，''=全部
   },
 
@@ -28,6 +34,12 @@ Page({
       this.setData({
         accountList: accounts,
         strategyList: summary.strategySummaries || [],
+        allSummary: {
+          marketValue: summary.totalMarketValue || 0,
+          pnl: summary.totalPnL || 0,
+          pnlPercent: summary.totalPnLPercent || 0,
+          holdingCount: summary.holdingCount || 0,
+        },
       });
     } catch (err) {
       console.error('[Holdings] load error:', err);
