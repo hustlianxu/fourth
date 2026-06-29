@@ -42,6 +42,13 @@
       </view>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onRebuildHoldings">
+      <view class="menu-left">
+        <text class="menu-icon">🔄</text>
+        <text>从交易流水重建持仓</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <!-- AI 模型设置 -->
@@ -95,7 +102,7 @@
     <view class="menu-item">
       <view class="menu-left">
         <text class="menu-icon">📖</text>
-        <text>版本 1.0.0</text>
+        <text>版本 0.2.0</text>
       </view>
     </view>
     <view class="menu-item" bindtap="onShowPrivacy">

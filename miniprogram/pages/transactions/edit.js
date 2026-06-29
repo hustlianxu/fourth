@@ -51,12 +51,27 @@ Page({
     if (options.id) {
       this.setData({ isEdit: true, transactionId: options.id });
       await this.loadTransaction(options.id);
-    } else if (options.account_id) {
-      // 新增模式：从 url 带入账户
-      const idx = this.data.accounts.findIndex(a => a._id === options.account_id);
-      if (idx >= 0) {
-        this.setData({ accountIndex: idx, 'form.account_id': options.account_id });
+    } else {
+      // 新增模式：从 url 带入预填字段（来自持仓详情的「记一笔」）
+      const patch = {};
+      if (options.account_id) {
+        const idx = this.data.accounts.findIndex(a => a._id === options.account_id);
+        if (idx >= 0) {
+          patch.accountIndex = idx;
+          patch['form.account_id'] = options.account_id;
+        }
       }
+      if (options.product_code) patch['form.product_code'] = decodeURIComponent(options.product_code);
+      if (options.product_name) patch['form.product_name'] = decodeURIComponent(options.product_name);
+      // 从持仓详情进入时，默认选中「买入」
+      if (options.from === 'holding' && options.product_code) {
+        const buyIdx = typeKeys.indexOf('buy');
+        if (buyIdx >= 0) {
+          patch.typeIndex = buyIdx;
+          patch['form.type'] = 'buy';
+        }
+      }
+      if (Object.keys(patch).length) this.setData(patch);
     }
   },
 
@@ -237,17 +252,39 @@ Page({
         updated_at: db.serverDate(),
       };
 
+      let newTxnId = '';
       if (isEdit) {
         await db.collection('transactions').doc(transactionId).update({ data });
+        newTxnId = transactionId;
       } else {
-        await db.collection('transactions').add({
-          data: { ...data, created_at: db.serverDate() },
+        const addRes = await db.collection('transactions').add({
+          data: { ...data, created_at: db.serverDate(), applied_holding: false },
         });
+        newTxnId = addRes._id;
       }
 
       wx.hideLoading();
-      wx.showToast({ title: '保存成功', icon: 'success' });
-      setTimeout(() => wx.navigateBack(), 800);
+
+      // 新增的买卖交易自动应用到持仓（加权平均成本）；编辑/非买卖不自动应用
+      if (!isEdit && (type === 'buy' || type === 'sell')) {
+        try {
+          const applyRes = await wx.cloud.callFunction({
+            name: 'apply_transaction',
+            data: { transaction_id: newTxnId },
+          });
+          if (applyRes.result && applyRes.result.success) {
+            wx.showToast({ title: '已记录并同步持仓', icon: 'success' });
+          } else {
+            wx.showToast({ title: '已记录', icon: 'success' });
+          }
+        } catch (applyErr) {
+          console.warn('[Transaction Edit] apply failed:', applyErr);
+          wx.showToast({ title: '已记录（持仓同步失败）', icon: 'none' });
+        }
+      } else {
+        wx.showToast({ title: '保存成功', icon: 'success' });
+      }
+      setTimeout(() => wx.navigateBack(), 900);
     } catch (err) {
       console.error('[Transaction Edit] save error:', err);
       wx.hideLoading();

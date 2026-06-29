@@ -7,6 +7,7 @@
       <text class="holding-name">{{holding.product_name}}</text>
       <text class="holding-code">{{holding.product_code}}</text>
       <text class="tag {{c.tagClass(holding.product_type)}}">{{c.productTypeName(holding.product_type)}}</text>
+      <text class="cleared-badge" wx:if="{{holding.is_cleared}}">已清仓</text>
     </view>
 
     <view class="price-row">
@@ -56,12 +57,39 @@
     </view>
 
     <view class="action-buttons">
+      <button class="btn-trade" bindtap="onRecordTrade">记一笔买卖</button>
       <button class="btn-edit" bindtap="onEdit">编辑</button>
       <button class="btn-delete" bindtap="onDelete">删除</button>
     </view>
   </view>
 
-  <view class="empty-state" wx:else>
+  <!-- 最近交易 -->
+  <view class="card" wx:if="{{recentTransactions.length > 0}}">
+    <view class="section-title">最近交易</view>
+    <view
+      class="recent-txn"
+      wx:for="{{recentTransactions}}"
+      wx:key="_id"
+    >
+      <view class="recent-txn-left">
+        <text class="recent-txn-badge {{c.transactionTypeClass(item.type)}}">{{c.transactionTypeName(item.type)}}</text>
+        <text class="recent-txn-date">{{item.trade_date}}</text>
+      </view>
+      <view class="recent-txn-right">
+        <text class="recent-txn-shares">{{fmt.formatQuantity(item.shares)}} @ {{fmt.formatMoney(item.price)}}</text>
+        <text class="recent-txn-amount {{c.transactionTypeClass(item.type)}}">
+          {{c.transactionSign(item.type)}}¥{{fmt.formatMoney(item.amount)}}
+        </text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else-if="{{holding._id && !loadingTxns}}">
+    <text>该持仓暂无交易记录</text>
+    <text class="empty-hint">点击「记一笔买卖」开始记录</text>
+  </view>
+
+  <view class="empty-state" wx:if="{{!holding._id}}">
     <text>持仓记录未找到</text>
   </view>
 </view>

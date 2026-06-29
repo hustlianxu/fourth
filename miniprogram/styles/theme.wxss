@@ -23,6 +23,10 @@ page {
   --txn-transfer-soft: #f2f2f4;
   --txn-income-soft: #eafaf0;
 
+  /* 语义状态色（错误/成功/警告的浅底） */
+  --color-up-soft: #fff1f0;           /* 错误/涨红浅底 */
+  --color-down-soft: #f6ffed;         /* 成功/跌绿浅底 */
+
   /* 背景 */
   --bg-primary: #f5f5f7;
   --bg-card: #ffffff;
