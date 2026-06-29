@@ -15,7 +15,7 @@ Page({
     accountList: [],          // 账户列表
     accountNames: [],         // 账户名 picker range
     accountIndex: 0,          // 当前选中的账户索引（0 = 全部）
-    typeNames: ['全部类型'],   // 类型 picker range（首项为“全部”）
+    typeNames: ['全部类型'],   // 类型 picker range（首项为”全部”）
     typeIndex: 0,              // 当前选中的类型索引
     typeKeys: ['all'],         // 与 typeNames 对应的 key
     summary: {
@@ -24,6 +24,10 @@ Page({
       netCashFlow: 0,         // 净现金流 = sell - buy
       count: 0,
     },
+    unappliedCount: 0,        // 未同步到持仓的交易数
+    syncing: false,           // 正在同步中
+    swipedItemId: '',         // 左滑展开的项 _id
+    touchStartX: 0,           // 滑动检测起始 X
     loading: false,
     page: 0,
     pageSize: 50,
@@ -100,10 +104,16 @@ Page({
       // 按交易日期分组
       const grouped = this.groupByDate(allItems);
 
+      // 统计未同步到持仓的交易数
+      const unappliedCount = allItems.filter(t =>
+        t.type === 'buy' || t.type === 'sell'
+      ).filter(t => !t.applied_holding).length;
+
       this.setData({
         rawItems: allItems,
         transactions: grouped,
         summary,
+        unappliedCount,
         page: page + 1,
         hasMore,
         loading: false,
@@ -201,6 +211,136 @@ Page({
         }
       },
     });
+  },
+
+  /**
+   * 单条交易重试同步到持仓
+   */
+  async syncTransaction(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    wx.showLoading({ title: '同步中...' });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'apply_transaction',
+        data: { transaction_id: id },
+      });
+      wx.hideLoading();
+      if (res.result && res.result.success) {
+        wx.showToast({ title: '同步成功', icon: 'success' });
+        this.reload();
+      } else {
+        wx.showToast({ title: '同步失败：' + (res.result?.message || '未知错误'), icon: 'none' });
+      }
+    } catch (err) {
+      wx.hideLoading();
+      const msg = err.errMsg && err.errMsg.indexOf('FUNCTION_NOT_FOUND') >= 0
+        ? '请先部署 apply_transaction 云函数'
+        : '同步失败';
+      wx.showToast({ title: msg, icon: 'none' });
+    }
+  },
+
+  /**
+   * 批量同步所有未同步到持仓的交易
+   */
+  async syncAll() {
+    const unapplied = this.data.rawItems.filter(t =>
+      (t.type === 'buy' || t.type === 'sell') && !t.applied_holding
+    );
+    if (unapplied.length === 0) {
+      wx.showToast({ title: '没有需要同步的记录', icon: 'none' });
+      return;
+    }
+
+    wx.showLoading({ title: `同步 ${unapplied.length} 条...`, mask: true });
+    this.setData({ syncing: true });
+    let success = 0;
+    let fail = 0;
+
+    for (const t of unapplied) {
+      try {
+        const res = await wx.cloud.callFunction({
+          name: 'apply_transaction',
+          data: { transaction_id: t._id },
+        });
+        if (res.result && res.result.success) success++;
+        else fail++;
+      } catch {
+        fail++;
+      }
+    }
+
+    wx.hideLoading();
+    this.setData({ syncing: false });
+    wx.showToast({
+      title: `同步完成：${success} 成功${fail > 0 ? `，${fail} 失败` : ''}`,
+      icon: fail > 0 ? 'none' : 'success',
+    });
+    this.reload();
+  },
+
+  /**
+   * 长按交易记录 → 底部操作菜单
+   */
+  onLongPress(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    // 关闭左滑状态
+    this.setData({ swipedItemId: '' });
+    wx.showActionSheet({
+      itemList: ['编辑', '删除'],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          this.onEditTransaction(e);
+        } else if (res.tapIndex === 1) {
+          this.onDeleteTransaction(e);
+        }
+      },
+    });
+  },
+
+  /**
+   * 左滑手势 → 触摸开始
+   */
+  onTouchStart(e) {
+    this.setData({ touchStartX: e.touches[0].clientX });
+  },
+
+  /**
+   * 左滑手势 → 触摸结束
+   */
+  onTouchEnd(e) {
+    const { touchStartX, swipedItemId } = this.data;
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    const id = e.currentTarget.dataset.id;
+
+    if (deltaX < -60) {
+      // 左滑超过 60px → 展开
+      this.setData({ swipedItemId: id });
+    } else if (deltaX > 60 && swipedItemId === id) {
+      // 右滑超过 60px → 收起
+      this.setData({ swipedItemId: '' });
+    } else {
+      // 点击其他区域 → 收起
+      this.setData({ swipedItemId: '' });
+    }
+  },
+
+  /**
+   * 从左滑菜单编辑
+   */
+  onSwipeEdit(e) {
+    this.setData({ swipedItemId: '' });
+    this.onEditTransaction(e);
+  },
+
+  /**
+   * 从左滑菜单删除
+   */
+  onSwipeDelete(e) {
+    this.setData({ swipedItemId: '' });
+    this.onDeleteTransaction(e);
   },
 
   onPullDownRefresh() {

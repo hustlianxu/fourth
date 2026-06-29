@@ -40,6 +40,7 @@ function request(url, options = {}) {
             try { return Promise.resolve(JSON.parse(text)); }
             catch (e) { return Promise.reject(new Error(`JSON parse failed: ${e.message}`)); }
           },
+          buffer: () => Promise.resolve(buf),
         });
       });
     });

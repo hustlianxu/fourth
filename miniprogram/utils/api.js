@@ -203,6 +203,22 @@ async function getPortfolioSummary() {
       };
     });
 
+    // 按策略/跟投计划汇总
+    const strategyMap = {};
+    holdings.forEach(h => {
+      const s = (h.strategy || '').trim();
+      if (!s) return;
+      if (!strategyMap[s]) strategyMap[s] = [];
+      strategyMap[s].push(h);
+    });
+    const strategySummaries = Object.entries(strategyMap).map(([name, hList]) => {
+      const marketValue = hList.reduce((s, h) => s + (h.market_value || 0), 0);
+      const costValue = hList.reduce((s, h) => s + (h.cost_value || 0), 0);
+      const pnl = marketValue - costValue;
+      const pnlPercent = costValue > 0 ? (pnl / costValue) * 100 : 0;
+      return { name, holdingCount: hList.length, marketValue, costValue, pnl, pnlPercent };
+    });
+
     return {
       totalAssets,
       totalMarketValue,
@@ -215,6 +231,7 @@ async function getPortfolioSummary() {
       accountCount: accounts.length,
       accounts: accountSummary,
       holdings,
+      strategySummaries,
     };
   } catch (err) {
     console.error('[getPortfolioSummary] error:', err);

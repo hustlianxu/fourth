@@ -8,6 +8,8 @@ const { PRODUCT_TYPES } = require('../../utils/constants');
 Page({
   data: {
     accountList: [],
+    strategyList: [],         // 策略汇总 [{ name, holdingCount, marketValue, costValue, pnl, pnlPercent }]
+    selectedStrategy: '',     // 当前筛选的策略名，''=全部
   },
 
   onShow() {
@@ -20,11 +22,47 @@ Page({
       const accounts = (summary.accounts || []).map(acc => ({
         ...acc,
         expanded: true,
+        visible: true,
+        displayHoldings: acc.holdings,
       }));
-      this.setData({ accountList: accounts });
+      this.setData({
+        accountList: accounts,
+        strategyList: summary.strategySummaries || [],
+      });
     } catch (err) {
       console.error('[Holdings] load error:', err);
     }
+  },
+
+  /**
+   * 根据 selectedStrategy 重新计算每个 account 的 visible 和 displayHoldings
+   */
+  applyFilter() {
+    const { accountList, selectedStrategy } = this.data;
+    this.setData({
+      accountList: accountList.map(acc => {
+        if (!selectedStrategy) {
+          return { ...acc, visible: true, displayHoldings: acc.holdings };
+        }
+        const filtered = (acc.holdings || []).filter(h =>
+          (h.strategy || '').trim() === selectedStrategy
+        );
+        return {
+          ...acc,
+          visible: filtered.length > 0,
+          displayHoldings: filtered,
+        };
+      }),
+    });
+  },
+
+  /** 切换策略筛选 */
+  onStrategyFilter(e) {
+    const name = e.currentTarget.dataset.name || '';
+    const next = name === this.data.selectedStrategy ? '' : name;
+    this.setData({ selectedStrategy: next }, () => {
+      this.applyFilter();
+    });
   },
 
   onToggleAccount(e) {
