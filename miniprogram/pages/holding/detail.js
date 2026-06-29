@@ -234,20 +234,89 @@ Page({
     if (!id) return;
     wx.showModal({
       title: '删除交易',
-      content: '确定要删除这条交易记录吗？',
-      success: (res) => {
+      content: '确定要删除这条交易记录吗？删除后对应持仓将自动修正。',
+      success: async (res) => {
         if (!res.confirm) return;
-        wx.showLoading({ title: '删除中...' });
-        db.collection('transactions').doc(id).remove().then(() => {
+        wx.showLoading({ title: '删除中...', mask: true });
+        try {
+          const txnRes = await db.collection('transactions').doc(id).get();
+          const txn = txnRes.data;
+          await db.collection('transactions').doc(id).remove();
+          if (txn && (txn.type === 'buy' || txn.type === 'sell')) {
+            await this.undoHolding(txn);
+          }
           wx.hideLoading();
-          wx.showToast({ title: '已删除', icon: 'success' });
+          wx.showToast({ title: '已删除，持仓已修正', icon: 'success' });
           this.loadAll();
-        }).catch(() => {
+        } catch (err) {
           wx.hideLoading();
           wx.showToast({ title: '删除失败', icon: 'none' });
-        });
+        }
       },
     });
+  },
+
+  /** 删除交易后修正对应持仓 */
+  async undoHolding(txn) {
+    try {
+      const holdingRes = await db.collection('holdings')
+        .where({ account_id: txn.account_id, product_code: txn.product_code })
+        .limit(1).get();
+      const holding = holdingRes.data[0];
+      if (!holding) return;
+
+      const shares = Number(txn.shares) || 0;
+      const price = Number(txn.price) || 0;
+      const curShares = Number(holding.shares) || 0;
+      const curPrice = Number(holding.current_price) || 0;
+
+      if (txn.type === 'buy') {
+        const newShares = Math.max(0, curShares - shares);
+        if (newShares <= 0) {
+          await db.collection('holdings').doc(holding._id).update({
+            data: { shares: 0, is_cleared: true, updated_at: db.serverDate() },
+          });
+        } else {
+          const oldCostValue = Number(holding.cost_value) || 0;
+          const buyCost = shares * price;
+          const newCostValue = Math.max(0, oldCostValue - buyCost);
+          const newCostPrice = newCostValue / newShares;
+          const newMarketValue = newShares * curPrice;
+          const pnl = newMarketValue - newCostValue;
+          await db.collection('holdings').doc(holding._id).update({
+            data: {
+              shares: newShares,
+              cost_price: Number(newCostPrice.toFixed(4)),
+              cost_value: Number(newCostValue.toFixed(2)),
+              market_value: Number(newMarketValue.toFixed(2)),
+              pnl: Number(pnl.toFixed(2)),
+              pnl_percent: newCostValue > 0 ? Number(((pnl / newCostValue) * 100).toFixed(2)) : 0,
+              is_cleared: false,
+              updated_at: db.serverDate(),
+            },
+          });
+        }
+      } else if (txn.type === 'sell') {
+        const newShares = curShares + shares;
+        const costPrice = Number(holding.cost_price) || 0;
+        const newCostValue = newShares * costPrice;
+        const newMarketValue = newShares * curPrice;
+        const pnl = newMarketValue - newCostValue;
+        await db.collection('holdings').doc(holding._id).update({
+          data: {
+            shares: newShares,
+            is_cleared: false,
+            cost_value: Number(newCostValue.toFixed(2)),
+            market_value: Number(newMarketValue.toFixed(2)),
+            pnl: Number(pnl.toFixed(2)),
+            pnl_percent: newCostValue > 0 ? Number(((pnl / newCostValue) * 100).toFixed(2)) : 0,
+            updated_at: db.serverDate(),
+          },
+        });
+      }
+    } catch (err) {
+      console.error('[undoHolding] error:', err);
+    }
   },
 
   onRecordTrade() {
