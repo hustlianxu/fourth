@@ -31,6 +31,7 @@ Page({
     suggestions: [],        // 产品名搜索建议
     codeSuggestions: [],    // 代码查询多匹配列表
     codeLookupHint: '',     // 代码查询提示
+    currentShares: '',      // 来自持仓详情的当前持有份额（分红时自动填入）
     _codeTimer: null,       // 代码输入防抖
     _nameTimer: null,
   },
@@ -66,6 +67,9 @@ Page({
       }
       if (options.product_code) patch['form.product_code'] = decodeURIComponent(options.product_code);
       if (options.product_name) patch['form.product_name'] = decodeURIComponent(options.product_name);
+      if (options.current_shares) {
+        patch.currentShares = decodeURIComponent(options.current_shares);
+      }
       // 从持仓详情进入时，默认选中「买入」
       if (options.from === 'holding' && options.product_code) {
         const buyIdx = typeKeys.indexOf('buy');
@@ -134,10 +138,16 @@ Page({
 
   onTypeChange(e) {
     const idx = parseInt(e.detail.value, 10);
-    this.setData({
+    const type = this.data.typeKeys[idx] || 'buy';
+    const patch = {
       typeIndex: idx,
-      'form.type': this.data.typeKeys[idx] || 'buy',
-    });
+      'form.type': type,
+    };
+    // 选分红时，自动填入当前持有份额（来自持仓详情传入）
+    if (type === 'dividend' && this.data.currentShares) {
+      patch['form.shares'] = this.data.currentShares;
+    }
+    this.setData(patch);
   },
 
   onCodeInput(e) {

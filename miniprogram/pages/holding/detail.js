@@ -258,6 +258,7 @@ Page({
       `product_name=${encodeURIComponent(h.product_name || '')}`,
       `product_type=${encodeURIComponent(h.product_type || '')}`,
       `exchange=${encodeURIComponent(h.exchange || '')}`,
+      `current_shares=${encodeURIComponent(String(h.shares || '0'))}`,
       `from=holding`,
     ].join('&');
     wx.navigateTo({
