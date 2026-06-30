@@ -17,7 +17,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
 // 涨跌提醒订阅消息模板 ID（占位符，需替换）
-const PRICE_ALERT_TMPL_ID = 'YOUR_PRICE_ALERT_TMPL_ID';
+const PRICE_ALERT_TMPL_ID = 'FlcTXL2NC2IXi6tXTKjC01vB3hAXkQNwZpomFy27N7s';
 
 const MAX_BATCH = 1000; // 单次 get 上限
 
@@ -107,9 +107,9 @@ exports.main = async () => {
             templateId: PRICE_ALERT_TMPL_ID,
             page: 'pages/index/index',
             data: {
-              thing1: { value: productName },
-              amount2: { value: changeText },
-              time3: { value: nowStr() },
+              thing11: { value: productName },
+              character_string14: { value: changeText },
+              time9: { value: nowStr() },
             },
           });
           alerted++;

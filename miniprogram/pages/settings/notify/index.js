@@ -10,9 +10,9 @@
 // 注意：以下为占位符，需在微信公众平台「订阅消息」后台申请真实模板 ID 后替换。
 // 当前为占位值时 wx.requestSubscribeMessage 调用会 fail，属预期行为，不影响本地与云端保存。
 const SUBSCRIBE_TMPL_IDS = {
-  morning: 'YOUR_MORNING_TMPL_ID',
-  evening: 'YOUR_EVENING_TMPL_ID',
-  price_alert: 'YOUR_PRICE_ALERT_TMPL_ID',
+  morning: 'ehz3IAziHqpm2wDlZEXl9AYryuZz65wFWjApiw2fmE8',
+  evening: 'ehz3IAziHqpm2wDlZEXl9AYryuZz65wFWjApiw2fmE8',
+  price_alert: 'FlcTXL2NC2IXi6tXTKjC01vB3hAXkQNwZpomFy27N7s',
 };
 
 Page({

@@ -18,8 +18,8 @@ const db = cloud.database();
 // 注意：以下为占位符，需在微信公众平台「订阅消息」后台申请真实模板 ID 后替换。
 // 替换后请保证模板的字段（thing1/thing2/time3）与申请到的模板一致，否则推送会失败。
 const TEMPLATE_IDS = {
-  morning: 'YOUR_MORNING_TMPL_ID',
-  evening: 'YOUR_EVENING_TMPL_ID',
+  morning: 'ehz3IAziHqpm2wDlZEXl9AYryuZz65wFWjApiw2fmE8',
+  evening: 'ehz3IAziHqpm2wDlZEXl9AYryuZz65wFWjApiw2fmE8',
 };
 
 const MAX_BATCH = 1000; // 单次 get 上限
@@ -79,9 +79,9 @@ exports.main = async (event) => {
           templateId,
           // page: 'pages/news/index', // 点击跳转页面，可选
           data: {
-            thing1: { value: title.slice(0, 20) },
-            thing2: { value: summary.slice(0, 20) },
-            time3: { value: timeStr },
+            thing2: { value: title.slice(0, 20) },
+            thing3: { value: summary.slice(0, 20) },
+            date4: { value: timeStr },
           },
         });
         pushed++;
