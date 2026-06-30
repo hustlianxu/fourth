@@ -79,7 +79,7 @@
       <text class="warning-item" wx:for="{{warnings}}" wx:key="*this">· {{item}}</text>
     </view>
 
-    <view class="trade-item" wx:for="{{parsedTrades}}" wx:key="index">
+    <view class="trade-item" wx:for="{{parsedTrades}}" wx:key="uid">
       <view class="trade-main">
         <text class="trade-type tag-{{item.type}}">{{item.typeLabel}}</text>
         <view class="trade-info">

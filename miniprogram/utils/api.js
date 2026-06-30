@@ -198,10 +198,11 @@ async function getPortfolioSummary() {
     const totalPnL = totalMarketValue - totalCostValue;
     const totalPnLPercent = totalCostValue > 0 ? (totalPnL / totalCostValue) * 100 : 0;
 
-    // 累计已实现/分红，用于计算总收益（同花顺口径）
+    // 累计已实现/分红/手续费，用于计算总收益（同花顺口径）
     // 手续费已计入成本(买入)与已实现盈亏(卖出)，不重复扣减
     const totalRealized = holdings.reduce((s, h) => s + (Number(h.realized_pnl) || 0), 0);
     const totalDividend = holdings.reduce((s, h) => s + (Number(h.total_dividend) || 0), 0);
+    const totalFee = holdings.reduce((s, h) => s + (Number(h.total_fee) || 0), 0);
     // 总收益 = 浮动 + 已实现 + 分红
     const totalAllPnL = Number((totalPnL + totalRealized + totalDividend).toFixed(2));
     const totalAllPnLPercent = totalCostValue > 0
@@ -226,7 +227,6 @@ async function getPortfolioSummary() {
       const accPnLPercent = accCostValue > 0 ? (accPnL / accCostValue) * 100 : 0;
       const accRealized = accHoldings.reduce((s, h) => s + (Number(h.realized_pnl) || 0), 0);
       const accDividend = accHoldings.reduce((s, h) => s + (Number(h.total_dividend) || 0), 0);
-      const accFee = accHoldings.reduce((s, h) => s + (Number(h.total_fee) || 0), 0);
       const accTotalPnL = Number((accPnL + accRealized + accDividend).toFixed(2));
       const accTodayPnL = accHoldings.reduce((s, h) =>
         s + (typeof h.daily_change === 'number' && h.shares ? h.daily_change * h.shares : 0), 0);
@@ -260,8 +260,7 @@ async function getPortfolioSummary() {
       // 策略维度的总收益（同花顺口径）
       const sRealized = hList.reduce((s, h) => s + (Number(h.realized_pnl) || 0), 0);
       const sDividend = hList.reduce((s, h) => s + (Number(h.total_dividend) || 0), 0);
-      const sFee = hList.reduce((s, h) => s + (Number(h.total_fee) || 0), 0);
-      const sTotalPnL = Number((pnl + sRealized + sDividend - sFee).toFixed(2));
+      const sTotalPnL = Number((pnl + sRealized + sDividend).toFixed(2));
       return {
         name, holdingCount: hList.length, marketValue, costValue,
         pnl: sTotalPnL,    // 列表展示用总收益

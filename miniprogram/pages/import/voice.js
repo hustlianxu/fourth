@@ -147,8 +147,9 @@ Page({
         this.setData({ parsing: false });
         return;
       }
-      const trades = (res.trades || []).map(t => ({
+      const trades = (res.trades || []).map((t, i) => ({
         ...t,
+        uid: 't' + Date.now() + '_' + i,
         typeLabel: TYPE_LABELS[t.type] || t.type,
         amountText: t.amount.toFixed(2),
         feeText: t.fee > 0 ? `（手续费 ¥${t.fee.toFixed(2)}）` : '',

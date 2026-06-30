@@ -46,7 +46,7 @@ Page({
     this.setData({ loading: true });
     try {
       const summary = await api.getPortfolioSummary();
-      // 优先使用总收益（同花顺口径：浮动+已实现+分红-手续费），回退到浮动盈亏
+      // 优先使用总收益（同花顺口径：浮动+已实现+分红），回退到浮动盈亏
       const totalPnlForDisplay = summary.totalAllPnL != null ? summary.totalAllPnL : summary.totalPnL;
       const totalPnlPctForDisplay = summary.totalAllPnLPercent != null ? summary.totalAllPnLPercent : (summary.totalPnLPercent || 0);
       this.setData({
@@ -106,7 +106,7 @@ Page({
       const canvas = res[0].node;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
-      const dpr = wx.getSystemInfoSync().pixelRatio || 1;
+      const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2;
       const width = res[0].width || 150;
       const height = res[0].height || 150;
       canvas.width = width * dpr;

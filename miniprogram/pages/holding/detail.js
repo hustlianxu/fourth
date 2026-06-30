@@ -10,6 +10,30 @@ const { PRODUCT_TYPES } = require('../../utils/constants');
 
 const db = wx.cloud.database();
 
+/**
+ * 分页拉取该持仓的全部交易（客户端单次 get 上限 20，需循环拉取）
+ */
+async function fetchAllTransactions(accountId, productCode) {
+  const PAGE_SIZE = 20;
+  let all = [];
+  let skip = 0;
+  while (true) {
+    const res = await db.collection('transactions')
+      .where({ account_id: accountId, product_code: productCode })
+      .orderBy('trade_date', 'asc')
+      .orderBy('created_at', 'asc')
+      .skip(skip)
+      .limit(PAGE_SIZE)
+      .get();
+    const batch = res.data || [];
+    all = all.concat(batch);
+    if (batch.length < PAGE_SIZE) break;
+    skip += PAGE_SIZE;
+    if (skip > 2000) break;
+  }
+  return all;
+}
+
 Page({
   data: {
     holding: {},
@@ -85,16 +109,9 @@ Page({
     if (!holding.account_id || !holding.product_code) return;
     this.setData({ loadingTxns: true });
     try {
-      const res = await db.collection('transactions')
-        .where({
-          account_id: holding.account_id,
-          product_code: holding.product_code,
-        })
-        .orderBy('trade_date', 'asc')
-        .orderBy('created_at', 'asc')
-        .get();
+      const list = await fetchAllTransactions(holding.account_id, holding.product_code);
       this.setData({
-        transactions: res.data || [],
+        transactions: list,
         loadingTxns: false,
       });
     } catch (err) {
@@ -118,7 +135,7 @@ Page({
       if (!res || !res[0]) return;
       const canvas = res[0].node;
       const ctx = canvas.getContext('2d');
-      const dpr = wx.getSystemInfoSync().pixelRatio;
+      const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2;
       const width = res[0].width;
       const height = res[0].height;
       canvas.width = width * dpr;
@@ -293,12 +310,7 @@ Page({
       if (!holding) return;
 
       // 拉取该持仓剩余的全部交易（被删除的已不在集合中），按日期正序回放
-      const txnsRes = await db.collection('transactions')
-        .where({ account_id: txn.account_id, product_code: txn.product_code })
-        .orderBy('trade_date', 'asc')
-        .orderBy('created_at', 'asc')
-        .get();
-      const txns = txnsRes.data || [];
+      const txns = await fetchAllTransactions(txn.account_id, txn.product_code);
 
       let shares = 0;
       let costValue = 0;

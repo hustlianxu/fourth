@@ -14,10 +14,20 @@ App({
       });
     }
 
-    // 获取系统信息
-    const systemInfo = wx.getSystemInfoSync();
-    this.globalData.systemInfo = systemInfo;
-    this.globalData.statusBarHeight = systemInfo.statusBarHeight;
+    // 获取系统信息（使用新 API，避免 wx.getSystemInfoSync deprecated 警告）
+    try {
+      const windowInfo = wx.getWindowInfo();
+      const deviceInfo = wx.getDeviceInfo();
+      const appBaseInfo = wx.getAppBaseInfo();
+      this.globalData.statusBarHeight = windowInfo.statusBarHeight || 20;
+      // 合并为兼容旧代码的 systemInfo 对象
+      this.globalData.systemInfo = Object.assign({}, windowInfo, deviceInfo, appBaseInfo);
+    } catch (e) {
+      // 旧版本基础库回退
+      const systemInfo = wx.getSystemInfoSync();
+      this.globalData.systemInfo = systemInfo;
+      this.globalData.statusBarHeight = systemInfo.statusBarHeight;
+    }
 
     // 检查是否有缓存的行情数据
     this.checkDailyUpdate();

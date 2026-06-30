@@ -133,15 +133,19 @@ exports.main = async (event) => {
     // 只保留前 80 条
     const saveNews = uniqueNews.slice(0, 80);
 
-    // 清理旧数据（保留最近 100 条）
+    // 清理旧数据（保留最近 100 条），分批删除避免单次 limit 超 100 上限
     const { total } = await db.collection('news_cache').count();
-    if (total > 100) {
+    const KEEP = 100;
+    let toDelete = total - KEEP;
+    while (toDelete > 0) {
+      const batch = Math.min(toDelete, 100);
       const { data: old } = await db.collection('news_cache')
         .orderBy('publish_time', 'asc')
-        .limit(total - 80)
+        .limit(batch)
         .get();
-      const deletePromises = old.map(item => db.collection('news_cache').doc(item._id).remove());
-      await Promise.all(deletePromises);
+      if (old.length === 0) break;
+      await Promise.all(old.map(item => db.collection('news_cache').doc(item._id).remove()));
+      toDelete -= old.length;
     }
 
     // 写入新的资讯

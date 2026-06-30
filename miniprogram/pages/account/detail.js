@@ -7,6 +7,30 @@ const { ACCOUNT_PLATFORMS } = require('../../utils/constants');
 
 const db = wx.cloud.database();
 
+/**
+ * 分页拉取该账户的全部交易（客户端单次 get 上限 20）
+ */
+async function fetchAllTransactions(accountId) {
+  const PAGE_SIZE = 20;
+  let all = [];
+  let skip = 0;
+  while (true) {
+    const res = await db.collection('transactions')
+      .where({ account_id: accountId })
+      .orderBy('trade_date', 'asc')
+      .orderBy('created_at', 'asc')
+      .skip(skip)
+      .limit(PAGE_SIZE)
+      .get();
+    const batch = res.data || [];
+    all = all.concat(batch);
+    if (batch.length < PAGE_SIZE) break;
+    skip += PAGE_SIZE;
+    if (skip > 2000) break;
+  }
+  return all;
+}
+
 Page({
   data: {
     account: {
@@ -75,12 +99,8 @@ Page({
   /** 加载该账户最近交易（用于图表） */
   async loadTransactions(id) {
     try {
-      const res = await db.collection('transactions')
-        .where({ account_id: id })
-        .orderBy('trade_date', 'asc')
-        .orderBy('created_at', 'asc')
-        .get();
-      this.setData({ recentTxns: res.data || [] });
+      const list = await fetchAllTransactions(id);
+      this.setData({ recentTxns: list });
     } catch (err) {
       console.error('[Account Detail] load txns error:', err);
     }
@@ -96,7 +116,7 @@ Page({
       if (!res || !res[0]) return;
       const canvas = res[0].node;
       const ctx = canvas.getContext('2d');
-      const dpr = wx.getSystemInfoSync().pixelRatio;
+      const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2;
       const width = res[0].width;
       const height = res[0].height;
       canvas.width = width * dpr;
