@@ -53,8 +53,8 @@ Page({
       const realized = Number(holding.realized_pnl) || 0;                   // 累计已实现盈亏
       const dividend = Number(holding.total_dividend) || 0;                 // 累计分红
       const totalFee = Number(holding.total_fee) || 0;                      // 累计手续费
-      // 总收益（同花顺口径） = 浮动 + 已实现 + 分红 - 手续费
-      const totalPnl = Number((pnl + realized + dividend - totalFee).toFixed(2));
+      // 总收益（同花顺口径） = 浮动 + 已实现 + 分红（手续费已计入成本与已实现）
+      const totalPnl = Number((pnl + realized + dividend).toFixed(2));
       // 总收益率（按累计投入成本算）
       const investedCost = costValue + Math.max(0, realized);  // 已实现盈亏对应的部分已退出，用累计投入近似
       const totalPnlPercent = investedCost > 0 ? (totalPnl / investedCost) * 100 : 0;
@@ -338,7 +338,7 @@ Page({
       const curPrice = Number(holding.current_price) || 0;
       const marketValue = Number((shares * curPrice).toFixed(2));
       const pnl = Number((marketValue - costValue).toFixed(2));
-      const totalPnl = Number((pnl + realizedPnl + totalDividend - totalFee).toFixed(2));
+      const totalPnl = Number((pnl + realizedPnl + totalDividend).toFixed(2));
       const isCleared = shares <= 0;
 
       await db.collection('holdings').doc(holding._id).update({
