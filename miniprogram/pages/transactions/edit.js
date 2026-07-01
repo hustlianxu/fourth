@@ -88,6 +88,11 @@ Page({
           patch['form.type'] = 'buy';
         }
       }
+      // 通过 url 指定交易类型（如银证转入/转出快捷入口）
+      if (options.type && typeKeys.indexOf(options.type) >= 0) {
+        patch.typeIndex = typeKeys.indexOf(options.type);
+        patch['form.type'] = options.type;
+      }
       if (Object.keys(patch).length) this.setData(patch);
     }
   },

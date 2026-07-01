@@ -370,6 +370,11 @@ Page({
     wx.switchTab({ url: '/pages/ai/index' });
   },
 
+  /** 跳转打新战绩统计页 */
+  onGoIpo() {
+    wx.navigateTo({ url: '/pages/ipo/index' });
+  },
+
   /**
    * 跳转导入
    */

@@ -1,6 +1,25 @@
 /* 持仓列表 - v0.2.0 清爽化 */
 .page { padding-bottom: 40rpx; }
 .page-title { font-size: 36rpx; font-weight: 600; color: var(--text-primary); }
+.page-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+.top-actions {
+  display: flex;
+  gap: 16rpx;
+}
+.top-btn {
+  font-size: 24rpx;
+  color: #6c63ff;
+  padding: 8rpx 20rpx;
+  border: 1rpx solid #6c63ff;
+  border-radius: 24rpx;
+  line-height: 1.4;
+}
 
 /* ═══════ 策略卡片（横向滚动）═══════ */
 .strategy-section { margin-bottom: 12rpx; }

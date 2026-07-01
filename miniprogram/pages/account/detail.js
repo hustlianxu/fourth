@@ -41,8 +41,10 @@ Page({
     },
     strategyGroups: [],       // [{ name, holdings, marketValue, pnl }]
     unassignedHoldings: [],   // 无策略标签的持仓
+    hasStrategy: false,       // 是否存在任何策略标签（决定是否分组显示）
     expandedGroups: {},       // { '策略名': true/false }
     recentTxns: [],           // 该账户最近交易
+    hideCleared: false,       // 隐藏已清仓持仓
   },
 
   onLoad(options) {
@@ -70,9 +72,16 @@ Page({
       const summary = await api.getPortfolioSummary();
       const account = (summary.accounts || []).find(a => a._id === id);
       if (account) {
+        // 按隐藏清仓开关过滤
+        let holdings = account.holdings || [];
+        if (this.data.hideCleared) {
+          holdings = holdings.filter(h => !h.is_cleared && (Number(h.shares) || 0) > 0);
+        }
+        // 判断是否有任何策略标签
+        const hasStrategy = holdings.some(h => (h.strategy || '').trim());
         const grouped = {};
         const unassigned = [];
-        (account.holdings || []).forEach(h => {
+        holdings.forEach(h => {
           const s = (h.strategy || '').trim();
           if (s) {
             if (!grouped[s]) grouped[s] = [];
@@ -81,14 +90,21 @@ Page({
             unassigned.push(h);
           }
         });
+        // 默认展开所有分组（含"未分类"），提升首次查看体验
+        const expandedGroups = {};
+        Object.keys(grouped).forEach(name => { expandedGroups[name] = true; });
+        if (unassigned.length > 0) expandedGroups['__other__'] = true;
+
         this.setData({
           account,
+          hasStrategy,
           strategyGroups: Object.entries(grouped).map(([name, hList]) => {
             const mktVal = hList.reduce((s, h) => s + (h.market_value || 0), 0);
             const costVal = hList.reduce((s, h) => s + (h.cost_value || 0), 0);
             return { name, holdings: hList, marketValue: mktVal, pnl: mktVal - costVal };
           }),
           unassignedHoldings: unassigned,
+          expandedGroups,
         });
       }
     } catch (err) {
@@ -213,6 +229,13 @@ Page({
     this.setData({ [key]: !this.data.expandedGroups[name] });
   },
 
+  /** 切换隐藏已清仓持仓 */
+  onToggleHideCleared() {
+    this.setData({ hideCleared: !this.data.hideCleared }, () => {
+      this.loadAccount(this.data.account._id);
+    });
+  },
+
   onHoldingTap(e) {
     const holding = e.currentTarget.dataset.holding;
     wx.navigateTo({
@@ -233,74 +256,25 @@ Page({
   },
 
   /**
-   * 银证转入：从银行卡向证券账户转入资金
-   * 写入一条 transfer_in 交易，apply_transaction 会联动增加账户 cash_balance
+   * 银证转入：跳转交易编辑页，预填 transfer_in 类型
+   * 复用完整表单（支持操作时间、金额、备注等字段）
    */
   onTransferIn() {
-    this._doTransfer('transfer_in', '银证转入', '请输入转入金额（元）');
+    const accountId = this.data.account._id;
+    if (!accountId) return;
+    wx.navigateTo({
+      url: `/pages/transactions/edit?type=transfer_in&account_id=${accountId}`,
+    });
   },
 
   /**
-   * 银证转出：从证券账户转出资金到银行卡
-   * 写入一条 transfer_out 交易，apply_transaction 会联动扣减账户 cash_balance
+   * 银证转出：跳转交易编辑页，预填 transfer_out 类型
    */
   onTransferOut() {
-    this._doTransfer('transfer_out', '银证转出', '请输入转出金额（元）');
-  },
-
-  _doTransfer(type, title, placeholder) {
     const accountId = this.data.account._id;
     if (!accountId) return;
-    wx.showModal({
-      title,
-      editable: true,
-      placeholderText: placeholder,
-      success: async (res) => {
-        if (!res.confirm) return;
-        const amount = parseFloat(res.content);
-        if (isNaN(amount) || amount <= 0) {
-          wx.showToast({ title: '请输入有效金额', icon: 'none' });
-          return;
-        }
-        wx.showLoading({ title: '处理中...' });
-        try {
-          const today = new Date().toISOString().split('T')[0];
-          const addRes = await db.collection('transactions').add({
-            data: {
-              account_id: accountId,
-              type,
-              product_code: '',
-              product_name: '',
-              shares: 0,
-              price: 0,
-              amount: Number(amount.toFixed(2)),
-              fee: 0,
-              ratio: 0,
-              trade_date: today,
-              note: title,
-              applied_holding: false,
-              created_at: db.serverDate(),
-              updated_at: db.serverDate(),
-            },
-          });
-          // 联动账户现金余额
-          try {
-            await wx.cloud.callFunction({
-              name: 'apply_transaction',
-              data: { transaction_id: addRes._id },
-            });
-          } catch (e) {
-            console.warn('[transfer] apply error:', e);
-          }
-          wx.hideLoading();
-          wx.showToast({ title: `${title}成功`, icon: 'success' });
-          this.loadAll();
-        } catch (err) {
-          console.error('[transfer] error:', err);
-          wx.hideLoading();
-          wx.showToast({ title: '操作失败', icon: 'none' });
-        }
-      },
+    wx.navigateTo({
+      url: `/pages/transactions/edit?type=transfer_out&account_id=${accountId}`,
     });
   },
 

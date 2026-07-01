@@ -103,10 +103,10 @@
   </view>
 
   <!-- 打新战绩 -->
-  <view class="card ipo-card" wx:if="{{ipoStats.count > 0}}">
+  <view class="card ipo-card" wx:if="{{ipoStats.count > 0}}" bindtap="onGoIpo">
     <view class="card-header">
       <text class="section-title">打新战绩</text>
-      <text class="ipo-count">中签 {{ipoStats.count}} 次</text>
+      <text class="ipo-count">中签 {{ipoStats.count}} 次 ›</text>
     </view>
     <view class="ipo-summary">
       <view class="ipo-stat">

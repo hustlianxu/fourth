@@ -16,6 +16,7 @@ Page({
       holdingCount: 0,
     },
     selectedStrategy: '',     // 当前筛选的策略名，''=全部
+    hideCleared: false,       // 隐藏已清仓持仓
   },
 
   onShow() {
@@ -25,12 +26,18 @@ Page({
   async loadData() {
     try {
       const summary = await api.getPortfolioSummary();
-      const accounts = (summary.accounts || []).map(acc => ({
-        ...acc,
-        expanded: true,
-        visible: true,
-        displayHoldings: acc.holdings,
-      }));
+      const accounts = (summary.accounts || []).map(acc => {
+        let holdings = acc.holdings || [];
+        if (this.data.hideCleared) {
+          holdings = holdings.filter(h => !h.is_cleared && (Number(h.shares) || 0) > 0);
+        }
+        return {
+          ...acc,
+          expanded: true,
+          visible: true,
+          displayHoldings: holdings,
+        };
+      });
       this.setData({
         accountList: accounts,
         strategyList: summary.strategySummaries || [],
@@ -50,13 +57,17 @@ Page({
    * 根据 selectedStrategy 重新计算每个 account 的 visible 和 displayHoldings
    */
   applyFilter() {
-    const { accountList, selectedStrategy } = this.data;
+    const { accountList, selectedStrategy, hideCleared } = this.data;
     this.setData({
       accountList: accountList.map(acc => {
-        if (!selectedStrategy) {
-          return { ...acc, visible: true, displayHoldings: acc.holdings };
+        let base = acc.holdings || [];
+        if (hideCleared) {
+          base = base.filter(h => !h.is_cleared && (Number(h.shares) || 0) > 0);
         }
-        const filtered = (acc.holdings || []).filter(h =>
+        if (!selectedStrategy) {
+          return { ...acc, visible: true, displayHoldings: base };
+        }
+        const filtered = base.filter(h =>
           (h.strategy || '').trim() === selectedStrategy
         );
         return {
@@ -65,6 +76,13 @@ Page({
           displayHoldings: filtered,
         };
       }),
+    });
+  },
+
+  /** 切换隐藏已清仓持仓 */
+  onToggleHideCleared() {
+    this.setData({ hideCleared: !this.data.hideCleared }, () => {
+      this.loadData();
     });
   },
 
@@ -90,6 +108,13 @@ Page({
     const holding = e.currentTarget.dataset.holding;
     wx.navigateTo({
       url: `/pages/holding/detail?id=${holding._id}`,
+    });
+  },
+
+  /** 跳转多维度分析页 */
+  onGoAnalysis() {
+    wx.navigateTo({
+      url: '/pages/analysis/index',
     });
   },
 
