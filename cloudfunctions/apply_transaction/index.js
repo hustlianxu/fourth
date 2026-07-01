@@ -36,6 +36,37 @@ function recomputeTotalPnl(holding, marketValue, costValue) {
   return Number((mv - cv + realized + dividend).toFixed(2));
 }
 
+/**
+ * 读取持仓 cost_value（null/undefined/NaN 时回退到 shares × cost_price）
+ */
+function readCostValue(h) {
+  return (h.cost_value !== null && h.cost_value !== undefined && !isNaN(h.cost_value))
+    ? Number(h.cost_value)
+    : (Number(h.shares) || 0) * (Number(h.cost_price) || 0);
+}
+
+/**
+ * 调整账户现金余额（transfer_in/transfer_out/fee/tax 联动）
+ * @param {string} account_id
+ * @param {string} openid - 调用者 openid，用于归属校验（为空则放行，如定时任务）
+ * @param {number} delta - 增减额（正=入账，负=出账）
+ */
+async function adjustAccountCash(account_id, openid, delta) {
+  try {
+    const accRes = await db.collection('accounts').doc(account_id).get();
+    const account = accRes.data;
+    if (!account) return;
+    if (openid && account._openid && account._openid !== openid) return;
+    const oldBalance = Number(account.cash_balance) || 0;
+    const newBalance = Number((oldBalance + delta).toFixed(2));
+    await db.collection('accounts').doc(account_id).update({
+      data: { cash_balance: newBalance, updated_at: db.serverDate() },
+    });
+  } catch (err) {
+    console.warn('[adjustAccountCash] error:', err);
+  }
+}
+
 exports.main = async (event) => {
   const { transaction_id } = event;
   if (!transaction_id) {
@@ -107,7 +138,157 @@ exports.main = async (event) => {
       return { success: true, message: '已应用分红/利息' };
     }
 
-    // 3. 非买卖且非分红利息：仅记录
+    // 3. 红股入账（送股）：份额增加，总成本不变，成本价摊薄；无现金流
+    if (type === 'stock_dividend') {
+      if (!txn.account_id || !txn.product_code) {
+        return { success: false, message: '红股入账缺少 account_id 或 product_code' };
+      }
+      const existRes = await db.collection('holdings').where({
+        _openid: ownerOpenid,
+        account_id: txn.account_id,
+        product_code: txn.product_code,
+      }).limit(1).get();
+      const existing = existRes.data[0];
+      if (!existing) {
+        await db.collection('transactions').doc(transaction_id).update({
+          data: { applied_holding: true, applied_at: db.serverDate() },
+        });
+        return { success: true, message: '无对应持仓，红股入账仅记录', warning: true };
+      }
+      const bonusShares = Number(txn.shares) || 0;
+      if (bonusShares <= 0) {
+        return { success: false, message: '红股入账份额无效' };
+      }
+      const oldShares = Number(existing.shares) || 0;
+      const newShares = oldShares + bonusShares;
+      const costValue = readCostValue(existing);
+      const newCost = newShares > 0 ? costValue / newShares : Number(existing.cost_price) || 0;
+      const curPrice = Number(existing.current_price) || 0;
+      const newMarketValue = Number((newShares * curPrice).toFixed(2));
+      const newPnl = Number((newMarketValue - costValue).toFixed(2));
+      const newPnlPercent = costValue > 0 ? Number(((newPnl / costValue) * 100).toFixed(2)) : 0;
+      const newTotalPnl = recomputeTotalPnl(existing, newMarketValue, costValue);
+      await db.collection('holdings').doc(existing._id).update({
+        data: {
+          shares: newShares,
+          cost_price: Number(newCost.toFixed(4)),
+          cost_value: Number(costValue.toFixed(2)),
+          market_value: newMarketValue,
+          pnl: newPnl,
+          pnl_percent: newPnlPercent,
+          total_pnl: newTotalPnl,
+          is_cleared: false,
+          updated_at: db.serverDate(),
+        },
+      });
+      await db.collection('transactions').doc(transaction_id).update({
+        data: { applied_holding: true, applied_at: db.serverDate() },
+      });
+      return { success: true, message: '已应用红股入账' };
+    }
+
+    // 4. 份额拆分/合并：按 ratio 调整份额与成本价，总成本与总资产不变；无现金流
+    //    ratio > 1 为拆分（如 3 = 1拆3），0 < ratio < 1 为合并（如 0.333 = 3合1）
+    if (type === 'split') {
+      if (!txn.account_id || !txn.product_code) {
+        return { success: false, message: '拆分/合并缺少 account_id 或 product_code' };
+      }
+      const existRes = await db.collection('holdings').where({
+        _openid: ownerOpenid,
+        account_id: txn.account_id,
+        product_code: txn.product_code,
+      }).limit(1).get();
+      const existing = existRes.data[0];
+      if (!existing) {
+        await db.collection('transactions').doc(transaction_id).update({
+          data: { applied_holding: true, applied_at: db.serverDate() },
+        });
+        return { success: true, message: '无对应持仓，拆分/合并仅记录', warning: true };
+      }
+      const ratio = Number(txn.ratio) || 0;
+      if (ratio <= 0) {
+        return { success: false, message: '拆分/合并比例无效（ratio 需 >0，如 3=1拆3，0.333=3合1）' };
+      }
+      const oldShares = Number(existing.shares) || 0;
+      const newShares = Number((oldShares * ratio).toFixed(4));
+      const costValue = readCostValue(existing);
+      const oldCost = Number(existing.cost_price) || 0;
+      const newCost = oldCost / ratio;
+      const curPrice = Number(existing.current_price) || 0;
+      const newMarketValue = Number((newShares * curPrice).toFixed(2));
+      const newPnl = Number((newMarketValue - costValue).toFixed(2));
+      const newPnlPercent = costValue > 0 ? Number(((newPnl / costValue) * 100).toFixed(2)) : 0;
+      const newTotalPnl = recomputeTotalPnl(existing, newMarketValue, costValue);
+      await db.collection('holdings').doc(existing._id).update({
+        data: {
+          shares: newShares,
+          cost_price: Number(newCost.toFixed(4)),
+          cost_value: Number(costValue.toFixed(2)),
+          market_value: newMarketValue,
+          pnl: newPnl,
+          pnl_percent: newPnlPercent,
+          total_pnl: newTotalPnl,
+          updated_at: db.serverDate(),
+        },
+      });
+      await db.collection('transactions').doc(transaction_id).update({
+        data: { applied_holding: true, applied_at: db.serverDate() },
+      });
+      return { success: true, message: '已应用拆分/合并' };
+    }
+
+    // 5. 纳税：扣减账户现金余额；若带 product_code 且有对应持仓，同时计入已实现盈亏扣减
+    //    （限售股个税、红利税等：从券商对账单抄入已扣缴税额）
+    if (type === 'tax') {
+      if (!txn.account_id) {
+        return { success: false, message: '纳税缺少 account_id' };
+      }
+      await adjustAccountCash(txn.account_id, ownerOpenid, -amount);
+      if (txn.product_code) {
+        const existRes = await db.collection('holdings').where({
+          _openid: ownerOpenid,
+          account_id: txn.account_id,
+          product_code: txn.product_code,
+        }).limit(1).get();
+        const existing = existRes.data[0];
+        if (existing) {
+          const oldRealized = Number(existing.realized_pnl) || 0;
+          const newRealized = Number((oldRealized - amount).toFixed(2));
+          const mv = Number(existing.market_value) || 0;
+          const cv = readCostValue(existing);
+          const newTotalPnl = recomputeTotalPnl(
+            Object.assign({}, existing, { realized_pnl: newRealized }), mv, cv
+          );
+          await db.collection('holdings').doc(existing._id).update({
+            data: {
+              realized_pnl: newRealized,
+              total_pnl: newTotalPnl,
+              updated_at: db.serverDate(),
+            },
+          });
+        }
+      }
+      await db.collection('transactions').doc(transaction_id).update({
+        data: { applied_holding: true, applied_at: db.serverDate() },
+      });
+      return { success: true, message: '已应用纳税' };
+    }
+
+    // 6. 转入/转出/手续费：仅联动账户现金余额，不影响持仓
+    if (type === 'transfer_in' || type === 'transfer_out' || type === 'fee') {
+      if (!txn.account_id) {
+        return { success: false, message: `${type} 缺少 account_id` };
+      }
+      const delta = type === 'transfer_in' ? amount : -amount;
+      await adjustAccountCash(txn.account_id, ownerOpenid, delta);
+      await db.collection('transactions').doc(transaction_id).update({
+        data: { applied_holding: true, applied_at: db.serverDate() },
+      });
+      const nameMap = { transfer_in: '转入', transfer_out: '转出', fee: '手续费' };
+      return { success: true, message: `已应用${nameMap[type]}` };
+    }
+
+    // 7. 其他未知类型（非买卖且未命中上述分支）：仅记录
     if (type !== 'buy' && type !== 'sell') {
       await db.collection('transactions').doc(transaction_id).update({
         data: { applied_holding: true, applied_at: db.serverDate() },

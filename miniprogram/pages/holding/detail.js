@@ -52,6 +52,25 @@ function replayHolding(txns, currentPrice) {
       totalFee += tFee;
     } else if (type === 'dividend' || type === 'interest') {
       totalDividend += tAmount;
+    } else if (type === 'stock_dividend') {
+      // 红股入账（送股）：份额增加，总成本不变，成本价摊薄
+      const bonusShares = Number(t.shares) || 0;
+      if (bonusShares > 0 && shares + bonusShares > 0) {
+        shares += bonusShares;
+        costPrice = shares > 0 ? costValue / shares : costPrice;
+      }
+    } else if (type === 'split') {
+      // 份额拆分/合并：按 ratio 调整份额与成本价，总成本不变
+      // ratio > 1 拆分（如 3=1拆3），0 < ratio < 1 合并（如 0.333=3合1）
+      const ratio = Number(t.ratio) || 0;
+      if (ratio > 0) {
+        shares = Number((shares * ratio).toFixed(4));
+        costPrice = costPrice / ratio;
+        costValue = Number((shares * costPrice).toFixed(2));
+      }
+    } else if (type === 'tax') {
+      // 纳税：计入已实现盈亏扣减（限售股个税、红利税等）
+      realizedPnl -= tAmount;
     }
   }
 
@@ -104,7 +123,8 @@ Page({
     holding: {},
     holdingId: '',
     priceColor: 'price-flat',
-    transactions: [],         // 该持仓的全部交易（按日期正序）
+    transactions: [],         // 该持仓的全部交易（按日期正序，供回放/图表）
+    displayTransactions: [],  // 倒序副本（最新在上，供列表展示）
     loadingTxns: false,
     chartRendered: false,
   },
@@ -169,15 +189,17 @@ Page({
     }
   },
 
-  /** 加载该持仓的全部交易（按日期正序，用于图表和列表） */
+  /** 加载该持仓的全部交易（按日期正序，用于回放和图表；列表展示用倒序副本） */
   async loadAllTransactions() {
     const { holding } = this.data;
     if (!holding.account_id || !holding.product_code) return;
     this.setData({ loadingTxns: true });
     try {
       const list = await fetchAllTransactions(holding.account_id, holding.product_code);
+      // transactions: 正序（回放/图表用）；displayTransactions: 倒序（列表展示，最新在上）
       this.setData({
         transactions: list,
+        displayTransactions: list.slice().reverse(),
         loadingTxns: false,
       });
     } catch (err) {
@@ -398,7 +420,9 @@ Page({
           const txnRes = await db.collection('transactions').doc(id).get();
           const txn = txnRes.data;
           await db.collection('transactions').doc(id).remove();
-          if (txn && (txn.type === 'buy' || txn.type === 'sell' || txn.type === 'dividend' || txn.type === 'interest')) {
+          // 影响持仓的交易（买卖/分红/利息/红股/拆分/纳税）删除后需回放剩余交易修正持仓
+          const holdingAffecting = ['buy', 'sell', 'dividend', 'interest', 'stock_dividend', 'split', 'tax'];
+          if (txn && holdingAffecting.indexOf(txn.type) >= 0) {
             await this.undoHolding(txn);
           }
           wx.hideLoading();

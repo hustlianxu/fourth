@@ -30,6 +30,7 @@ Page({
       price: '',
       amount: '',
       fee: '',
+      ratio: '',
       trade_date: '',
       note: '',
     },
@@ -130,6 +131,7 @@ Page({
           price: t.price != null ? String(t.price) : '',
           amount: t.amount != null ? String(t.amount) : '',
           fee: t.fee != null ? String(t.fee) : '',
+          ratio: t.ratio != null ? String(t.ratio) : '',
           trade_date: t.trade_date || '',
           note: t.note || '',
         },
@@ -273,6 +275,10 @@ Page({
     this.setData({ 'form.fee': e.detail.value, _feeTouched: true, feeHint: '' });
   },
 
+  onRatioInput(e) {
+    this.setData({ 'form.ratio': e.detail.value });
+  },
+
   /**
    * 用户未手动输入手续费时，按账户费率自动计算并填充
    * 触发时机：账户变更 / 交易类型变更 / 份额/单价/金额变化
@@ -341,23 +347,51 @@ Page({
       return;
     }
 
-    // 转入/转出/手续费/利息 允许只有金额；买入/卖出/分红建议填写产品+份额
     const type = form.type;
-    const isTrade = (type === 'buy' || type === 'sell');
-    if (isTrade && !form.product_code) {
+    // 需要产品代码才能匹配持仓的类型
+    const needsCode = ['buy', 'sell', 'dividend', 'interest', 'stock_dividend', 'split'].indexOf(type) >= 0;
+    if (needsCode && !form.product_code) {
       wx.showToast({ title: '请输入产品代码', icon: 'none' });
-      return;
-    }
-
-    const amount = parseFloat(form.amount);
-    if (isNaN(amount) || amount <= 0) {
-      wx.showToast({ title: '请输入有效金额', icon: 'none' });
       return;
     }
 
     const shares = form.shares ? parseFloat(form.shares) : 0;
     const price = form.price ? parseFloat(form.price) : 0;
+    const amount = form.amount ? parseFloat(form.amount) : 0;
     const fee = form.fee ? parseFloat(form.fee) : 0;
+    const ratio = form.ratio ? parseFloat(form.ratio) : 0;
+
+    // 按类型校验关键数值字段
+    if (type === 'buy' || type === 'sell') {
+      if (isNaN(amount) || amount <= 0) {
+        wx.showToast({ title: '请输入有效金额', icon: 'none' });
+        return;
+      }
+    } else if (type === 'dividend' || type === 'interest') {
+      // 现金分红/利息：仅需金额
+      if (isNaN(amount) || amount <= 0) {
+        wx.showToast({ title: '请输入分红/利息金额', icon: 'none' });
+        return;
+      }
+    } else if (type === 'stock_dividend') {
+      // 红股入账：仅需红股份额，无现金流
+      if (isNaN(shares) || shares <= 0) {
+        wx.showToast({ title: '请输入红股份额', icon: 'none' });
+        return;
+      }
+    } else if (type === 'split') {
+      // 拆分/合并：仅需 ratio
+      if (isNaN(ratio) || ratio <= 0) {
+        wx.showToast({ title: '请输入拆分比例(>0)', icon: 'none' });
+        return;
+      }
+    } else if (type === 'tax' || type === 'transfer_in' || type === 'transfer_out' || type === 'fee') {
+      // 纳税/转入/转出/手续费：仅需金额
+      if (isNaN(amount) || amount <= 0) {
+        wx.showToast({ title: '请输入有效金额', icon: 'none' });
+        return;
+      }
+    }
 
     wx.showLoading({ title: '保存中...' });
     try {
@@ -368,10 +402,11 @@ Page({
         product_name: form.product_name || '',
         product_type: form.product_type || '',
         exchange: form.exchange || '',
-        shares,
-        price,
-        amount,
+        shares: isNaN(shares) ? 0 : Number(shares.toFixed(4)),
+        price: isNaN(price) ? 0 : Number(price.toFixed(4)),
+        amount: isNaN(amount) ? 0 : Number(amount.toFixed(2)),
         fee: isNaN(fee) ? 0 : Number(fee.toFixed(2)),
+        ratio: isNaN(ratio) ? 0 : Number(ratio.toFixed(4)),
         trade_date: form.trade_date,
         note: form.note || '',
         updated_at: db.serverDate(),
@@ -417,15 +452,17 @@ Page({
 
       wx.hideLoading();
 
-      // 新增的买卖交易自动应用到持仓（加权平均成本）；编辑/非买卖不自动应用
-      if (!isEdit && (type === 'buy' || type === 'sell')) {
+      // 新增交易均自动应用到持仓/账户（apply_transaction 内部按类型分发：
+      // buy/sell 更新持仓、stock_dividend/split 调整份额与成本、tax/transfer类联动账户现金）；
+      // 编辑模式不自动应用，避免与历史应用重复
+      if (!isEdit) {
         try {
           const applyRes = await wx.cloud.callFunction({
             name: 'apply_transaction',
             data: { transaction_id: newTxnId },
           });
           if (applyRes.result && applyRes.result.success) {
-            wx.showToast({ title: '已记录并同步持仓', icon: 'success' });
+            wx.showToast({ title: '已记录并同步', icon: 'success' });
           } else {
             wx.showToast({ title: '已记录', icon: 'success' });
           }

@@ -107,6 +107,9 @@ var transactionTypeName = function (key) {
     buy: '买入',
     sell: '卖出',
     dividend: '分红',
+    stock_dividend: '红股入账',
+    split: '拆分/合并',
+    tax: '纳税',
     transfer_in: '转入',
     transfer_out: '转出',
     fee: '手续费',
@@ -122,6 +125,9 @@ var transactionTypeClass = function (key) {
     buy: 'txn-buy',
     sell: 'txn-sell',
     dividend: 'txn-in',
+    stock_dividend: 'txn-in',
+    split: 'txn-flat',
+    tax: 'txn-out',
     transfer_in: 'txn-in',
     transfer_out: 'txn-out',
     fee: 'txn-out',
@@ -134,7 +140,7 @@ var transactionTypeClass = function (key) {
 var transactionSign = function (key) {
   if (!key) return '';
   if (key === 'sell' || key === 'dividend' || key === 'transfer_in' || key === 'interest') return '+';
-  if (key === 'buy' || key === 'transfer_out' || key === 'fee') return '-';
+  if (key === 'buy' || key === 'transfer_out' || key === 'fee' || key === 'tax') return '-';
   return '';
 };
 

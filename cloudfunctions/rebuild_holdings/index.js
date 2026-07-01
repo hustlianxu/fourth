@@ -138,8 +138,30 @@ exports.main = async (event) => {
         // 分红/利息：累加 total_dividend
         const amount = Number(t.amount) || 0;
         h.total_dividend = Number((h.total_dividend + amount).toFixed(2));
+      } else if (type === 'stock_dividend') {
+        // 红股入账（送股）：份额增加，总成本不变，成本价摊薄
+        const bonusShares = Number(t.shares) || 0;
+        if (bonusShares > 0 && h.shares + bonusShares > 0) {
+          const newShares = h.shares + bonusShares;
+          h.cost_price = Number((h.cost_value / newShares).toFixed(4));
+          h.shares = newShares;
+          h.is_cleared = false;
+        }
+      } else if (type === 'split') {
+        // 份额拆分/合并：按 ratio 调整份额与成本价，总成本不变
+        // ratio > 1 拆分（如 3=1拆3），0 < ratio < 1 合并（如 0.333=3合1）
+        const ratio = Number(t.ratio) || 0;
+        if (ratio > 0) {
+          h.shares = Number((h.shares * ratio).toFixed(4));
+          h.cost_price = Number((h.cost_price / ratio).toFixed(4));
+          h.cost_value = Number((h.shares * h.cost_price).toFixed(2));
+        }
+      } else if (type === 'tax') {
+        // 纳税：计入已实现盈亏扣减（限售股个税、红利税等）
+        const amount = Number(t.amount) || 0;
+        h.realized_pnl = Number((h.realized_pnl - amount).toFixed(2));
       }
-      // 其他类型（转账/手续费交易）跳过
+      // 其他类型（转入/转出/手续费，仅影响账户现金余额，不影响持仓）跳过
     }
 
     // 4. upsert 到 holdings

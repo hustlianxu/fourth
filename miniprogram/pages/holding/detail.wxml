@@ -106,7 +106,7 @@
     <view class="section-title">全部交易（{{transactions.length}}）</view>
     <view
       class="recent-txn"
-      wx:for="{{transactions}}"
+      wx:for="{{displayTransactions}}"
       wx:key="_id"
       data-id="{{item._id}}"
       bindlongpress="onLongPressTxn"
