@@ -304,7 +304,7 @@ exports.main = async (event) => {
       return { success: false, message: '交易缺少 account_id 或 product_code' };
     }
 
-    const shares = Number(txn.shares) || 0;
+    const shares = Math.abs(Number(txn.shares) || 0);
     const price = Number(txn.price) || 0;
     if (shares <= 0) {
       return { success: false, message: '交易份额无效' };

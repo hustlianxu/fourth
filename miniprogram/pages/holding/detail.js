@@ -29,7 +29,7 @@ function replayHolding(txns, currentPrice) {
   for (let i = 0; i < txns.length; i++) {
     const t = txns[i];
     const type = t.type;
-    const tShares = Number(t.shares) || 0;
+    const tShares = Math.abs(Number(t.shares) || 0);
     const tPrice = Number(t.price) || 0;
     const tFee = Number(t.fee) || 0;
     const tAmount = Number(t.amount) || 0;
@@ -54,7 +54,7 @@ function replayHolding(txns, currentPrice) {
       totalDividend += tAmount;
     } else if (type === 'stock_dividend') {
       // 红股入账（送股）：份额增加，总成本不变，成本价摊薄
-      const bonusShares = Number(t.shares) || 0;
+      const bonusShares = Math.abs(Number(t.shares) || 0);
       if (bonusShares > 0 && shares + bonusShares > 0) {
         shares += bonusShares;
         costPrice = shares > 0 ? costValue / shares : costPrice;
@@ -244,18 +244,65 @@ Page({
     if (holding._id) {
       db.collection('holdings').doc(holding._id).update({
         data: {
+          shares: r.shares,
           cost_price: r.costPrice,
           cost_value: r.costValue,
           realized_pnl: r.realizedPnl,
           total_dividend: r.totalDividend,
           total_fee: r.totalFee,
           total_pnl: r.totalPnl,
+          is_cleared: r.shares <= 0,
           updated_at: db.serverDate(),
         },
       }).catch(err => {
         console.warn('[replayAndCorrect] DB update error:', err);
       });
     }
+  },
+
+  /**
+   * 从交易流水定向重建当前持仓（调 rebuild_holdings 云函数，限定 account_id+product_code）
+   * 用于修复"已记录但未应用"的交易、负数 shares 等导致的持仓数据错误
+   */
+  onRebuildHolding() {
+    const holding = this.data.holding;
+    if (!holding || !holding._id) return;
+    wx.showModal({
+      title: '重建持仓',
+      content: `将根据「${holding.product_name || holding.product_code}」的全部交易流水重新计算份额与成本（幂等，可重复执行）。是否继续？`,
+      success: async (res) => {
+        if (!res.confirm) return;
+        wx.showLoading({ title: '重建中...', mask: true });
+        try {
+          const r = await wx.cloud.callFunction({
+            name: 'rebuild_holdings',
+            data: {
+              account_id: holding.account_id,
+              product_code: holding.product_code,
+            },
+          });
+          wx.hideLoading();
+          const result = r.result || {};
+          if (result.success) {
+            wx.showToast({ title: '重建完成', icon: 'success' });
+            this.loadAll();
+          } else {
+            wx.showModal({
+              title: '重建失败',
+              content: result.message || '请稍后重试',
+              showCancel: false,
+            });
+          }
+        } catch (err) {
+          wx.hideLoading();
+          console.error('[onRebuildHolding] error:', err);
+          const msg = err.errMsg && err.errMsg.indexOf('FUNCTION_NOT_FOUND') >= 0
+            ? '云函数 rebuild_holdings 未部署'
+            : '重建失败，请稍后重试';
+          wx.showModal({ title: '错误', content: msg, showCancel: false });
+        }
+      },
+    });
   },
   drawChart() {
     const txns = this.data.transactions;

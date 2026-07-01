@@ -96,7 +96,7 @@ exports.main = async (event) => {
       const h = holdingsMap[key];
 
       if (type === 'buy' || type === 'sell' || type === 'ipo_win') {
-        const shares = Number(t.shares) || 0;
+        const shares = Math.abs(Number(t.shares) || 0);
         const price = Number(t.price) || 0;
         const fee = Number(t.fee) || 0;
         if (shares <= 0) continue;
@@ -141,7 +141,7 @@ exports.main = async (event) => {
         h.total_dividend = Number((h.total_dividend + amount).toFixed(2));
       } else if (type === 'stock_dividend') {
         // 红股入账（送股）：份额增加，总成本不变，成本价摊薄
-        const bonusShares = Number(t.shares) || 0;
+        const bonusShares = Math.abs(Number(t.shares) || 0);
         if (bonusShares > 0 && h.shares + bonusShares > 0) {
           const newShares = h.shares + bonusShares;
           h.cost_price = Number((h.cost_value / newShares).toFixed(4));

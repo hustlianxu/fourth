@@ -92,7 +92,8 @@ function buildParsePrompt(text) {
 9. tax(纳税/扣税)：amount 填已扣缴税额，shares/price 填 0
 10. ipo_win(打新中签/新股中签)：填 product_code(新股代码)、shares(中签股数)、price(发行价)，amount = shares × price；会计处理等同买入，中签缴款会自动从账户余额扣减
 11. buy/sell/ipo_win 的 amount = shares × price（不含手续费）
-12. 只输出 JSON 数组，不要任何解释文字、不要 markdown 代码块标记
+12. shares 永远为正数！卖出时不要写负号（如"卖出500股"填 shares:500，不是 -500）。"卖出减少股数"由系统在应用时自动扣减，shares 字段只表示"交易了多少股"这个绝对数量。同理 amount 也永远为正数。
+13. 只输出 JSON 数组，不要任何解释文字、不要 markdown 代码块标记
 
 输出格式（严格遵循）：
 [
@@ -257,12 +258,19 @@ function normalizeTrade(t, warnings) {
     warnings.push(`跳过未知交易类型：${t.type}`);
     return null;
   }
-  const shares = Number(t.shares) || 0;
+  let shares = Number(t.shares) || 0;
   const price = Number(t.price) || 0;
   const fee = Number(t.fee) || 0;
   const ratio = Number(t.ratio) || 0;
   let amount = Number(t.amount);
   if (isNaN(amount)) amount = 0;
+  // 归一化：外部 JSON（如同花顺/东财导出）sell 习惯用负数表示减少，统一取绝对值。
+  // "卖出减少股数"是会计语义，由系统在应用时用 oldShares - shares 处理，shares 本身应为正数。
+  if (shares < 0 && (type === 'buy' || type === 'sell' || type === 'ipo_win' || type === 'stock_dividend')) {
+    warnings.push(`「${t.product_name || type}」shares 为负数(${shares})，已自动取绝对值归一化`);
+    shares = Math.abs(shares);
+    if (amount < 0) amount = Math.abs(amount);
+  }
   // buy/sell/ipo_win 缺失 amount 时按 shares×price 自动补
   if ((type === 'buy' || type === 'sell' || type === 'ipo_win') && amount === 0 && shares > 0 && price > 0) {
     amount = shares * price;
@@ -440,9 +448,10 @@ const NEEDS_CODE = ['buy', 'sell', 'ipo_win', 'dividend', 'interest', 'stock_div
 
 async function importTrade(trade, account_id, warnings, openid) {
   const type = trade.type;
-  // 影响持仓的交易必须有产品代码
+  // 影响持仓的交易必须有产品代码：缺码则跳过（不抛错，避免打断整批导入）
   if (NEEDS_CODE.indexOf(type) >= 0 && !trade.product_code) {
-    throw new Error(`「${trade.product_name || type}」缺少产品代码，无法导入`);
+    warnings.push(`「${trade.product_name || type}」缺少产品代码，已跳过（请在导入前补全代码）`);
+    return null;
   }
 
   // 判断是否建仓（首次买入）：该账户+代码下既无持仓又无历史买入
@@ -644,7 +653,7 @@ exports.main = async (event) => {
       const batchStart = i;
       const results = await Promise.all(batch.map((trade, j) =>
         importTrade(trade, account_id, warnings, openid)
-          .then(() => { imported++; return true; })
+          .then(id => { if (id) imported++; return true; })
           .catch(err => {
             warnings.push(`第 ${batchStart + j + 1} 笔写入失败：${err.message}`);
             return false;
