@@ -95,14 +95,15 @@ exports.main = async (event) => {
       }
       const h = holdingsMap[key];
 
-      if (type === 'buy' || type === 'sell') {
+      if (type === 'buy' || type === 'sell' || type === 'ipo_win') {
         const shares = Number(t.shares) || 0;
         const price = Number(t.price) || 0;
         const fee = Number(t.fee) || 0;
         if (shares <= 0) continue;
 
-        if (type === 'buy') {
+        if (type === 'buy' || type === 'ipo_win') {
           // 买入成本 = 份额 × 单价 + 手续费（同花顺口径）
+          // 打新中签 ipo_win 会计处理等同 buy
           const buyCost = shares * price + fee;
           const oldShares = h.shares;
           const oldCostValue = h.cost_value;

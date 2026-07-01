@@ -73,15 +73,16 @@ function buildParsePrompt(text) {
 规则：
 1. 日期格式统一为 YYYY-MM-DD，年份缺失时用当前年份 ${year}
 2. 金额"36块5""36.5""36元5"都解析为 36.50
-3. type 只能是：buy(买入) / sell(卖出) / dividend(分红/现金分红) / stock_dividend(红股入账/送股) / split(份额拆分或合并) / tax(纳税/扣税) / transfer_in(资金转入) / transfer_out(资金转出) / fee(手续费) / interest(利息)
+3. type 只能是：buy(买入) / sell(卖出) / ipo_win(打新中签/新股中签/中签缴款) / dividend(分红/现金分红) / stock_dividend(红股入账/送股) / split(份额拆分或合并) / tax(纳税/扣税) / transfer_in(银证转入/资金转入) / transfer_out(银证转出/资金转出) / fee(手续费) / interest(利息)
 4. 产品代码（product_code）：如果用户输入中已明确给出代码，直接使用；如果用户只提供了产品名称而未给代码，你必须根据产品名称从你的知识库中查找对应的A股/港股/基金代码并填入 product_code 字段（例如：招商银行→600036，华工科技→000988，贵州茅台→600519，中国平安→601318，腾讯→00700，沪深300ETF→510300，易方达蓝筹精选→005827）。若产品名称有简称/全称差异，按最常见的上市交易代码填写。只有当你完全无法确定代码时才填空字符串。产品名称尽量保留用户原文。注意：transfer_in/transfer_out/fee/tax 若未指明具体产品，product_code 填空字符串。
 5. 手续费：用户明确提到时填入 fee 字段（单位：元）；未提到则填 0（系统会按账户费率自动计算，无需估算）
 6. dividend(现金分红)/interest(利息)：shares 和 price 填 0，amount 填实际到账金额
 7. stock_dividend(红股入账/送股)：shares 填红股股数（新增份额），price/amount/fee 填 0；总成本不变，成本价由系统自动摊薄
 8. split(份额拆分/合并)：ratio 填拆分比例（如 1拆3 填 3，3合1 填 0.333），shares/price/amount/fee 填 0；总资产不变由系统自动调整
 9. tax(纳税/扣税)：amount 填已扣缴税额，shares/price 填 0；如对应具体股票则填 product_code，否则留空
-10. buy/sell 的 amount = shares × price（不含手续费）
-11. 只输出 JSON 数组，不要任何解释文字、不要 markdown 代码块标记
+10. ipo_win(打新中签/新股中签)：填 product_code(新股代码)、shares(中签股数)、price(发行价)，amount = shares × price；会计处理等同买入，中签缴款会自动从账户余额扣减
+11. buy/sell 的 amount = shares × price（不含手续费）
+12. 只输出 JSON 数组，不要任何解释文字、不要 markdown 代码块标记
 
 输出格式（严格遵循）：
 [
@@ -205,7 +206,7 @@ function extractJsonArray(content) {
 function normalizeTrade(t, warnings) {
   if (!t || typeof t !== 'object') return null;
   const type = String(t.type || '').toLowerCase();
-  const allowed = ['buy', 'sell', 'dividend', 'stock_dividend', 'split', 'tax', 'transfer_in', 'transfer_out', 'fee', 'interest'];
+  const allowed = ['buy', 'sell', 'ipo_win', 'dividend', 'stock_dividend', 'split', 'tax', 'transfer_in', 'transfer_out', 'fee', 'interest'];
   if (!allowed.includes(type)) {
     warnings.push(`跳过未知交易类型：${t.type}`);
     return null;
@@ -216,8 +217,8 @@ function normalizeTrade(t, warnings) {
   const ratio = Number(t.ratio) || 0;
   let amount = Number(t.amount);
   if (isNaN(amount)) amount = 0;
-  // buy/sell 缺失 amount 时按 shares×price 自动补
-  if ((type === 'buy' || type === 'sell') && amount === 0 && shares > 0 && price > 0) {
+  // buy/sell/ipo_win 缺失 amount 时按 shares×price 自动补
+  if ((type === 'buy' || type === 'sell' || type === 'ipo_win') && amount === 0 && shares > 0 && price > 0) {
     amount = shares * price;
   }
   // 日期缺失或格式不对
@@ -226,8 +227,8 @@ function normalizeTrade(t, warnings) {
     warnings.push(`交易"${t.product_name || type}"日期格式异常：${tradeDate}，已用今天兜底`);
     tradeDate = new Date().toISOString().split('T')[0];
   }
-  // 买卖/分红/利息/红股/拆分类交易需要产品代码才能匹配持仓，缺失时预警
-  const needsCode = ['buy', 'sell', 'dividend', 'interest', 'stock_dividend', 'split'].indexOf(type) >= 0;
+  // 买卖/打新中签/分红/利息/红股/拆分类交易需要产品代码才能匹配持仓，缺失时预警
+  const needsCode = ['buy', 'sell', 'ipo_win', 'dividend', 'interest', 'stock_dividend', 'split'].indexOf(type) >= 0;
   if (needsCode && !String(t.product_code || '').trim()) {
     warnings.push(`「${t.product_name || type}」缺少产品代码，将无法匹配持仓（请在导入前补全代码）`);
   }
@@ -389,7 +390,7 @@ async function postProcessTrades(trades, account_id, warnings, openid) {
  * - buy 计算 is_opening（首次建仓）
  * - 所有类型均调 apply_transaction 应用（持仓更新 + 账户现金余额联动），失败仅预警（交易已记录，可重建修复）
  */
-const NEEDS_CODE = ['buy', 'sell', 'dividend', 'interest', 'stock_dividend', 'split'];
+const NEEDS_CODE = ['buy', 'sell', 'ipo_win', 'dividend', 'interest', 'stock_dividend', 'split'];
 
 async function importTrade(trade, account_id, warnings, openid) {
   const type = trade.type;

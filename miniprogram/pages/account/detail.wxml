@@ -16,8 +16,19 @@
       </text>
     </view>
 
-    <view class="balance-row" wx:if="{{account.cash_balance}}">
-      <text>余额: ¥{{fmt.formatMoney(account.cash_balance)}}</text>
+    <view class="balance-row" wx:if="{{account.cash_balance != null}}">
+      <text>账户余额: ¥{{fmt.formatMoney(account.cash_balance)}}</text>
+      <view class="balance-actions">
+        <text class="balance-btn" bindtap="onTransferIn">银证转入</text>
+        <text class="balance-btn" bindtap="onTransferOut">银证转出</text>
+      </view>
+    </view>
+    <view class="balance-row" wx:else>
+      <text>账户余额: ¥0.00</text>
+      <view class="balance-actions">
+        <text class="balance-btn" bindtap="onTransferIn">银证转入</text>
+        <text class="balance-btn" bindtap="onTransferOut">银证转出</text>
+      </view>
     </view>
 
     <view class="section-title">持仓列表 ({{account.holdingCount}})</view>

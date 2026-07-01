@@ -123,16 +123,17 @@ Page({
       canvas.height = height * dpr;
       ctx.scale(dpr, dpr);
 
-      // 计算累计投入
+      // 计算累计净投入（资金流出为负，流入为正）
       const points = [];
       let cumNet = 0;
       for (const t of txns) {
         const amt = Number(t.amount) || 0;
-        if (t.type === 'buy' || t.type === 'transfer_out' || t.type === 'fee') {
+        if (t.type === 'buy' || t.type === 'ipo_win' || t.type === 'transfer_out' || t.type === 'fee' || t.type === 'tax') {
           cumNet -= amt;
         } else if (t.type === 'sell' || t.type === 'dividend' || t.type === 'transfer_in' || t.type === 'interest') {
           cumNet += amt;
         }
+        // stock_dividend / split 无现金流，跳过
         points.push({
           date: (t.trade_date || '').slice(5),
           value: cumNet,
@@ -228,6 +229,78 @@ Page({
   onAddHolding() {
     wx.navigateTo({
       url: `/pages/holding/edit?account_id=${this.data.account._id}`,
+    });
+  },
+
+  /**
+   * 银证转入：从银行卡向证券账户转入资金
+   * 写入一条 transfer_in 交易，apply_transaction 会联动增加账户 cash_balance
+   */
+  onTransferIn() {
+    this._doTransfer('transfer_in', '银证转入', '请输入转入金额（元）');
+  },
+
+  /**
+   * 银证转出：从证券账户转出资金到银行卡
+   * 写入一条 transfer_out 交易，apply_transaction 会联动扣减账户 cash_balance
+   */
+  onTransferOut() {
+    this._doTransfer('transfer_out', '银证转出', '请输入转出金额（元）');
+  },
+
+  _doTransfer(type, title, placeholder) {
+    const accountId = this.data.account._id;
+    if (!accountId) return;
+    wx.showModal({
+      title,
+      editable: true,
+      placeholderText: placeholder,
+      success: async (res) => {
+        if (!res.confirm) return;
+        const amount = parseFloat(res.content);
+        if (isNaN(amount) || amount <= 0) {
+          wx.showToast({ title: '请输入有效金额', icon: 'none' });
+          return;
+        }
+        wx.showLoading({ title: '处理中...' });
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const addRes = await db.collection('transactions').add({
+            data: {
+              account_id: accountId,
+              type,
+              product_code: '',
+              product_name: '',
+              shares: 0,
+              price: 0,
+              amount: Number(amount.toFixed(2)),
+              fee: 0,
+              ratio: 0,
+              trade_date: today,
+              note: title,
+              applied_holding: false,
+              created_at: db.serverDate(),
+              updated_at: db.serverDate(),
+            },
+          });
+          // 联动账户现金余额
+          try {
+            await wx.cloud.callFunction({
+              name: 'apply_transaction',
+              data: { transaction_id: addRes._id },
+            });
+          } catch (e) {
+            console.warn('[transfer] apply error:', e);
+          }
+          wx.hideLoading();
+          wx.showToast({ title: `${title}成功`, icon: 'success' });
+          this.loadAll();
+        } catch (err) {
+          console.error('[transfer] error:', err);
+          wx.hideLoading();
+          wx.showToast({ title: '操作失败', icon: 'none' });
+        }
+      },
     });
   },
 

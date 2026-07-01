@@ -120,12 +120,13 @@ const NEWS_CATEGORIES = [
 const TRANSACTION_TYPES = [
   { key: 'buy', name: '买入', sign: '-' },
   { key: 'sell', name: '卖出', sign: '+' },
+  { key: 'ipo_win', name: '打新中签', sign: '-' },
   { key: 'dividend', name: '分红', sign: '+' },
   { key: 'stock_dividend', name: '红股入账', sign: '' },
   { key: 'split', name: '拆分/合并', sign: '' },
   { key: 'tax', name: '纳税', sign: '-' },
-  { key: 'transfer_in', name: '转入', sign: '+' },
-  { key: 'transfer_out', name: '转出', sign: '-' },
+  { key: 'transfer_in', name: '银证转入', sign: '+' },
+  { key: 'transfer_out', name: '银证转出', sign: '-' },
   { key: 'fee', name: '手续费', sign: '-' },
   { key: 'interest', name: '利息', sign: '+' },
 ];

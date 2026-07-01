@@ -34,8 +34,8 @@ function replayHolding(txns, currentPrice) {
     const tFee = Number(t.fee) || 0;
     const tAmount = Number(t.amount) || 0;
 
-    if (type === 'buy') {
-      // 买入成本含手续费（同花顺口径）
+    if (type === 'buy' || type === 'ipo_win') {
+      // 买入成本含手续费（同花顺口径）；打新中签 ipo_win 会计处理等同 buy
       const buyCost = tShares * tPrice + tFee;
       const newShares = shares + tShares;
       const newCostValue = costValue + buyCost;
@@ -420,8 +420,8 @@ Page({
           const txnRes = await db.collection('transactions').doc(id).get();
           const txn = txnRes.data;
           await db.collection('transactions').doc(id).remove();
-          // 影响持仓的交易（买卖/分红/利息/红股/拆分/纳税）删除后需回放剩余交易修正持仓
-          const holdingAffecting = ['buy', 'sell', 'dividend', 'interest', 'stock_dividend', 'split', 'tax'];
+          // 影响持仓的交易（买卖/打新中签/分红/利息/红股/拆分/纳税）删除后需回放剩余交易修正持仓
+          const holdingAffecting = ['buy', 'sell', 'ipo_win', 'dividend', 'interest', 'stock_dividend', 'split', 'tax'];
           if (txn && holdingAffecting.indexOf(txn.type) >= 0) {
             await this.undoHolding(txn);
           }

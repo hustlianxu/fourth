@@ -11,8 +11,12 @@
  *   卖出：newShares = S - N；cost_price 不变；归零则 is_cleared=true
  *        realized_pnl += (sell_price - cost_price) * sell_shares - sell_fee
  *        total_fee += sell_fee
+ *   打新中签(ipo_win)：会计处理同买入，并额外扣减账户 cash_balance（中签缴款由券商自动扣收）
+ *   红股入账(stock_dividend)：shares += bonus；cost_value 不变；cost_price = cost_value / new_shares 摊薄
+ *   拆分/合并(split)：shares × ratio；cost_price ÷ ratio；cost_value 不变
+ *   纳税(tax)：扣减账户 cash_balance；若带 product_code 则 realized_pnl -= amount
  *   分红/利息：不影响份额；找对应持仓累加 total_dividend += amount
- *   转账/手续费交易：不影响持仓
+ *   银证转入/转出/手续费：联动账户 cash_balance，不影响持仓
  *
  * 总收益（同花顺口径）：
  *   total_pnl = 浮动盈亏(market_value - cost_value) + realized_pnl + total_dividend
@@ -288,8 +292,8 @@ exports.main = async (event) => {
       return { success: true, message: `已应用${nameMap[type]}` };
     }
 
-    // 7. 其他未知类型（非买卖且未命中上述分支）：仅记录
-    if (type !== 'buy' && type !== 'sell') {
+    // 7. 其他未知类型（非买卖/打新中签且未命中上述分支）：仅记录
+    if (type !== 'buy' && type !== 'sell' && type !== 'ipo_win') {
       await db.collection('transactions').doc(transaction_id).update({
         data: { applied_holding: true, applied_at: db.serverDate() },
       });
@@ -316,8 +320,10 @@ exports.main = async (event) => {
     const existing = existRes.data[0];
     let resultHolding;
 
-    if (type === 'buy') {
+    if (type === 'buy' || type === 'ipo_win') {
       // 买入成本 = 份额 × 单价 + 手续费（同花顺口径）
+      // 打新中签 ipo_win 会计处理等同 buy（加权平均成本），并额外扣减账户现金余额
+      //   （中签缴款由券商从资金账户自动扣收，与普通买入的银证结算不同）
       const buyCost = shares * price + fee;
       if (existing) {
         const oldShares = Number(existing.shares) || 0;
@@ -387,6 +393,10 @@ exports.main = async (event) => {
         };
         const addRes = await db.collection('holdings').add({ data: newHolding });
         resultHolding = { ...newHolding, _id: addRes._id };
+      }
+      // 打新中签缴款由券商从资金账户自动扣收，联动扣减账户现金余额
+      if (type === 'ipo_win') {
+        await adjustAccountCash(txn.account_id, ownerOpenid, -buyCost);
       }
     } else {
       // 卖出

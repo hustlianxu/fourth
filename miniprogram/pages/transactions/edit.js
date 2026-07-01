@@ -349,7 +349,7 @@ Page({
 
     const type = form.type;
     // 需要产品代码才能匹配持仓的类型
-    const needsCode = ['buy', 'sell', 'dividend', 'interest', 'stock_dividend', 'split'].indexOf(type) >= 0;
+    const needsCode = ['buy', 'sell', 'ipo_win', 'dividend', 'interest', 'stock_dividend', 'split'].indexOf(type) >= 0;
     if (needsCode && !form.product_code) {
       wx.showToast({ title: '请输入产品代码', icon: 'none' });
       return;
@@ -362,7 +362,7 @@ Page({
     const ratio = form.ratio ? parseFloat(form.ratio) : 0;
 
     // 按类型校验关键数值字段
-    if (type === 'buy' || type === 'sell') {
+    if (type === 'buy' || type === 'sell' || type === 'ipo_win') {
       if (isNaN(amount) || amount <= 0) {
         wx.showToast({ title: '请输入有效金额', icon: 'none' });
         return;
