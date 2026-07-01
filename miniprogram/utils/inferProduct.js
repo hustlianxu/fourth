@@ -37,11 +37,15 @@ function inferProductType(code, accountType) {
 
   // A股/基金：6位数字
   if (/^\d{6}$/.test(c)) {
-    // 沪市 ETF
+    // 沪市 REITs（508xxx，必须在 50/51/52 之前判断）
+    if (/^508/.test(c)) return 'reit';
+    // 沪市科创50 ETF（588xxx，必须在 58 之前判断）
+    if (/^588/.test(c)) return 'etf';
+    // 沪市 ETF（50/51/52 开头，排除 508 后剩余）
     if (/^5[012]/.test(c)) return 'etf';
     // 沪市跨境ETF
     if (/^56/.test(c)) return 'etf';
-    // 沪市 REITs
+    // 沪市 REITs（58 开头，排除 588 后剩余）
     if (/^58/.test(c)) return 'reit';
     // 深市 ETF
     if (/^15/.test(c)) return 'etf';
@@ -74,7 +78,7 @@ function inferExchange(code) {
   if (/^[A-Z]/.test(c)) return 'US';
   if (/^\d{6}$/.test(c)) {
     if (/^6[08]/.test(c)) return 'SH';
-    if (/^5[0128]/.test(c)) return 'SH';
+    if (/^5[0128]/.test(c)) return 'SH';  // 50/51/52/58 均为沪市
     if (/^0[03]/.test(c)) return 'SZ';
     if (/^1[568]/.test(c)) return 'SZ';
   }

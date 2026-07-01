@@ -108,10 +108,11 @@ Page({
       const acc = this.data.accounts[accIdx] || {};
       // 同步 typeIndex：根据 product_type 反查 picker 索引（修复编辑回显时显示恒为"A股"的 Bug）
       const typeIdx = this.data.typeKeys.indexOf(h.product_type);
+      const exIdx = ['SH', 'SZ', 'HK', 'US'].indexOf(h.exchange);
       this.setData({
         accountIndex: Math.max(0, accIdx),
         typeIndex: typeIdx >= 0 ? typeIdx : 0,
-        exchangeIndex: ['SH', 'SZ', 'HK', 'US'].indexOf(h.exchange) || 0,
+        exchangeIndex: exIdx >= 0 ? exIdx : 0,
         currentAccountType: acc.type || '',
         form: {
           account_id: h.account_id || '',

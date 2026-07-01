@@ -29,6 +29,8 @@ function inferProductType(code) {
   if (/^\d{5}$/.test(c)) return 'hk_stock';
   if (/^[A-Z]/.test(c)) return 'us_stock';
   if (/^\d{6}$/.test(c)) {
+    if (/^508/.test(c)) return 'reit';
+    if (/^588/.test(c)) return 'etf';
     if (/^5[012]/.test(c)) return 'etf';
     if (/^56/.test(c)) return 'etf';
     if (/^58/.test(c)) return 'reit';

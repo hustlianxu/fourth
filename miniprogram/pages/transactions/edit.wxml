@@ -62,6 +62,8 @@
           bindtap="onSelectSuggestion"
           data-code="{{item.code}}"
           data-name="{{item.name}}"
+          data-type="{{item.type}}"
+          data-exchange="{{item.exchange}}"
         >
           <view class="suggestion-left">
             <text class="suggestion-name">{{item.name}}</text>
