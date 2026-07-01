@@ -47,12 +47,21 @@
   border-radius: 40rpx;
   border: 2rpx solid var(--border-color);
   transition: all 0.15s;
+  position: relative;
 }
 .provider-chip.selected {
   background: var(--primary-color);
   border-color: var(--primary-color);
+  box-shadow: 0 4rpx 12rpx rgba(108, 99, 255, 0.35);
 }
-.provider-chip.selected .chip-name { color: #fff; }
+.provider-chip.selected .chip-name { color: #fff; font-weight: 600; }
+.provider-chip.selected .chip-icon { opacity: 1; }
+.chip-check {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 700;
+  margin-left: 8rpx;
+}
 .chip-icon { width: 36rpx; height: 36rpx; margin-right: 8rpx; border-radius: 8rpx; }
 .chip-name { font-size: 26rpx; color: var(--text-primary); }
 
