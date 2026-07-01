@@ -36,7 +36,7 @@
 /* 模型多选 chips */
 .provider-chips {
   white-space: nowrap;
-  padding: 4rpx 0;
+  padding: 8rpx 0;
 }
 .provider-chip {
   display: inline-flex;
@@ -46,24 +46,38 @@
   background: var(--bg-input);
   border-radius: 40rpx;
   border: 2rpx solid var(--border-color);
-  transition: all 0.15s;
+  transition: all 0.2s ease;
   position: relative;
+  opacity: 0.6;
+}
+.provider-chip:active {
+  transform: scale(0.96);
 }
 .provider-chip.selected {
   background: var(--primary-color);
   border-color: var(--primary-color);
-  box-shadow: 0 4rpx 12rpx rgba(108, 99, 255, 0.35);
+  box-shadow: 0 0 0 4rpx rgba(74, 108, 247, 0.25), 0 4rpx 16rpx rgba(74, 108, 247, 0.3);
+  opacity: 1;
+  transform: scale(1.04);
 }
 .provider-chip.selected .chip-name { color: #fff; font-weight: 600; }
 .provider-chip.selected .chip-icon { opacity: 1; }
 .chip-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32rpx;
+  height: 32rpx;
+  background: rgba(255,255,255,0.25);
+  border-radius: 50%;
   color: #fff;
-  font-size: 28rpx;
+  font-size: 22rpx;
   font-weight: 700;
   margin-left: 8rpx;
+  flex-shrink: 0;
 }
-.chip-icon { width: 36rpx; height: 36rpx; margin-right: 8rpx; border-radius: 8rpx; }
-.chip-name { font-size: 26rpx; color: var(--text-primary); }
+.chip-icon { width: 36rpx; height: 36rpx; margin-right: 8rpx; border-radius: 8rpx; transition: transform 0.2s ease; }
+.provider-chip.selected .chip-icon { transform: scale(1.1); }
 
 /* 汇总模型选择 */
 .synth-row {
@@ -101,7 +115,8 @@
 .sub-report-header .chip-icon { width: 32rpx; height: 32rpx; margin-right: 8rpx; }
 .sub-report-provider { font-size: 26rpx; font-weight: 600; color: var(--text-primary); }
 .sub-report-error { font-size: 22rpx; color: var(--txn-sell); margin-left: 8rpx; }
-.sub-report-content { font-size: 24rpx; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; display: block; }
+.sub-report-content { font-size: 24rpx; color: var(--text-secondary); line-height: 1.6; display: block; }
+.sub-report-copy { margin-left: auto; font-size: 28rpx; padding: 4rpx 8rpx; }
 
 /* 持仓概况 */
 .overview-grid {
@@ -159,6 +174,13 @@
 .btn-primary[disabled] {
   opacity: 0.5;
 }
+.progress-hint {
+  display: block;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--primary-color);
+  margin-top: 8rpx;
+}
 .btn-hint {
   display: block;
   text-align: center;
@@ -212,6 +234,25 @@
   font-size: 26rpx;
   line-height: 1.7;
   color: var(--text-primary);
+}
+
+/* 导出按钮组 */
+.export-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid var(--divider-color);
+}
+.btn-export {
+  flex: 1;
+  padding: 16rpx 0;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  font-size: 24rpx;
+  color: var(--text-primary);
+  text-align: center;
+  border: 2rpx solid var(--border-color);
 }
 
 /* 历史记录 */

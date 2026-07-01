@@ -19,7 +19,7 @@
         bindtap="onToggleAnalyst"
         data-key="{{item.key}}"
       >
-        <image class="chip-icon" src="../../images/providers/provider_{{item.key}}.png" mode="aspectFit"></image>
+        <image class="chip-icon" src="../../images/providers/provider_{{item.key}}{{analysts.indexOf(item.key) >= 0 ? '_active' : ''}}.png" mode="aspectFit"></image>
         <text class="chip-name">{{item.name}}</text>
         <text class="chip-check" wx:if="{{analysts.indexOf(item.key) >= 0}}">✓</text>
       </view>
@@ -31,7 +31,7 @@
       已选 {{analysts.length}} 个分析模型
     </view>
 
-    <!-- 汇总模型：仅当选择 >1 个分析师时显示 -->
+    <!-- 汇总模型 -->
     <view class="synth-row" wx:if="{{analysts.length > 1}}">
       <text class="synth-label">汇总模型</text>
       <picker bindchange="onSynthChange" value="{{synthIndex}}" range="{{synthNames}}">
@@ -86,9 +86,10 @@
 
   <!-- 开始分析按钮 -->
   <view class="card">
-    <button class="btn-primary" bindtap="onStartAnalysis" disabled="{{!canAnalyze}}">
-      {{analyzing ? '分析中...' : '开始分析'}}
+    <button class="btn-primary" bindtap="onStartAnalysis" disabled="{{!canAnalyze || analyzing}}">
+      {{analyzing ? '分析中...' : (timedOut ? '继续分析' : '开始分析')}}
     </button>
+    <text class="progress-hint" wx:if="{{progress}}">{{progress}}</text>
     <text class="btn-hint" wx:if="{{!providerConfigured}}">请先配置 API Key</text>
     <text class="btn-hint" wx:elif="{{!summary.holdings || summary.holdings.length === 0}}">请先录入持仓数据</text>
   </view>
@@ -103,7 +104,13 @@
       <text>风险等级: </text>
       <text class="risk-badge">{{result.riskLevel}}</text>
     </view>
-    <view class="result-summary">{{result.summary}}</view>
+
+    <!-- 摘要（Markdown 渲染） -->
+    <view class="result-summary" wx:if="{{result.summaryHtml}}">
+      <rich-text nodes="{{result.summaryHtml}}"></rich-text>
+    </view>
+
+    <!-- 关键发现 -->
     <view class="result-findings" wx:if="{{result.keyFindings && result.keyFindings.length > 0}}">
       <view class="findings-title">关键发现</view>
       <view wx:for="{{result.keyFindings}}" wx:for-item="finding" wx:key="*this" class="finding-item">
@@ -111,11 +118,19 @@
         <text>{{finding}}</text>
       </view>
     </view>
-    <view class="result-content" wx:if="{{result.content}}">
-      <text class="result-text" user-select="{{true}}" decode="{{true}}">{{result.content}}</text>
+
+    <!-- 详细报告（Markdown 渲染） -->
+    <view class="result-content" wx:if="{{result.contentHtml}}">
+      <rich-text nodes="{{result.contentHtml}}"></rich-text>
     </view>
 
-    <!-- 多模型协作：各分析师独立报告（可折叠） -->
+    <!-- 导出按钮组 -->
+    <view class="export-actions" wx:if="{{result.content || result.summary}}">
+      <button class="btn-export" bindtap="onCopyReport">📋 复制报告</button>
+      <button class="btn-export" bindtap="onDownloadReport">📥 下载报告</button>
+    </view>
+
+    <!-- 多模型协作：各分析师独立报告 -->
     <view class="sub-reports" wx:if="{{result.subReports && result.subReports.length > 0}}">
       <view class="sub-reports-title" bindtap="onToggleSubReports">
         <text>各分析师独立报告（{{result.subReports.length}} 份）</text>
@@ -127,8 +142,11 @@
             <image class="chip-icon" src="../../images/providers/provider_{{sub.provider}}.png" mode="aspectFit"></image>
             <text class="sub-report-provider">{{sub.provider}}</text>
             <text class="sub-report-error" wx:if="{{sub.error}}">（失败：{{sub.error}}）</text>
+            <text class="sub-report-copy" wx:if="{{sub.content}}" bindtap="onCopySubReport" data-index="{{index}}">📋</text>
           </view>
-          <text class="sub-report-content" wx:if="{{sub.content}}" user-select="{{true}}" decode="{{true}}">{{sub.content}}</text>
+          <view class="sub-report-content" wx:if="{{sub.contentHtml}}">
+            <rich-text nodes="{{sub.contentHtml}}"></rich-text>
+          </view>
         </view>
       </view>
     </view>
@@ -169,8 +187,10 @@
       <view class="quick-q" bindtap="onQuickQuestion" data-q="当前仓位适合什么行情？">› 当前仓位适合什么行情？</view>
       <view class="quick-q" bindtap="onQuickQuestion" data-q="我是不是银行股太多了？">› 我是不是银行股太多了？</view>
     </view>
-    <view class="qa-answer" wx:if="{{qaAnswer}}">
-      <view class="qa-bubble">{{qaAnswer}}</view>
+    <view class="qa-answer" wx:if="{{qaAnswerHtml}}">
+      <view class="qa-bubble">
+        <rich-text nodes="{{qaAnswerHtml}}"></rich-text>
+      </view>
     </view>
   </view>
 

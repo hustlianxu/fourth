@@ -3,7 +3,10 @@
 <wxs src="../../utils/constants.wxs" module="c" />
 <view class="page">
   <view class="card">
-    <text class="page-title">📊 分析报告</text>
+    <view class="page-header">
+      <text class="page-title">📊 分析报告</text>
+      <text class="btn-copy" bindtap="onCopy">📋 导出</text>
+    </view>
     <view class="report-meta" wx:if="{{report._id}}">
       <text>分析时间: {{fmt.formatDate(report.created_at)}}</text>
       <text>使用模型: {{report.provider || 'unknown'}} / {{report.model || ''}}</text>
@@ -17,9 +20,13 @@
       <text class="risk-badge-{{report.riskClass}}">{{report.risk_level}}</text>
     </view>
 
+    <!-- 摘要（Markdown 渲染） -->
     <view class="section-title" wx:if="{{report.summary}}">摘要</view>
-    <view class="report-summary">{{report.summary}}</view>
+    <view class="report-summary" wx:if="{{summaryHtml}}">
+      <rich-text nodes="{{summaryHtml}}"></rich-text>
+    </view>
 
+    <!-- 关键发现 -->
     <view wx:if="{{report.key_findings && report.key_findings.length > 0}}">
       <view class="section-title">关键发现</view>
       <view wx:for="{{report.key_findings}}" wx:for-item="finding" wx:key="*this" class="finding-row">
@@ -27,9 +34,10 @@
       </view>
     </view>
 
+    <!-- 详细报告（Markdown 渲染） -->
     <view class="section-title">详细分析</view>
     <view class="report-content">
-      <text class="report-text" user-select="{{true}}" decode="{{true}}">{{report.report_content}}</text>
+      <rich-text nodes="{{contentHtml}}"></rich-text>
     </view>
   </view>
 

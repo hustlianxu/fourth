@@ -279,7 +279,7 @@ async function callOpenAICompatible(provider, apiKey, messages, model) {
       temperature: 0.3,
       max_tokens: 4096,
     }),
-    timeout: 45000,
+    timeout: 55000,
   });
 
   if (!res.ok) {
@@ -322,7 +322,7 @@ async function callClaude(apiKey, messages, model) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify(body),
-    timeout: 45000,
+    timeout: 55000,
   });
 
   if (!res.ok) {
@@ -348,7 +348,7 @@ async function callLLM(provider, apiKey, messages, model) {
  * 带重试的 LLM 调用（指数退避，默认重试 2 次）
  */
 async function callLLMWithRetry(provider, apiKey, messages, model, retries) {
-  const max = typeof retries === 'number' ? retries : 2;
+  const max = typeof retries === 'number' ? retries : 1;
   let lastErr;
   for (let attempt = 0; attempt <= max; attempt++) {
     try {
@@ -424,6 +424,18 @@ function parseAnalysisResult(content) {
 /**
  * 入口函数
  */
+/**
+ * 保存分析进度到 DB（用于超时续传）
+ */
+async function saveProgress(taskId, progress, data) {
+  if (!taskId) return;
+  try {
+    await db.collection('analysis_tasks').doc(taskId).update({
+      data: { progress, ...data, updated_at: db.serverDate() },
+    });
+  } catch (e) { /* 离线保存失败不影响主流程 */ }
+}
+
 exports.main = async (event) => {
   const {
     type = 'portfolio_health',
@@ -431,6 +443,7 @@ exports.main = async (event) => {
     question = '',
     analysts,           // 多 AI 协作：分析师 provider 数组（可选）
     synthesizer,        // 多 AI 协作：汇总 provider（可选，默认取 analysts[0]）
+    task_id = '',       // 前端创建的任务 ID（用于超时续传 + 进度跟踪）
   } = event;
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID || '';
@@ -484,6 +497,8 @@ exports.main = async (event) => {
         const model = cfg.model || PROVIDERS[ap].defaultModel || '';
         try {
           const content = await callLLMWithRetry(ap, apiKey, messages, model);
+          // 每完成一个分析师保存一次进度（用于超时续传）
+          await saveProgress(task_id, `analyst_${ap}`, { [`sub_${ap}`]: content.slice(0, 500) });
           return { provider: ap, content, model };
         } catch (err) {
           return { provider: ap, content: '', error: err.message };
