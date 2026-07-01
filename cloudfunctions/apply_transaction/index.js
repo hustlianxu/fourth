@@ -28,6 +28,42 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
+// 根据产品代码推断 product_type（用于交易缺类型时兜底）
+function inferProductType(code, accountType) {
+  if (!code) return '';
+  const c = String(code).trim().toUpperCase();
+  if (/^\d{5}$/.test(c)) return 'hk_stock';
+  if (/^[A-Z]/.test(c)) return 'us_stock';
+  if (/^\d{6}$/.test(c)) {
+    if (/^5[012]/.test(c)) return 'etf';
+    if (/^56/.test(c)) return 'etf';
+    if (/^58/.test(c)) return 'reit';
+    if (/^15/.test(c)) return 'etf';
+    if (/^16/.test(c)) return 'lof';
+    if (/^18/.test(c)) return 'reit';
+    if (/^6[08]/.test(c)) return 'stock';
+    if (/^0[03]/.test(c)) return 'stock';
+    if (accountType === 'fund_platform' || accountType === 'fund') return 'fund_mix';
+    return 'stock';
+  }
+  return '';
+}
+
+// 推断交易所
+function inferExchange(code) {
+  if (!code) return '';
+  const c = String(code).trim().toUpperCase();
+  if (/^\d{5}$/.test(c)) return 'HK';
+  if (/^[A-Z]/.test(c)) return 'US';
+  if (/^\d{6}$/.test(c)) {
+    if (/^6[08]/.test(c)) return 'SH';
+    if (/^5[0128]/.test(c)) return 'SH';
+    if (/^0[03]/.test(c)) return 'SZ';
+    if (/^1[568]/.test(c)) return 'SZ';
+  }
+  return '';
+}
+
 /**
  * 重算 total_pnl（在份额/成本/已实现/分红/手续费变化后调用）
  */
@@ -371,8 +407,8 @@ exports.main = async (event) => {
           account_id: txn.account_id,
           product_code: txn.product_code,
           product_name: txn.product_name || txn.product_code,
-          product_type: txn.product_type || '',
-          exchange: txn.exchange || '',
+          product_type: txn.product_type || inferProductType(txn.product_code) || '',
+          exchange: txn.exchange || inferExchange(txn.product_code) || '',
           shares: shares,
           cost_price: Number(newCostPrice.toFixed(4)),
           cost_value: Number(buyCost.toFixed(2)),

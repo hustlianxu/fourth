@@ -5,6 +5,7 @@
  */
 const api = require('../../utils/api');
 const { formatMoney } = require('../../utils/format');
+const { inferProductType, productTypeName } = require('../../utils/inferProduct');
 
 const DIMENSIONS = [
   { key: 'product_type', name: '产品类型' },
@@ -61,7 +62,8 @@ Page({
       let name = '';
       switch (currentDim) {
         case 'product_type':
-          name = h.product_type || '未分类';
+          // 缺类型时按代码推断兜底，并映射为中文名（如 stock→股票，etf→ETF）
+          name = productTypeName(h.product_type || inferProductType(h.product_code));
           break;
         case 'exchange':
           name = h.exchange || '未知';

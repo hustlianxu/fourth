@@ -72,6 +72,12 @@
     <text>加载中...</text>
   </view>
 
+  <view class="card hint-card" wx:if="{{!loading && currentDim === 'product_type'}}">
+    <text class="hint-text">💡 产品类型由系统按代码自动识别（60/68=股票，50/51/52=ETF，16=LOF等）。如识别有误可在持仓编辑页修改。</text>
+  </view>
+  <view class="card hint-card" wx:if="{{!loading && currentDim === 'strategy'}}">
+    <text class="hint-text">💡 策略维度依赖持仓的「策略/计划名称」字段。在持仓编辑页可填写（如：长赢150份、S定投、螺丝钉定投），未填写的将归入「未分类」。</text>
+  </view>
   <view class="card hint-card" wx:if="{{!loading && currentDim === 'industry'}}">
     <text class="hint-text">💡 行业维度依赖持仓的「行业」字段。在持仓编辑页可手动填写行业（如：银行、半导体、新能源），未填写的将归入「未分类」。</text>
   </view>

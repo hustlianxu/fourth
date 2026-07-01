@@ -22,6 +22,40 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
+// 根据产品代码推断 product_type（用于交易缺类型时兜底）
+function inferProductType(code) {
+  if (!code) return '';
+  const c = String(code).trim().toUpperCase();
+  if (/^\d{5}$/.test(c)) return 'hk_stock';
+  if (/^[A-Z]/.test(c)) return 'us_stock';
+  if (/^\d{6}$/.test(c)) {
+    if (/^5[012]/.test(c)) return 'etf';
+    if (/^56/.test(c)) return 'etf';
+    if (/^58/.test(c)) return 'reit';
+    if (/^15/.test(c)) return 'etf';
+    if (/^16/.test(c)) return 'lof';
+    if (/^18/.test(c)) return 'reit';
+    if (/^6[08]/.test(c)) return 'stock';
+    if (/^0[03]/.test(c)) return 'stock';
+    return 'stock';
+  }
+  return '';
+}
+
+function inferExchange(code) {
+  if (!code) return '';
+  const c = String(code).trim().toUpperCase();
+  if (/^\d{5}$/.test(c)) return 'HK';
+  if (/^[A-Z]/.test(c)) return 'US';
+  if (/^\d{6}$/.test(c)) {
+    if (/^6[08]/.test(c)) return 'SH';
+    if (/^5[0128]/.test(c)) return 'SH';
+    if (/^0[03]/.test(c)) return 'SZ';
+    if (/^1[568]/.test(c)) return 'SZ';
+  }
+  return '';
+}
+
 // 云数据库单次 get 上限 100 条，需分页拉取
 const PAGE_SIZE = 100;
 
@@ -81,8 +115,8 @@ exports.main = async (event) => {
           account_id: t.account_id,
           product_code: t.product_code,
           product_name: t.product_name || t.product_code,
-          product_type: t.product_type || '',
-          exchange: t.exchange || '',
+          product_type: t.product_type || inferProductType(t.product_code) || '',
+          exchange: t.exchange || inferExchange(t.product_code) || '',
           shares: 0,
           cost_price: 0,
           cost_value: 0,
@@ -190,13 +224,20 @@ exports.main = async (event) => {
         realized_pnl: h.realized_pnl,
         total_dividend: h.total_dividend,
         total_fee: h.total_fee,
+        // 补全 product_type/exchange（仅当现有持仓缺失时写入，不覆盖用户手填值）
+        product_type: h.product_type || inferProductType(h.product_code) || '',
+        exchange: h.exchange || inferExchange(h.product_code) || '',
         updated_at: db.serverDate(),
       };
 
       if (existRes.data.length > 0) {
         // 保留现有的 current_price/market_value 等行情字段，仅更新份额/成本/累计字段
         // total_pnl 等行情刷新时由 sync_prices 重算
-        await db.collection('holdings').doc(existRes.data[0]._id).update({ data: updateData });
+        // product_type/exchange 仅在现有持仓该字段为空时补全，不覆盖用户手填值
+        const existH = existRes.data[0];
+        if (existH.product_type) delete updateData.product_type;
+        if (existH.exchange) delete updateData.exchange;
+        await db.collection('holdings').doc(existH._id).update({ data: updateData });
       } else {
         // 新建
         const newHolding = Object.assign({}, updateData, {

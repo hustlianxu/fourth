@@ -118,6 +118,26 @@ function inferStockPrefix(code, exchange) {
   return 'sh';
 }
 
+// 根据代码推断 product_type（用于持仓缺类型时兜底回写）
+function inferProductType(code) {
+  if (!code) return '';
+  const c = String(code).trim().toUpperCase();
+  if (/^\d{5}$/.test(c)) return 'hk_stock';
+  if (/^[A-Z]/.test(c)) return 'us_stock';
+  if (/^\d{6}$/.test(c)) {
+    if (/^5[012]/.test(c)) return 'etf';
+    if (/^56/.test(c)) return 'etf';
+    if (/^58/.test(c)) return 'reit';
+    if (/^15/.test(c)) return 'etf';
+    if (/^16/.test(c)) return 'lof';
+    if (/^18/.test(c)) return 'reit';
+    if (/^6[08]/.test(c)) return 'stock';
+    if (/^0[03]/.test(c)) return 'stock';
+    return 'stock';
+  }
+  return '';
+}
+
 async function fetchAllHoldings() {
   const PAGE_SIZE = 100;
   let all = [];
@@ -211,6 +231,11 @@ exports.main = async (event) => {
       };
       if (h.exchange !== correctExchange) {
         updateData.exchange = correctExchange;
+      }
+      // 顺带补全 product_type（仅当持仓缺类型时，按代码推断回写）
+      if (!h.product_type) {
+        const inferredType = inferProductType(h.product_code);
+        if (inferredType) updateData.product_type = inferredType;
       }
 
       await db.collection('holdings').doc(h._id).update({ data: updateData });
