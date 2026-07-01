@@ -309,6 +309,19 @@ async function parseTradesByText(params) {
   return callCloudFunction(CLOUD_FUNCTIONS.PARSE_TRADES_BY_TEXT, params);
 }
 
+/**
+ * 推断持仓行业分类（LLM 批量推断，写回 holdings.industry）
+ * @param {object} params - { holding_ids?, only_missing?, force?, provider? }
+ *   holding_ids?: string[]  指定持仓 ID（为空则处理全部）
+ *   only_missing?: boolean  仅推断 industry 为空的持仓（默认 true）
+ *   force?: boolean         强制重新推断（忽略开关与 only_missing）
+ *   provider?: string       指定 LLM 提供商
+ * @returns {Promise<{success, processed, updated, skipped, failed, results}>}
+ */
+async function inferIndustry(params) {
+  return callCloudFunction(CLOUD_FUNCTIONS.INFER_INDUSTRY, params);
+}
+
 module.exports = {
   callCloudFunction,
   refreshPrices,
@@ -324,4 +337,5 @@ module.exports = {
   getHoldings,
   getPortfolioSummary,
   parseTradesByText,
+  inferIndustry,
 };

@@ -79,6 +79,6 @@
     <text class="hint-text">💡 策略维度依赖持仓的「策略/计划名称」字段。在持仓编辑页可填写（如：长赢150份、S定投、螺丝钉定投），未填写的将归入「未分类」。</text>
   </view>
   <view class="card hint-card" wx:if="{{!loading && currentDim === 'industry'}}">
-    <text class="hint-text">💡 行业维度依赖持仓的「行业」字段。在持仓编辑页可手动填写行业（如：银行、半导体、新能源），未填写的将归入「未分类」。</text>
+    <text class="hint-text">💡 行业维度依赖持仓的「行业」字段。可在持仓列表点「🏷 刷新行业」由 AI 自动推断（不覆盖手填值），或在持仓编辑页手动填写。未填写的将归入「未分类」。</text>
   </view>
 </view>

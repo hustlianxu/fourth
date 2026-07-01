@@ -56,7 +56,12 @@ page {
 /* 暗色模式 - 预留 */
 @media (prefers-color-scheme: dark) {
   page {
-    --primary-soft: rgba(74,108,247,0.18);
+    /* 主色提亮，保证暗底上的选中态/按钮有足够对比度 */
+    --primary-color: #6e8bff;
+    --primary-light: #8aa2ff;
+    --primary-dark: #4a6cf7;
+    --primary-soft: rgba(110,139,255,0.18);
+    --primary-color-rgb: 110,139,255;
     --bg-primary: #1c1c1e;
     --bg-card: #2c2c2e;
     --bg-input: #3a3a3c;

@@ -146,6 +146,7 @@ const CLOUD_FUNCTIONS = {
   SAVE_NOTIFY_SETTINGS: 'save_notify_settings',
   GET_NOTIFY_SETTINGS: 'get_notify_settings',
   CHECK_PRICE_ALERT: 'check_price_alert',
+  INFER_INDUSTRY: 'infer_industry',
 };
 
 module.exports = {

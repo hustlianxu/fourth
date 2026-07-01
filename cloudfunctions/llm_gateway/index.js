@@ -217,7 +217,8 @@ async function getHoldingsSummary(openid) {
     const cv = h.cost_value || h.shares * h.cost_price || 0;
     totalMarketValue += mv;
     totalCostValue += cv;
-    const sector = h.sector || '其他';
+    // 行业取 holdings.industry 字段（修复原 h.sector 字段名不匹配导致行业分布全部归入"其他"的 bug）
+    const sector = h.industry || '其他';
     sectorMap[sector] = (sectorMap[sector] || 0) + mv;
   });
 

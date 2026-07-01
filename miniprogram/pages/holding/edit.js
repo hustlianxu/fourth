@@ -31,6 +31,8 @@ Page({
       strategy: '',
       // 行业分类（用于多维度分析，如：银行、半导体、新能源）
       industry: '',
+      // 是否参与「刷新行业」AI 推断任务（默认开启）
+      industry_auto_refresh: true,
       // 单基金费率覆盖（优先级 > 账户层级配置）
       management_fee_rate: '',
       custodian_fee_rate: '',
@@ -126,6 +128,7 @@ Page({
           note: h.note || '',
           strategy: h.strategy || '',
           industry: h.industry || '',
+          industry_auto_refresh: h.industry_auto_refresh !== false,
           management_fee_rate: h.management_fee_rate != null ? String(h.management_fee_rate) : '',
           custodian_fee_rate: h.custodian_fee_rate != null ? String(h.custodian_fee_rate) : '',
           advisory_fee_rate: h.advisory_fee_rate != null ? String(h.advisory_fee_rate) : '',
@@ -287,6 +290,10 @@ Page({
     this.setData({ 'form.industry': e.detail.value });
   },
 
+  onAutoRefreshChange(e) {
+    this.setData({ 'form.industry_auto_refresh': e.detail.value });
+  },
+
   onMgmtFeeInput(e) {
     this.setData({ 'form.management_fee_rate': e.detail.value });
   },
@@ -344,6 +351,8 @@ Page({
         strategy: f.strategy || '',
         // 行业分类（用于多维度分析）
         industry: f.industry || '',
+        // 是否参与「刷新行业」AI 推断任务
+        industry_auto_refresh: f.industry_auto_refresh !== false,
         // 单基金费率覆盖（优先级高于账户层级配置）
         management_fee_rate: parseFloat(f.management_fee_rate) || 0,
         custodian_fee_rate: parseFloat(f.custodian_fee_rate) || 0,

@@ -48,7 +48,7 @@
   border: 2rpx solid var(--border-color);
   transition: all 0.2s ease;
   position: relative;
-  opacity: 0.6;
+  opacity: 0.55;
 }
 .provider-chip:active {
   transform: scale(0.96);
@@ -56,7 +56,8 @@
 .provider-chip.selected {
   background: var(--primary-color);
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 4rpx rgba(74, 108, 247, 0.25), 0 4rpx 16rpx rgba(74, 108, 247, 0.3);
+  /* 使用主色变量，保证暗黑模式下光晕与主色一致 */
+  box-shadow: 0 0 0 4rpx rgba(var(--primary-color-rgb), 0.28), 0 6rpx 20rpx rgba(var(--primary-color-rgb), 0.4);
   opacity: 1;
   transform: scale(1.04);
 }
@@ -68,7 +69,7 @@
   justify-content: center;
   width: 32rpx;
   height: 32rpx;
-  background: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.3);
   border-radius: 50%;
   color: #fff;
   font-size: 22rpx;
@@ -155,7 +156,8 @@
 }
 .analysis-type-item.selected {
   border-color: var(--primary-color);
-  background: var(--bg-card);
+  /* 选中态用主色浅底，在明亮/暗黑模式下都明显区别于未选中的 --bg-input */
+  background: var(--primary-soft);
 }
 .type-icon { font-size: 36rpx; display: block; }
 .type-name { font-size: 28rpx; font-weight: 600; margin-top: 8rpx; display: block; }
