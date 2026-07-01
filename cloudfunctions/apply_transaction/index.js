@@ -148,17 +148,25 @@ exports.main = async (event) => {
         // 累计手续费
         const oldFee = Number(existing.total_fee) || 0;
         const newTotalFee = oldFee + fee;
-        // 重算浮动盈亏 & 总收益
-        const mv = Number(existing.market_value) || 0;
+        // 重算市值/浮动盈亏/总收益：用 newShares × current_price 重算市值，
+        // 不能复用旧 market_value（份额已变，旧值已失效）
+        const curPrice = Number(existing.current_price) || price;
+        const newMarketValue = Number((newShares * curPrice).toFixed(2));
+        const newPnl = Number((newMarketValue - newCostValue).toFixed(2));
+        const newPnlPercent = newCostValue > 0
+          ? Number(((newPnl / newCostValue) * 100).toFixed(2)) : 0;
         const newTotalPnl = recomputeTotalPnl(
           { ...existing, total_fee: newTotalFee },
-          mv, newCostValue
+          newMarketValue, newCostValue
         );
 
         const updateData = {
           shares: newShares,
           cost_price: Number(newCost.toFixed(4)),
           cost_value: Number(newCostValue.toFixed(2)),
+          market_value: newMarketValue,
+          pnl: newPnl,
+          pnl_percent: newPnlPercent,
           total_fee: Number(newTotalFee.toFixed(2)),
           total_pnl: newTotalPnl,
           is_cleared: false,
@@ -224,24 +232,31 @@ exports.main = async (event) => {
       const oldFee = Number(existing.total_fee) || 0;
       const newTotalFee = oldFee + fee;
 
+      // 重算市值/浮动盈亏/总收益：用 finalShares × current_price 重算市值，
+      // 不能复用旧 market_value（份额已变，旧值已失效）
+      const curPrice = Number(existing.current_price) || price;
+      const newMarketValue = isCleared ? 0
+        : Number((finalShares * curPrice).toFixed(2));
+      const newPnl = Number((newMarketValue - newCostValue).toFixed(2));
+      const newPnlPercent = newCostValue > 0
+        ? Number(((newPnl / newCostValue) * 100).toFixed(2)) : 0;
+      const newTotalPnl = recomputeTotalPnl(
+        { ...existing, realized_pnl: newRealized, total_fee: newTotalFee },
+        newMarketValue, newCostValue
+      );
+
       const updateData = {
         shares: finalShares,
         is_cleared: isCleared,
         cost_value: newCostValue,
+        market_value: newMarketValue,
+        pnl: newPnl,
+        pnl_percent: newPnlPercent,
         realized_pnl: Number(newRealized.toFixed(2)),
         total_fee: Number(newTotalFee.toFixed(2)),
+        total_pnl: newTotalPnl,
         updated_at: db.serverDate(),
       };
-
-      const mv = isCleared ? 0 : (Number(existing.market_value) || 0);
-      const newTotalPnl = recomputeTotalPnl(
-        { ...existing, realized_pnl: newRealized, total_fee: newTotalFee },
-        mv, newCostValue
-      );
-      updateData.total_pnl = newTotalPnl;
-      if (isCleared) {
-        updateData.market_value = 0;
-      }
 
       await db.collection('holdings').doc(existing._id).update({ data: updateData });
       resultHolding = { ...existing, ...updateData };

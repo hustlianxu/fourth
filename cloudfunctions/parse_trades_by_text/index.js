@@ -74,7 +74,7 @@ function buildParsePrompt(text) {
 1. 日期格式统一为 YYYY-MM-DD，年份缺失时用当前年份 ${year}
 2. 金额"36块5""36.5""36元5"都解析为 36.50
 3. type 只能是：buy(买入) / sell(卖出) / dividend(分红) / transfer_in(转入) / transfer_out(转出) / fee(手续费) / interest(利息)
-4. 产品代码缺失时填空字符串，产品名称尽量保留原文
+4. 产品代码（product_code）：如果用户输入中已明确给出代码，直接使用；如果用户只提供了产品名称而未给代码，你必须根据产品名称从你的知识库中查找对应的A股/港股/基金代码并填入 product_code 字段（例如：招商银行→600036，华工科技→000988，贵州茅台→600519，中国平安→601318，腾讯→00700，沪深300ETF→510300，易方达蓝筹精选→005827）。若产品名称有简称/全称差异，按最常见的上市交易代码填写。只有当你完全无法确定代码时才填空字符串。产品名称尽量保留用户原文。
 5. 手续费：用户明确提到时填入 fee 字段（单位：元）；未提到则填 0（系统会按账户费率自动计算，无需估算）
 6. 分红/利息类交易 shares 和 price 填 0，amount 填实际金额
 7. buy/sell 的 amount = shares × price（不含手续费）
@@ -85,7 +85,7 @@ function buildParsePrompt(text) {
   {
     "type": "buy",
     "product_name": "招商银行",
-    "product_code": "",
+    "product_code": "600036",
     "shares": 1000,
     "price": 36.50,
     "fee": 5,

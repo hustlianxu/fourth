@@ -75,6 +75,21 @@ async function fetchFundPrices(fundCodes) {
   return result;
 }
 
+/**
+ * 根据代码推断交易所前缀（比 exchange 字段更可靠）
+ * 沪市: 60xxxx(主板) 68xxxx(科创板) 50/51/52/56/58xxxx(ETF/基金)
+ * 深市: 00xxxx(主板) 30xxxx(创业板) 15/16/12/14xxxx(基金/ETF)
+ * 港股: exchange=hk
+ */
+function inferStockPrefix(code, exchange) {
+  const ex = (exchange || '').toLowerCase();
+  if (ex === 'hk') return 'hk';
+  if (/^(60|68|50|51|52|56|58)/.test(code)) return 'sh';
+  if (/^(00|30|15|16|12|14)/.test(code)) return 'sz';
+  if (ex === 'sz') return 'sz';
+  return 'sh';
+}
+
 async function fetchAllHoldings(openid) {
   const PAGE_SIZE = 100;
   let all = [];
@@ -104,12 +119,13 @@ exports.main = async (event) => {
     const fundCodes = [];
     for (const h of holdings) {
       const type = h.product_type;
-      const exchange = (h.exchange || 'SH').toLowerCase();
       const code = h.product_code;
-      if (['stock', 'etf', 'lof', 'hk_stock', 'us_stock'].includes(type)) {
-        let prefix = 'sh';
-        if (exchange === 'sz') prefix = 'sz';
-        else if (exchange === 'hk') prefix = 'hk';
+      if (!code) continue;
+      // product_type 缺失时按 6 位数字代码推断为股票/ETF，避免行情永远不更新
+      const isStock = ['stock', 'etf', 'lof', 'hk_stock', 'us_stock'].includes(type)
+        || (!type && /^\d{6}$/.test(code));
+      if (isStock) {
+        const prefix = inferStockPrefix(code, h.exchange);
         stockCodes.push(`${prefix}${code}`);
       } else if (type && type.indexOf('fund') === 0) {
         fundCodes.push(code);
@@ -131,31 +147,40 @@ exports.main = async (event) => {
         || allPrices[`hk${h.product_code}`];
       if (!priceData || !priceData.price) continue;
 
-      const marketValue = h.shares * priceData.price;
+      const marketValue = Number((h.shares * priceData.price).toFixed(2));
       // cost_value 为 0 是合法值（清仓持仓），仅在 null/undefined/NaN 时回退到 shares × cost_price
       const costValue = (h.cost_value !== null && h.cost_value !== undefined && !isNaN(h.cost_value))
         ? Number(h.cost_value)
         : (Number(h.shares) || 0) * (Number(h.cost_price) || 0);
-      const pnl = marketValue - costValue;
-      const pnlPercent = costValue > 0 ? (pnl / costValue) * 100 : 0;
-      const dailyChange = priceData.change || 0;
+      const pnl = Number((marketValue - costValue).toFixed(2));
+      const pnlPercent = costValue > 0 ? Number(((pnl / costValue) * 100).toFixed(2)) : 0;
+      const dailyChange = Number(priceData.change) || 0;
+      const dailyChangePercent = Number(priceData.changePercent) || 0;
       // 总收益（同花顺口径）：浮动 + 已实现 + 分红
       // 手续费已计入成本(买入)与已实现盈亏(卖出)，不重复扣减
       const realized = Number(h.realized_pnl) || 0;
       const dividend = Number(h.total_dividend) || 0;
       const totalPnl = Number((pnl + realized + dividend).toFixed(2));
 
-      await db.collection('holdings').doc(h._id).update({
-        data: {
-          current_price: priceData.price,
-          market_value: marketValue,
-          pnl,
-          pnl_percent: pnlPercent,
-          total_pnl: totalPnl,
-          daily_change: dailyChange,
-          price_updated_at: db.serverDate(),
-        },
-      });
+      // 顺带修正交易所（exchange 为空或与推断不符时写回，保证后续接口/费率正确）
+      const correctPrefix = inferStockPrefix(h.product_code, h.exchange);
+      const correctExchange = correctPrefix === 'hk' ? 'HK'
+        : (correctPrefix === 'sz' ? 'SZ' : 'SH');
+      const updateData = {
+        current_price: priceData.price,
+        market_value: marketValue,
+        pnl,
+        pnl_percent: pnlPercent,
+        total_pnl: totalPnl,
+        daily_change: dailyChange,
+        daily_change_percent: dailyChangePercent,
+        price_updated_at: db.serverDate(),
+      };
+      if (h.exchange !== correctExchange) {
+        updateData.exchange = correctExchange;
+      }
+
+      await db.collection('holdings').doc(h._id).update({ data: updateData });
       updateCount++;
     }
 
