@@ -88,8 +88,8 @@
         </view>
       </view>
       <view class="trade-detail">
-        <text wx:if="{{item.shares > 0}}">{{item.shares}} 股 × ¥{{item.price}}</text>
-        <text class="trade-amount">¥{{item.amountText}}</text>
+        <text wx:if="{{item.shares > 0 && item.type !== 'stock_dividend'}}">{{item.shares}} 股 × ¥{{item.price}}</text>
+        <text class="trade-amount">{{item.type === 'split' || item.type === 'stock_dividend' ? '' : '¥'}}{{item.amountText}}</text>
         <text class="trade-fee" wx:if="{{item.feeText}}">{{item.feeText}}</text>
       </view>
       <view class="trade-actions">
@@ -143,6 +143,10 @@
       <view class="edit-row">
         <text class="edit-label">单价</text>
         <input class="edit-input" type="digit" value="{{editTrade.price}}" bindinput="onEditField" data-field="price" />
+      </view>
+      <view class="edit-row" wx:if="{{editTrade.type === 'split'}}">
+        <text class="edit-label">拆分比例</text>
+        <input class="edit-input" type="digit" value="{{editTrade.ratio}}" bindinput="onEditField" data-field="ratio" placeholder="1拆3 填 3，3合1 填 0.333" />
       </view>
       <view class="edit-row">
         <text class="edit-label">手续费</text>

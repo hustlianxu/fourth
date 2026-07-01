@@ -12,14 +12,18 @@ const db = wx.cloud.database();
 const TYPE_LABELS = {
   buy: '买入',
   sell: '卖出',
+  ipo_win: '打新中签',
   dividend: '分红',
-  transfer_in: '转入',
-  transfer_out: '转出',
+  stock_dividend: '红股入账',
+  split: '拆分/合并',
+  tax: '纳税',
+  transfer_in: '银证转入',
+  transfer_out: '银证转出',
   fee: '手续费',
   interest: '利息',
 };
 
-const TYPE_KEYS = ['buy', 'sell', 'dividend', 'transfer_in', 'transfer_out', 'fee', 'interest'];
+const TYPE_KEYS = ['buy', 'sell', 'ipo_win', 'dividend', 'stock_dividend', 'split', 'tax', 'transfer_in', 'transfer_out', 'fee', 'interest'];
 const TYPE_NAME_LIST = TYPE_KEYS.map(k => TYPE_LABELS[k]);
 
 Page({
@@ -34,8 +38,8 @@ Page({
     importing: false,
     parsedTrades: [],      // 解析结果（预览用）
     warnings: [],
-    sampleText: '3月15号买入1000股招商银行，36块5，手续费5块\n4月20号卖出500股招商银行，38块2\n5月10号买入2000股上证50ETF，2.85\n6月1号招行分红500块',
-    sampleJson: '[\n  {\n    "type": "buy",\n    "product_name": "招商银行",\n    "product_code": "600036",\n    "shares": 1000,\n    "price": 36.50,\n    "fee": 5,\n    "amount": 36500,\n    "trade_date": "2025-03-15",\n    "note": ""\n  }\n]',
+    sampleText: '3月15号买入1000股招商银行，36块5，手续费5块\n4月20号卖出500股招商银行，38块2\n5月10号买入2000股上证50ETF，2.85\n6月1号招行分红500块\n7月15号茅台10送1股红股\n8月2号通信ETF 1拆3\n9月20号打新中签某新股500股，发行价12块5',
+    sampleJson: '[\n  {\n    "type": "buy",\n    "product_name": "招商银行",\n    "product_code": "600036",\n    "shares": 1000,\n    "price": 36.50,\n    "fee": 5,\n    "amount": 36500,\n    "ratio": 0,\n    "trade_date": "2025-03-15",\n    "note": ""\n  },\n  {\n    "type": "stock_dividend",\n    "product_name": "贵州茅台",\n    "product_code": "600519",\n    "shares": 100,\n    "price": 0,\n    "amount": 0,\n    "fee": 0,\n    "ratio": 0,\n    "trade_date": "2025-07-15",\n    "note": "10送1"\n  },\n  {\n    "type": "split",\n    "product_name": "通信ETF",\n    "product_code": "515880",\n    "shares": 0,\n    "price": 0,\n    "amount": 0,\n    "fee": 0,\n    "ratio": 3,\n    "trade_date": "2025-08-02",\n    "note": "1拆3"\n  }\n]',
     // 编辑弹层
     editVisible: false,
     editIndex: -1,
@@ -147,13 +151,22 @@ Page({
         this.setData({ parsing: false });
         return;
       }
-      const trades = (res.trades || []).map((t, i) => ({
-        ...t,
-        uid: 't' + Date.now() + '_' + i,
-        typeLabel: TYPE_LABELS[t.type] || t.type,
-        amountText: t.amount.toFixed(2),
-        feeText: t.fee > 0 ? `（手续费 ¥${t.fee.toFixed(2)}）` : '',
-      }));
+      const trades = (res.trades || []).map((t, i) => {
+        // 展示金额：split/stock_dividend 无现金流，展示 ratio 或份额
+        let amountText = t.amount.toFixed(2);
+        if (t.type === 'split' && t.ratio) {
+          amountText = t.ratio > 1 ? `1拆${t.ratio}` : `${(1/t.ratio).toFixed(0)}合1`;
+        } else if (t.type === 'stock_dividend') {
+          amountText = `送 ${t.shares} 股`;
+        }
+        return {
+          ...t,
+          uid: 't' + Date.now() + '_' + i,
+          typeLabel: TYPE_LABELS[t.type] || t.type,
+          amountText,
+          feeText: t.fee > 0 ? `（手续费 ¥${t.fee.toFixed(2)}）` : '',
+        };
+      });
       this.setData({
         parsedTrades: trades,
         warnings: res.warnings || [],
@@ -223,10 +236,11 @@ Page({
     const shares = Number(t.shares) || 0;
     const price = Number(t.price) || 0;
     const fee = Number(t.fee) || 0;
+    const ratio = Number(t.ratio) || 0;
     let amount = Number(t.amount);
     if (isNaN(amount)) amount = 0;
-    // 买卖缺金额时按份额×单价补全
-    if ((t.type === 'buy' || t.type === 'sell') && amount === 0 && shares > 0 && price > 0) {
+    // 买卖/打新中签缺金额时按份额×单价补全
+    if ((t.type === 'buy' || t.type === 'sell' || t.type === 'ipo_win') && amount === 0 && shares > 0 && price > 0) {
       amount = shares * price;
     }
     const tradeDate = String(t.trade_date || '');
@@ -234,15 +248,23 @@ Page({
       wx.showToast({ title: '日期格式应为 YYYY-MM-DD', icon: 'none' });
       return;
     }
+    // 与 callParse 一致的展示口径：split/stock_dividend 无现金流，展示 ratio 或份额
+    let amountText = amount.toFixed(2);
+    if (t.type === 'split' && ratio > 0) {
+      amountText = ratio > 1 ? `1拆${ratio}` : `${(1 / ratio).toFixed(0)}合1`;
+    } else if (t.type === 'stock_dividend' && shares > 0) {
+      amountText = `送 ${shares} 股`;
+    }
     const updated = {
       ...t,
       shares,
       price,
       fee,
+      ratio,
       amount: Number(amount.toFixed(2)),
       trade_date: tradeDate,
       typeLabel: TYPE_LABELS[t.type] || t.type,
-      amountText: amount.toFixed(2),
+      amountText,
       feeText: fee > 0 ? `（手续费 ¥${fee.toFixed(2)}）` : '',
     };
     const list = this.data.parsedTrades.slice();
@@ -281,6 +303,7 @@ Page({
             shares: t.shares,
             price: t.price,
             fee: t.fee,
+            ratio: t.ratio || 0,
             amount: t.amount,
             trade_date: t.trade_date,
             note: t.note,

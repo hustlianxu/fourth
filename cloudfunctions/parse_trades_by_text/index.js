@@ -73,15 +73,25 @@ function buildParsePrompt(text) {
 规则：
 1. 日期格式统一为 YYYY-MM-DD，年份缺失时用当前年份 ${year}
 2. 金额"36块5""36.5""36元5"都解析为 36.50
-3. type 只能是：buy(买入) / sell(卖出) / ipo_win(打新中签/新股中签/中签缴款) / dividend(分红/现金分红) / stock_dividend(红股入账/送股) / split(份额拆分或合并) / tax(纳税/扣税) / transfer_in(银证转入/资金转入) / transfer_out(银证转出/资金转出) / fee(手续费) / interest(利息)
-4. 产品代码（product_code）：如果用户输入中已明确给出代码，直接使用；如果用户只提供了产品名称而未给代码，你必须根据产品名称从你的知识库中查找对应的A股/港股/基金代码并填入 product_code 字段（例如：招商银行→600036，华工科技→000988，贵州茅台→600519，中国平安→601318，腾讯→00700，沪深300ETF→510300，易方达蓝筹精选→005827）。若产品名称有简称/全称差异，按最常见的上市交易代码填写。只有当你完全无法确定代码时才填空字符串。产品名称尽量保留用户原文。注意：transfer_in/transfer_out/fee/tax 若未指明具体产品，product_code 填空字符串。
+3. type 只能是以下之一（注意区分相似概念）：
+   - buy(买入) / sell(卖出)
+   - ipo_win(打新中签/新股中签/中签缴款/新股申购中签)
+   - dividend(现金分红/分红派息/派现/到账分红) —— 注意：现金分红有金额到账
+   - stock_dividend(红股入账/送股/转增/公积金转增/送红股) —— 注意：送股只增加份额无现金到账
+   - split(份额拆分/合并/拆分/折分/缩股/合股/拆股/拆细) —— 基金拆分和股票拆分均归此类
+   - tax(纳税/扣税/缴税/红利税/个税/限售股纳税)
+   - transfer_in(银证转入/资金转入/入金)
+   - transfer_out(银证转出/资金转出/出金)
+   - fee(手续费/佣金/过户费)
+   - interest(利息/利息收入)
+4. 产品代码（product_code）：如果用户输入中已明确给出代码，直接使用；如果用户只提供了产品名称而未给代码，你必须根据产品名称从你的知识库中查找对应的A股/港股/基金代码并填入 product_code 字段（例如：招商银行→600036，华工科技→000988，贵州茅台→600519，中国平安→601318，腾讯→00700，沪深300ETF→510300，易方达蓝筹精选→005827）。若产品名称有简称/全称差异，按最常见的上市交易代码填写。只有当你完全无法确定代码时才填空字符串。产品名称尽量保留用户原文。注意：transfer_in/transfer_out/fee 若未指明具体产品，product_code 填空字符串；tax 如对应具体股票则填 product_code，否则留空。
 5. 手续费：用户明确提到时填入 fee 字段（单位：元）；未提到则填 0（系统会按账户费率自动计算，无需估算）
 6. dividend(现金分红)/interest(利息)：shares 和 price 填 0，amount 填实际到账金额
 7. stock_dividend(红股入账/送股)：shares 填红股股数（新增份额），price/amount/fee 填 0；总成本不变，成本价由系统自动摊薄
 8. split(份额拆分/合并)：ratio 填拆分比例（如 1拆3 填 3，3合1 填 0.333），shares/price/amount/fee 填 0；总资产不变由系统自动调整
-9. tax(纳税/扣税)：amount 填已扣缴税额，shares/price 填 0；如对应具体股票则填 product_code，否则留空
+9. tax(纳税/扣税)：amount 填已扣缴税额，shares/price 填 0
 10. ipo_win(打新中签/新股中签)：填 product_code(新股代码)、shares(中签股数)、price(发行价)，amount = shares × price；会计处理等同买入，中签缴款会自动从账户余额扣减
-11. buy/sell 的 amount = shares × price（不含手续费）
+11. buy/sell/ipo_win 的 amount = shares × price（不含手续费）
 12. 只输出 JSON 数组，不要任何解释文字、不要 markdown 代码块标记
 
 输出格式（严格遵循）：
@@ -97,6 +107,42 @@ function buildParsePrompt(text) {
     "ratio": 0,
     "trade_date": "${year}-03-15",
     "note": ""
+  },
+  {
+    "type": "stock_dividend",
+    "product_name": "贵州茅台",
+    "product_code": "600519",
+    "shares": 100,
+    "price": 0,
+    "amount": 0,
+    "fee": 0,
+    "ratio": 0,
+    "trade_date": "${year}-06-15",
+    "note": "10送1"
+  },
+  {
+    "type": "split",
+    "product_name": "通信ETF",
+    "product_code": "515880",
+    "shares": 0,
+    "price": 0,
+    "amount": 0,
+    "fee": 0,
+    "ratio": 3,
+    "trade_date": "${year}-02-02",
+    "note": "1拆3"
+  },
+  {
+    "type": "ipo_win",
+    "product_name": "某某新股",
+    "product_code": "301xxx",
+    "shares": 500,
+    "price": 12.50,
+    "amount": 6250,
+    "fee": 0,
+    "ratio": 0,
+    "trade_date": "${year}-05-20",
+    "note": "打新中签"
   }
 ]
 
@@ -588,15 +634,23 @@ exports.main = async (event) => {
       };
     }
 
-    // ============ 3. 实际写入 ============
+    // ============ 3. 实际写入（分批并发，避免大量数据超时） ============
+    // 每笔 importTrade 内部会调 apply_transaction 云函数，串行执行时
+    // 超过 20 笔极易触发云函数 60s 超时。这里按 BATCH_SIZE 并发写入。
+    const BATCH_SIZE = 5;
     let imported = 0;
-    for (let i = 0; i < trades.length; i++) {
-      try {
-        await importTrade(trades[i], account_id, warnings, openid);
-        imported++;
-      } catch (err) {
-        warnings.push(`第 ${i + 1} 笔写入失败：${err.message}`);
-      }
+    for (let i = 0; i < trades.length; i += BATCH_SIZE) {
+      const batch = trades.slice(i, i + BATCH_SIZE);
+      const batchStart = i;
+      const results = await Promise.all(batch.map((trade, j) =>
+        importTrade(trade, account_id, warnings, openid)
+          .then(() => { imported++; return true; })
+          .catch(err => {
+            warnings.push(`第 ${batchStart + j + 1} 笔写入失败：${err.message}`);
+            return false;
+          })
+      ));
+      // 批次结果已合并到 imported 和 warnings
     }
 
     return {
