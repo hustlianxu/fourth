@@ -75,12 +75,14 @@ async function fetchFundPrices(fundCodes) {
   return result;
 }
 
-async function fetchAllHoldings() {
+async function fetchAllHoldings(openid) {
   const PAGE_SIZE = 100;
   let all = [];
   let skip = 0;
   while (true) {
-    const res = await db.collection('holdings').skip(skip).limit(PAGE_SIZE).get();
+    let query = db.collection('holdings');
+    if (openid) query = query.where({ _openid: openid });
+    const res = await query.skip(skip).limit(PAGE_SIZE).get();
     all = all.concat(res.data || []);
     if (!res.data || res.data.length < PAGE_SIZE) break;
     skip += PAGE_SIZE;
@@ -91,7 +93,9 @@ async function fetchAllHoldings() {
 
 exports.main = async (event) => {
   try {
-    const holdings = await fetchAllHoldings();
+    const wxContext = cloud.getWXContext();
+    const openid = wxContext.OPENID || '';
+    const holdings = await fetchAllHoldings(openid);
     if (!holdings || holdings.length === 0) {
       return { success: true, message: '暂无持仓', updated: 0 };
     }

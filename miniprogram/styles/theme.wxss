@@ -17,7 +17,7 @@ page {
   --txn-buy: #4a6cf7;                 /* 买入：主色蓝 */
   --txn-sell: #f5a623;                /* 卖出：琥珀橙 */
   --txn-transfer: #8e8e93;            /* 转账：中性灰 */
-  --txn-income: #34c759;              /* 分红/利息：清新绿 */
+  --txn-income: #f5222d;              /* 分红/利息：正收益红（A 股惯例涨红跌绿） */
   --txn-buy-soft: #eef2ff;
   --txn-sell-soft: #fff5e6;
   --txn-transfer-soft: #f2f2f4;
@@ -68,6 +68,6 @@ page {
     --txn-buy-soft: rgba(74,108,247,0.18);
     --txn-sell-soft: rgba(245,166,35,0.18);
     --txn-transfer-soft: rgba(142,142,147,0.18);
-    --txn-income-soft: rgba(52,199,89,0.18);
+    --txn-income-soft: rgba(245,34,45,0.18);
   }
 }
