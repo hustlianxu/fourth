@@ -19,6 +19,7 @@ Page({
     providerConfigured: false,
     configuredProviders: [],
     analysts: [],
+    analystSelected: {},      // { providerKey: true } 供 WXML 成员访问判断选中态（WXML 不支持 .indexOf()）
     synthIndex: 0,
     synthNames: [],
     selectedType: 'portfolio_health',
@@ -88,11 +89,19 @@ Page({
         analysts = [];
       }
       this.setData({ configuredProviders, providerConfigured, analysts });
+      this._syncAnalystSelected();
       this.updateSynthNames();
       this.updateCanAnalyze();
     } catch (err) {
       console.error('[AI] loadLLMConfig error:', err);
     }
+  },
+
+  /** 由 analysts 数组派生 analystSelected 对象 map（WXML 不支持 .indexOf()，改用成员访问） */
+  _syncAnalystSelected() {
+    const map = {};
+    this.data.analysts.forEach(k => { map[k] = true; });
+    this.setData({ analystSelected: map });
   },
 
   async loadHistory() {
@@ -144,6 +153,7 @@ Page({
       analysts.push(key);
     }
     this.setData({ analysts });
+    this._syncAnalystSelected();
     this.updateSynthNames();
     this.updateCanAnalyze();
   },
