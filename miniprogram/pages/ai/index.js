@@ -197,9 +197,9 @@ Page({
 
     try {
       // 预先在 DB 创建一条任务记录（用于超时后续传）
+      // 注：_openid 由云数据库在前端 add 时自动注入当前用户，手动写入会报 Invalid Key Name
       const taskRes = await DB.collection('analysis_tasks').add({
         data: {
-          _openid: wx.cloud.getWXContext ? '' : '',
           type: this.data.selectedType,
           analysts,
           status: 'processing',
