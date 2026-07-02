@@ -198,17 +198,23 @@ Page({
     try {
       // 预先在 DB 创建一条任务记录（用于超时后续传）
       // 注：_openid 由云数据库在前端 add 时自动注入当前用户，手动写入会报 Invalid Key Name
-      const taskRes = await DB.collection('analysis_tasks').add({
-        data: {
-          type: this.data.selectedType,
-          analysts,
-          status: 'processing',
-          progress: 0,
-          created_at: DB.serverDate(),
-          updated_at: DB.serverDate(),
-        },
-      });
-      const taskId = taskRes._id;
+      // 注：analysis_tasks 集合可能未创建（未运行 init_db），失败时降级为无续传，不阻塞主流程
+      let taskId = '';
+      try {
+        const taskRes = await DB.collection('analysis_tasks').add({
+          data: {
+            type: this.data.selectedType,
+            analysts,
+            status: 'processing',
+            progress: 0,
+            created_at: DB.serverDate(),
+            updated_at: DB.serverDate(),
+          },
+        });
+        taskId = taskRes._id;
+      } catch (taskErr) {
+        console.warn('[AI] analysis_tasks 不可用，降级为无续传模式:', taskErr.errMsg || taskErr.message);
+      }
       this.setData({ taskId });
 
       let res;
