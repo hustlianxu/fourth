@@ -76,6 +76,25 @@ function uploadExportFile(localPath, openid, fileName) {
   return uploadFile(localPath, cloudPath);
 }
 
+/**
+ * 云端生成 xlsx（调用云函数，不上传本地文件）
+ * @param {Array} records - 记录数据 [{ modelo, desEs, ..., imageFileID, width, height }]
+ * @param {string} fileName
+ * @param {string} openid
+ * @returns {Promise<Object>} { success, fileID, fileName, error }
+ */
+function generateXlsxOnCloud(records, fileName, openid) {
+  return wx.cloud.callFunction({
+    name: 'generateXlsx',
+    data: { records: records, fileName: fileName, openid: openid }
+  }).then(function (res) {
+    return res.result || { success: false, error: '云函数无返回' };
+  }).catch(function (err) {
+    console.error('[Cloud] generateXlsxOnCloud 失败:', err);
+    return { success: false, error: '调用云函数失败: ' + (err.errMsg || err.message) };
+  });
+}
+
 // ===== 云数据库 - 记录 CRUD =====
 
 var db = null;
@@ -1158,6 +1177,8 @@ module.exports = {
   saveExportRecordToCloud: saveExportRecordToCloud,
   fetchExportRecordsFromCloud: fetchExportRecordsFromCloud,
   deleteExportRecordFromCloud: deleteExportRecordFromCloud,
+  // 云端生成 xlsx
+  generateXlsxOnCloud: generateXlsxOnCloud,
   // 拉取
   syncFromCloud: syncFromCloud,
   fetchCloudRecord: fetchCloudRecord,

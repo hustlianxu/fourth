@@ -224,6 +224,30 @@ function preReadImageBytes(records, onProgress) {
 }
 
 /**
+ * 同步读取单张图片原始字节（用于流式 xlsx 构建，读一张写入一张后释放）
+ * 先尝试 readFileSync 读二进制，失败回退 readFileSync 读 base64 再解码
+ */
+function getImageBytesSync(imagePath) {
+  if (!imagePath) return null;
+  var fs = wx.getFileSystemManager();
+  try {
+    var result = fs.readFileSync(imagePath);
+    var u8 = _toUint8Array(result);
+    if (u8 && u8.length > 0) return u8;
+  } catch (e) {
+    console.warn('[Exporter] getImageBytesSync 二进制读取失败:', e && e.errMsg);
+  }
+  // 回退：同步读 base64 再转字节
+  try {
+    var b64 = fs.readFileSync(imagePath, 'base64');
+    if (b64 && typeof b64 === 'string' && b64.length > 0) {
+      return _base64ToUint8Array(b64);
+    }
+  } catch (e2) {}
+  return null;
+}
+
+/**
  * 扁平化记录：把 rec.values[key] 提到 rec 顶层，便于 xlsx-writer 统一访问
  */
 function flattenRecords(records) {
@@ -478,30 +502,32 @@ function preTranslateRecords(records, onProgress) {
 }
 
 /**
+ * 获取导出文件的基础目录：优先 TEMP_BASE（配额更宽），回退 USER_DATA_PATH
+ */
+function _getExportBasePath() {
+  return (wx.env.TEMP_BASE || wx.env.USER_DATA_PATH);
+}
+
+/**
  * 主路径：真实 .xlsx（OOXML，图片原始字节不压缩）
- * 先翻译预处理，再异步预读图片字节，任一失败则 reject 触发回退到伪 xls
+ * 流式写入，图片单张读取写入后释放，内存峰值仅单张图片大小×2
+ * 写入到 TEMP_BASE 以规避 USER_DATA_PATH 的存储配额限制
  */
 function exportToXlsx(records, customFileName, onProgress) {
   // 1. 翻译预处理（依据文本真实语言填充 desEs/desZh）
   return preTranslateRecords(records, onProgress).then(function () {
-  // 2. 异步预读所有图片字节（分批串行，降低大数量导出时的内存/IO 峰值）
-  return preReadImageBytes(records, onProgress).then(function (preRead) {
-    // 有图片读取失败 → reject 触发回退（用户要求：图片无法导入则回退伪 xls）
-    if (preRead.failures.length > 0) {
-      var failNames = preRead.failures.map(function (f) { return f.name; }).join(', ');
-      console.warn('[Exporter] 图片字节预读失败 ' + preRead.failures.length + ' 张，记录:',
-        failNames, '→ 触发回退伪 xls');
-      throw new Error('图片读取失败 ' + preRead.failures.length + ' 张：' + failNames.slice(0, 60));
-    }
+    // 2. 构建 xlsx 并流式写入文件（图片单张读取，写后释放）
+    var flatRecords = flattenRecords(records);
+    var colWidths = calcColumnWidths(records);
+    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
+    var fileName = baseName + '.xlsx';
+    var filePath = _getExportBasePath() + '/' + fileName;
+    var fs = wx.getFileSystemManager();
 
-    // 3. 构建 xlsx（同步，使用预读字节）
-    var bytes;
     try {
-      var flatRecords = flattenRecords(records);
-      var colWidths = calcColumnWidths(records);
-      bytes = xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
-        imageBytesMap: preRead.map,   // 预读字节 map: {recordIdx: Uint8Array}
-        getImageBytes: null,          // 不再用同步读取
+      xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
+        streamToFile: { fs: fs, filePath: filePath },
+        getImageBytes: getImageBytesSync,
         calcRowHeight: calcRowHeight,
         calcImgDisplayH: calcImgDisplayH,
         calcColumnWidths: function () { return colWidths; },
@@ -511,35 +537,23 @@ function exportToXlsx(records, customFileName, onProgress) {
       throw e instanceof Error ? e : new Error(String(e));
     }
 
-    // 3. 写入文件并打开
-    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
-    var fileName = baseName + '.xlsx';
-    var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
+    console.log('[Exporter] xlsx 流式写入完成:', filePath);
 
+    // 3. 打开文档预览
     return new Promise(function (resolve, reject) {
-      wx.getFileSystemManager().writeFile({
-        filePath: filePath,
-        data: bytes.buffer,
-        encoding: 'binary',
-        success: function () {
-          console.log('[Exporter] xlsx 写入完成:', filePath, '大小:', bytes.length, 'bytes');
-          wx.openDocument({
-            filePath: filePath, fileType: 'xlsx', showMenu: true,
+      wx.openDocument({
+        filePath: filePath, fileType: 'xlsx', showMenu: true,
+        success: function () { resolve(filePath); },
+        fail: function (err) {
+          wx.shareFileMessage({
+            filePath: filePath, fileName: baseName + '.xlsx',
             success: function () { resolve(filePath); },
-            fail: function (err) {
-              wx.shareFileMessage({
-                filePath: filePath, fileName: baseName + '.xlsx',
-                success: function () { resolve(filePath); },
-                fail: function () { reject(new Error('打开 xlsx 文件失败')); }
-              });
-            }
+            fail: function () { reject(new Error('打开 xlsx 文件失败')); }
           });
-        },
-        fail: function (err) { reject(new Error('写入 xlsx 失败: ' + (err && err.errMsg))); }
+        }
       });
     });
-  });  // preReadImageBytes.then
-  });  // preTranslateRecords.then
+  });
 }
 
 /**
@@ -579,6 +593,7 @@ function exportToLegacyXls(records, customFileName, onProgress) {
 
 /**
  * 静默生成 xlsx 文件（不打开预览），供云端上传使用
+ * 流式写入，图片单张读取写入后释放
  * @param {Array} records
  * @param {string} [customFileName]
  * @param {Function} [onProgress]
@@ -586,19 +601,17 @@ function exportToLegacyXls(records, customFileName, onProgress) {
  */
 function generateXlsxFile(records, customFileName, onProgress) {
   return preTranslateRecords(records, onProgress).then(function () {
-  return preReadImageBytes(records, onProgress).then(function (preRead) {
-    if (preRead.failures.length > 0) {
-      var failNames = preRead.failures.map(function (f) { return f.name; }).join(', ');
-      throw new Error('图片读取失败 ' + preRead.failures.length + ' 张：' + failNames.slice(0, 60));
-    }
+    var flatRecords = flattenRecords(records);
+    var colWidths = calcColumnWidths(records);
+    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
+    var fileName = baseName + '.xlsx';
+    var filePath = _getExportBasePath() + '/' + fileName;
+    var fs = wx.getFileSystemManager();
 
-    var bytes;
     try {
-      var flatRecords = flattenRecords(records);
-      var colWidths = calcColumnWidths(records);
-      bytes = xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
-        imageBytesMap: preRead.map,
-        getImageBytes: null,
+      xlsxWriter.buildXlsx(flatRecords, COLUMNS, {
+        streamToFile: { fs: fs, filePath: filePath },
+        getImageBytes: getImageBytesSync,
         calcRowHeight: calcRowHeight,
         calcImgDisplayH: calcImgDisplayH,
         calcColumnWidths: function () { return colWidths; },
@@ -608,23 +621,8 @@ function generateXlsxFile(records, customFileName, onProgress) {
       throw e instanceof Error ? e : new Error(String(e));
     }
 
-    var baseName = customFileName ? sanitizeFileName(customFileName) : ('export_' + Date.now());
-    var fileName = baseName + '.xlsx';
-    var filePath = wx.env.USER_DATA_PATH + '/' + fileName;
-
-    return new Promise(function (resolve, reject) {
-      wx.getFileSystemManager().writeFile({
-        filePath: filePath,
-        data: bytes.buffer,
-        encoding: 'binary',
-        success: function () {
-          console.log('[Exporter] xlsx 文件已生成（静默）:', filePath, '大小:', bytes.length, 'bytes');
-          resolve(filePath);
-        },
-        fail: function (err) { reject(new Error('写入 xlsx 失败: ' + (err && err.errMsg))); }
-      });
-    });
-  });
+    console.log('[Exporter] xlsx 文件已生成（流式）:', filePath);
+    return filePath;
   });
 }
 
@@ -633,6 +631,7 @@ module.exports = {
   exportToXlsx: exportToXlsx,
   exportToLegacyXls: exportToLegacyXls,
   generateXlsxFile: generateXlsxFile,
+  preTranslateRecords: preTranslateRecords,
   sanitizeFileName: sanitizeFileName,
   COLUMNS: COLUMNS,
   buildHtmlTable: buildHtmlTable

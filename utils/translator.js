@@ -280,15 +280,22 @@ function localTranslateSegment(text, from, to, index) {
     }
   }
 
-  // 模糊匹配：文本中包含词典中的某个词
+  // 模糊匹配：词库条目在文本中以完整单词出现时才替换（前后为单词边界）
   var result = text;
   var matched = false;
   for (var j = 0; j < list.length; j++) {
     var entry = list[j];
     var src = entry[srcKey];
-    if (src && result.indexOf(src) >= 0) {
-      result = result.split(src).join(entry[dstKey]);
+    if (!src) continue;
+    // 用正则确保 src 以完整单词形式出现（不匹配子串，如"o"不匹配"modelo"内部）
+    var boundaryRe = new RegExp('(^|[\\s·×+\\-/,，.。:;：；()（）\\[\\]{}])'
+      + src.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+      + '([\\s·×+\\-/,，.。:;：；()（）\\[\\]{}]|$)', 'i');
+    var match = result.match(boundaryRe);
+    if (match) {
       matched = true;
+      // 用 matched[1] + 译文 + matched[2] 替换，保留边界字符
+      result = result.slice(0, match.index) + (match[1] || '') + entry[dstKey] + (match[2] || '') + result.slice(match.index + match[0].length);
     }
   }
   if (matched) return { translated: true, result: result };
@@ -534,6 +541,27 @@ function _tryLLM(text, from, to, localJoined, missWords, withDebug, cfg) {
   });
 }
 
+// ============ LLM 优先模式 ============
+
+var STORAGE_LLM_FIRST_KEY = 'watermark_translator_llm_first';
+
+/**
+ * 获取 LLM 优先模式开关：开启后跳过本地匹配，直接调用 LLM
+ */
+function getLLMFirst() {
+  try {
+    return wx.getStorageSync(STORAGE_LLM_FIRST_KEY) === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function setLLMFirst(enabled) {
+  try {
+    wx.setStorageSync(STORAGE_LLM_FIRST_KEY, !!enabled);
+  } catch (e) {}
+}
+
 // ============ 主翻译函数 ============
 
 /**
@@ -546,6 +574,25 @@ function _tryLLM(text, from, to, localJoined, missWords, withDebug, cfg) {
  */
 function translate(text, from, to, withDebug) {
   if (!text || !text.trim()) return Promise.resolve(withDebug ? { result: '', debug: { source: 'empty' } } : '');
+
+  // LLM 优先模式：跳过本地匹配，直接走 LLM
+  var llmFirst = getLLMFirst();
+  if (llmFirst) {
+    var cfg = getConfig();
+    if (cfg && cfg.apiKey && cfg.baseURL) {
+      var t0 = Date.now();
+      return callLLM(text, from, to).then(function (apiResult) {
+        var elapsed = Date.now() - t0;
+        if (apiResult) {
+          return withDebug
+            ? { result: apiResult, debug: { source: 'api', provider: cfg.provider, elapsed: elapsed, llmFirst: true } }
+            : apiResult;
+        }
+        // LLM 失败 → 降级本地匹配
+        console.warn('[Translator] LLM 优先模式调用失败，降级本地');
+      });
+    }
+  }
 
   var index = buildIndex();
   var segments = splitText(text);
@@ -612,6 +659,109 @@ function translate(text, from, to, withDebug) {
  */
 function translateBatch(items, withDebug) {
   if (!items || items.length === 0) return Promise.resolve([]);
+
+  // LLM 优先模式：跳过本地匹配，直接批量走 LLM
+  var llmFirst = getLLMFirst();
+  if (llmFirst) {
+    var cfg = getConfig();
+    if (cfg && cfg.apiKey && cfg.baseURL) {
+      var t0 = Date.now();
+      // 按 (from, to) 分组
+      var groupMap = {};
+      var hasText = false;
+      items.forEach(function (item, idx) {
+        if (!item.text || !item.text.trim()) return;
+        hasText = true;
+        var key = item.from + '|' + item.to;
+        if (!groupMap[key]) groupMap[key] = { from: item.from, to: item.to, items: [], origIndices: [] };
+        groupMap[key].items.push(item);
+        groupMap[key].origIndices.push(idx);
+      });
+      if (hasText) {
+        var groupKeys = Object.keys(groupMap);
+        return Promise.all(groupKeys.map(function (gk) {
+          var g = groupMap[gk];
+          // 复用现有批量 prompt 逻辑，独立发起 LLM 调用
+          var whitelistStr = getMergedWhitelist().join(', ');
+          var sourceName = g.from === 'zh' ? '中文' : '西班牙语';
+          var targetName = g.to === 'zh' ? '中文' : '西班牙语';
+          var lines = g.items.map(function (a, i) { return '[' + (i + 1) + '] ' + a.text; });
+          var merged = lines.join('\n');
+          var batchPrompt =
+            '请将以下多条文本从' + sourceName + '翻译为' + targetName + '。\n' +
+            '规则：\n' +
+            '1. 数字、货号、通用符号（× · + / , . 等）保持不变；\n' +
+            '2. 以下词汇保持原文不翻译：' + whitelistStr + '\n' +
+            '3. 每条译文独占一行，以相同 [编号] 开头，格式：[编号]译文，不要解释、引号或多余内容；\n' +
+            '4. 严格按编号顺序输出，数量必须与输入一致。\n\n' +
+            '待翻译：\n' + merged;
+          var custom = getCustomPrompt();
+          if (custom && custom.trim()) {
+            batchPrompt = custom
+              .replace(/\{source\}/g, sourceName)
+              .replace(/\{target\}/g, targetName)
+              .replace(/\{whitelist\}/g, whitelistStr)
+              .replace(/\{text\}/g, merged);
+            batchPrompt += '\n\n[批量模式：每条以 [编号] 开头，请按 [编号]译文 格式逐行输出，严格对应]';
+          }
+          var model = cfg.model || 'deepseek-chat';
+          return new Promise(function (resolve) {
+            wx.request({
+              url: cfg.baseURL.replace(/\/$/, '') + '/chat/completions',
+              method: 'POST',
+              header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+              data: { model: model, messages: [{ role: 'user', content: batchPrompt }], temperature: 0.3, max_tokens: 4096 },
+              timeout: 60000,
+              success: function (res) {
+                if (res.statusCode === 200 && res.data && res.data.choices && res.data.choices[0]) {
+                  var content = res.data.choices[0].message.content;
+                  content = String(content || '').replace(/^["'「『]+|["'」』]+$/g, '').trim();
+                  var resultMap = {};
+                  var lineRegex = /\[(\d+)\]\s*([^\n]*)/g;
+                  var m;
+                  while ((m = lineRegex.exec(content)) !== null) {
+                    var num = parseInt(m[1], 10);
+                    if (num >= 1 && num <= g.items.length) resultMap[num] = m[2].trim();
+                  }
+                  var fallbackParts = content.split(/\n+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+                  var results = g.items.map(function (a, i) {
+                    var num = i + 1;
+                    if (resultMap[num] != null) return resultMap[num];
+                    if (fallbackParts.length === g.items.length) return fallbackParts[i];
+                    return null;
+                  });
+                  resolve({ origIndices: g.origIndices, results: results });
+                } else {
+                  resolve({ origIndices: g.origIndices, results: g.items.map(function () { return null; }) });
+                }
+              },
+              fail: function () {
+                resolve({ origIndices: g.origIndices, results: g.items.map(function () { return null; }) });
+              }
+            });
+          });
+        })).then(function (allGroups) {
+          var results = items.map(function () { return null; });
+          var allOk = true;
+          allGroups.forEach(function (ag) {
+            ag.origIndices.forEach(function (origIdx, i) {
+              results[origIdx] = ag.results[i];
+              if (ag.results[i] == null) allOk = false;
+            });
+          });
+          if (allOk) {
+            var elapsed = Date.now() - t0;
+            console.log('[Translator] LLM 优先模式批量完成:', results.length, '条, 耗时', elapsed, 'ms');
+            return withDebug
+              ? results.map(function (r) { return { result: r, debug: { source: 'api', llmFirst: true, elapsed: elapsed } }; })
+              : results;
+          }
+          // LLM 部分失败 → 降级本地匹配
+          console.warn('[Translator] LLM 优先模式部分失败，降级本地');
+        });
+      }
+    }
+  }
 
   var index = buildIndex();
 
@@ -891,6 +1041,8 @@ module.exports = {
   getCustomPrompt: getCustomPrompt,
   setCustomPrompt: setCustomPrompt,
   getDefaultPromptTemplate: getDefaultPromptTemplate,
+  getLLMFirst: getLLMFirst,
+  setLLMFirst: setLLMFirst,
   buildPrompt: buildPrompt,
   isWhitelist: isWhitelist,
   detectLang: detectLang,

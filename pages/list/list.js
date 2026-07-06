@@ -1348,60 +1348,120 @@ Page({
     });
   },
 
-  // ===== 导出到云端 =====
+  // ===== 导出到云端（云端生成 xlsx，绕过本地存储配额）=====
 
   async _doExportToCloud(selected, customFileName) {
-    // 非阻塞提示，用户可折叠小程序等待
-    wx.showToast({ title: '正在生成导出文件...', icon: 'none', duration: 10000 });
+    wx.showToast({ title: '正在上传图片...', icon: 'none', duration: 15000 });
     var toastTimer = setTimeout(function () {
-      wx.showToast({ title: '仍在处理中，请稍候...', icon: 'none', duration: 10000 });
-    }, 10000);
+      wx.showToast({ title: '正在上传图片，请稍候...', icon: 'none', duration: 10000 });
+    }, 15000);
 
     try {
-      // 1. 生成 xlsx 文件
-      const filePath = await exporter.generateXlsxFile(selected, customFileName, null);
-      if (!filePath) throw new Error('文件生成失败');
-
-      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
-      wx.showToast({ title: '正在上传到云端...', icon: 'none', duration: 8000 });
-
-      // 2. 获取 openid 并上传
+      // 1. 获取 openid
       var openid = cloud._getCachedOpenid();
       if (!openid) {
         openid = await cloud.getOpenid();
       }
       if (!openid) throw new Error('无法获取用户身份');
 
-      // 验证生成的文件是否存在
-      try {
-        wx.getFileSystemManager().accessSync(filePath);
-      } catch (accessErr) {
-        console.error('[List] 导出文件不存在:', filePath);
-        throw new Error('导出文件在本地不存在，请重试');
-      }
-
-      // 只在未设置文件名时自动生成带时间戳的名称
+      // 2. 构造记录数据，已有云端图片的复用 fileID（免重复上传）
       var ts = this._formatTimeForFile();
       var baseName = customFileName
         ? customFileName.replace(/[/\:*?"<>|]/g, '_')
         : ('export_' + ts);
       var fileName = baseName + '.xlsx';
-      console.log('[List] 开始上传导出文件:', fileName, '大小:', (wx.getFileSystemManager().statSync(filePath).size || 0), 'bytes');
-      var fileID = await cloud.uploadExportFile(filePath, openid, fileName);
-      console.log('[List] 上传结果:', fileID ? '成功' : '失败', 'fileID:', fileID);
-      if (!fileID) throw new Error('上传到云端失败，请检查网络后重试');
+
+      // 3. 翻译预处理：填充缺失的 desEs/desZh（双语文案），LLM 优先模式下直接走大模型
+      await exporter.preTranslateRecords(selected, null);
+
+      var cloudRecords = [];
+      var uploadTasks = [];    // 真正需要上传的图片
+      var BATCH_SIZE = 3;
+
+      for (var i = 0; i < selected.length; i++) {
+        var rec = selected[i];
+        var recordData = {
+          modelo: (rec.values && rec.values.modelo) || '',
+          desEs: (rec.values && rec.values.desEs) || '',
+          desZh: (rec.values && rec.values.desZh) || '',
+          precio: (rec.values && rec.values.precio) || '',
+          pzs: (rec.values && rec.values.pzs) || '',
+          cajas: (rec.values && rec.values.cajas) || '',
+          volumen: (rec.values && rec.values.volumen) || '',
+          peso: (rec.values && rec.values.peso) || '',
+          imageFileID: null,
+          width: rec.width || 0,
+          height: rec.height || 0
+        };
+
+        if (rec.imagePath) {
+          if (rec._cloudFileId) {
+            // 已有云端图片 → 直接复用，免上传
+            recordData.imageFileID = rec._cloudFileId;
+          } else {
+            // 本地图片 → 加入上传队列，成功后回写 _cloudFileId 到本地存储
+            var recIdx = cloudRecords.length;
+            var recId = rec.id;
+            var cloudPath = 'temp_excel/' + openid + '/' + Date.now() + '_' + (rec.id || i) + '.jpg';
+            uploadTasks.push(
+              (function (idx, id, path, cPath) {
+                return cloud.uploadFile(path, cPath).then(function (fileID) {
+                  if (fileID) {
+                    cloudRecords[idx].imageFileID = fileID;
+                    // 回写 _cloudFileId，下次导出不再重复上传
+                    if (id) {
+                      try { storage.update(id, { _cloudFileId: fileID }); } catch (e) {}
+                    }
+                  }
+                }).catch(function (err) {
+                  console.warn('[List] 图片上传失败:', path, err);
+                });
+              })(recIdx, recId, rec.imagePath, cloudPath)
+            );
+          }
+        }
+
+        cloudRecords.push(recordData);
+      }
+
+      // 执行图片上传（分批并发，避免连接数过多）
+      if (uploadTasks.length > 0) {
+        wx.showToast({ title: '正在上传 ' + uploadTasks.length + ' 张图片...', icon: 'none', duration: 15000 });
+        for (var tStart = 0; tStart < uploadTasks.length; tStart += BATCH_SIZE) {
+          var tEnd = Math.min(tStart + BATCH_SIZE, uploadTasks.length);
+          await Promise.all(uploadTasks.slice(tStart, tEnd));
+        }
+      }
+
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+      wx.showToast({ title: '正在云端生成 Excel...', icon: 'none', duration: 20000 });
+      toastTimer = setTimeout(function () {
+        wx.showToast({ title: '生成中，大数据量可能需要较长时间...', icon: 'none', duration: 10000 });
+      }, 20000);
+
+      // 4. 调用云函数生成 xlsx
+      var result = await cloud.generateXlsxOnCloud(cloudRecords, fileName, openid);
+      if (!result || !result.success || !result.fileID) {
+        throw new Error(result && result.error ? result.error : '云端生成失败，请重试');
+      }
 
       wx.hideToast();
+      if (toastTimer) clearTimeout(toastTimer);
       wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
 
-      // 3. 保存导出记录（本地 + 云端，云端使跨设备可见）
-      storage.addExportRecord({ fileID: fileID, fileName: fileName });
-      cloud.saveExportRecordToCloud(openid, fileID, fileName);
+      // 5. 保存导出记录（等待完成，确保设置页可见）
+      var finalFileName = result.fileName || fileName;
+      storage.addExportRecord({ fileID: result.fileID, fileName: finalFileName });
+      try {
+        await cloud.saveExportRecordToCloud(openid, result.fileID, finalFileName);
+      } catch (saveErr) {
+        console.warn('[List] 云端保存导出记录失败（不影响本地记录）:', saveErr);
+      }
 
-      // 4. 提示成功并提供操作选项
+      // 6. 提示成功
       wx.showModal({
         title: '导出完成',
-        content: '文件 "' + fileName + '" 已上传到云端。\n前往「设置」→「云端导出文件」可随时下载。',
+        content: '文件 "' + finalFileName + '" 已上传到云端。\n前往「设置」→「云端导出文件」可随时下载。',
         confirmText: '确认',
         showCancel: false
       });
@@ -1440,7 +1500,7 @@ Page({
     wx.hideLoading();
     wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
     console.error('[List] 导出失败:', err);
-    wx.showToast({ title: '导出失败: ' + ((err && err.message) || '').slice(0, 20), icon: 'none', duration: 3000 });
+    wx.showToast({ title: '导出失败: ' + ((err && err.message) || err || ''), icon: 'none', duration: 3000 });
   },
 
   async _doExport(selected, customFileName, format) {
@@ -1482,7 +1542,7 @@ Page({
       wx.hideLoading();
       wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: false });
       console.error('[List] 导出失败:', e);
-      wx.showToast({ title: '导出失败: ' + (e.message || '').slice(0, 15), icon: 'none' });
+      wx.showToast({ title: '导出失败: ' + (e.message || e || ''), icon: 'none' });
     }
   },
 

@@ -69,7 +69,8 @@ Page({
       builtinWhitelist: builtin.WHITELIST,
       builtinDict: builtin.BUILTIN_DICT,
       filteredBuiltin: builtin.BUILTIN_DICT,
-      customPrompt: translator.getCustomPrompt() || ''
+      customPrompt: translator.getCustomPrompt() || '',
+      llmFirst: translator.getLLMFirst()
     });
     this._loadConfig();
     this._loadFreeDictConfig();
@@ -376,6 +377,13 @@ Page({
     }
     translator.setConfig(cfg);
     wx.showToast({ title: '配置已保存', icon: 'success' });
+  },
+
+  onLLMFirstToggle(e) {
+    const enabled = e.detail.value;
+    translator.setLLMFirst(enabled);
+    this.setData({ llmFirst: enabled });
+    wx.showToast({ title: enabled ? '已开启 LLM 优先' : '已关闭 LLM 优先', icon: 'success' });
   },
 
   onTestTranslate() {

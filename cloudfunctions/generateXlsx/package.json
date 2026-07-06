@@ -1,0 +1,9 @@
+{
+  "name": "generateXlsx",
+  "version": "1.0.0",
+  "description": "云端生成 xlsx 导出文件",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

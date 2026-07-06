@@ -187,6 +187,17 @@
 
       <view class="btn save-btn" bindtap="onSaveConfig">保存配置</view>
 
+      <!-- LLM 优先模式开关 -->
+      <view class="form-item" style="margin-top:20rpx;">
+        <view class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+          <text>LLM 优先（跳过本地词典，直接调用大模型）</text>
+          <switch checked="{{llmFirst}}" bindchange="onLLMFirstToggle" />
+        </view>
+        <view class="section-desc" style="margin-top:6rpx;">
+          开启后所有翻译直接走 LLM，不再匹配本地词典。适用于本地词典频繁误翻的场景。
+        </view>
+      </view>
+
       <!-- Prompt 编辑区 -->
       <view class="prompt-section">
         <view class="form-label">翻译 Prompt</view>
