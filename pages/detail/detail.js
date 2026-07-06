@@ -463,13 +463,13 @@ Page({
           console.log('[Detail] 无原始图，跳过水印重渲，仅更新字段值');
         }
 
-        // 将记录数据嵌入图片末尾，供从相册恢复时直接读取
+        // 将记录数据嵌入图片（写出到新文件，避免 store_* 路径只读问题）
         console.log('[Detail] 开始嵌入数据到图片:', newImagePath, 'canRerender:', canRerender);
         console.log('[Detail] 嵌入数据预览: values keys=', Object.keys(this.data.editValues).join(','),
           'templateId=', record.templateId || 'handwrite',
           'customName=', record.customName || '');
         try {
-          var embedOk = imageData.embed(newImagePath, {
+          var embedPath = imageData.embed(newImagePath, {
             values: this.data.editValues,
             templateId: record.templateId || 'handwrite',
             templateName: record.templateName || '',
@@ -483,9 +483,14 @@ Page({
             height: record.height || 1440,
             watermarkPosition: record.watermarkPosition || 'bottom-right'
           });
-          console.log('[Detail] 嵌入数据结果:', embedOk ? '成功' : '失败');
+          if (embedPath) {
+            newImagePath = embedPath; // 使用嵌入了数据的新文件路径
+            console.log('[Detail] 嵌入数据成功, 新路径:', embedPath);
+          } else {
+            console.log('[Detail] 嵌入数据跳过（非 JPEG 或写入失败）, 使用原路径');
+          }
         } catch (embedErr) {
-          console.warn('[Detail] 嵌入数据到图片失败（不影响保存）:', embedErr && embedErr.errMsg ? embedErr.errMsg : embedErr);
+          console.warn('[Detail] 嵌入数据到图片异常（不影响保存）:', embedErr && embedErr.errMsg ? embedErr.errMsg : embedErr);
         }
 
         const patch = {
