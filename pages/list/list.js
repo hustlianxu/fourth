@@ -693,7 +693,7 @@ Page({
           height: file.height || 1440,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          templateId: '',
+          templateId: 'handwrite',
           templateName: '',
           customName: fields.customName || fields.modelo || '',
           folderId: null,

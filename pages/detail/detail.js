@@ -579,8 +579,13 @@ Page({
 
   async _rerenderWatermark() {
     const record = this.data.record;
-    const tpl = templates.getTemplateById(record.templateId);
-    if (!tpl) throw new Error('模板不存在');
+    var tpl = templates.getTemplateById(record.templateId);
+    if (!tpl) {
+      // 模板不存在时使用预设默认模板（如从相册恢复的记录）
+      tpl = templates.getTemplateById('handwrite');
+      if (!tpl) throw new Error('模板不存在');
+      console.warn('[Detail] 模板', record.templateId, '不存在，使用默认模板 handwrite');
+    }
 
     // 快速检测可用源图（不等待 10s canvas 超时）
     var src = await this._getSourceImagePath(record);
