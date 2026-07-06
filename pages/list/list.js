@@ -648,6 +648,7 @@ Page({
         wx.getFileSystemManager().copyFileSync(file.tempFilePath, destPath);
 
         // 2. 尝试从图片提取嵌入数据（有则跳过 AI，水印参数、模板信息等完整保留）
+        console.log('[List] 尝试提取嵌入数据, 文件:', file.tempFilePath, '大小:', file.size || '未知', 'bytes');
         var extractedData = imageData.extract(file.tempFilePath);
         var fields, embeddedRecord;
 

@@ -464,8 +464,12 @@ Page({
         }
 
         // 将记录数据嵌入图片末尾，供从相册恢复时直接读取
+        console.log('[Detail] 开始嵌入数据到图片:', newImagePath, 'canRerender:', canRerender);
+        console.log('[Detail] 嵌入数据预览: values keys=', Object.keys(this.data.editValues).join(','),
+          'templateId=', record.templateId || 'handwrite',
+          'customName=', record.customName || '');
         try {
-          imageData.embed(newImagePath, {
+          var embedOk = imageData.embed(newImagePath, {
             values: this.data.editValues,
             templateId: record.templateId || 'handwrite',
             templateName: record.templateName || '',
@@ -479,8 +483,9 @@ Page({
             height: record.height || 1440,
             watermarkPosition: record.watermarkPosition || 'bottom-right'
           });
+          console.log('[Detail] 嵌入数据结果:', embedOk ? '成功' : '失败');
         } catch (embedErr) {
-          console.warn('[Detail] 嵌入数据到图片失败（不影响保存）:', embedErr);
+          console.warn('[Detail] 嵌入数据到图片失败（不影响保存）:', embedErr && embedErr.errMsg ? embedErr.errMsg : embedErr);
         }
 
         const patch = {
@@ -517,12 +522,27 @@ Page({
 
         // 若开启"自动保存修改到相册"，则把修改后的水印图存入系统相册，防止小程序数据丢失
         if (this.data.autoSaveEditAlbum) {
+          // 保存前检查文件大小（确认嵌入数据写在文件里）
+          try {
+            var savedStat = wx.getFileSystemManager().statSync(newImagePath);
+            console.log('[Detail] 即将保存到相册, 文件:', newImagePath, '大小:', savedStat.size, 'bytes');
+          } catch (statErr) {
+            console.warn('[Detail] 保存前检查文件状态失败:', statErr);
+          }
+
           wx.saveImageToPhotosAlbum({
             filePath: newImagePath,
-            success: () => wx.showToast({ title: '已更新并保存到相册', icon: 'success' }),
-            fail: () => wx.showToast({ title: '已更新（相册保存失败）', icon: 'none' })
+            success: function () {
+              console.log('[Detail] saveImageToPhotosAlbum 成功');
+              wx.showToast({ title: '已更新并保存到相册', icon: 'success' });
+            },
+            fail: function (err) {
+              console.warn('[Detail] saveImageToPhotosAlbum 失败:', err && err.errMsg ? err.errMsg : err);
+              wx.showToast({ title: '已更新（相册保存失败）', icon: 'none' });
+            }
           });
         } else {
+          console.log('[Detail] 自动保存到相册未开启，跳过');
           wx.showToast({ title: '已更新', icon: 'success' });
         }
 
