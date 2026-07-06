@@ -4,6 +4,7 @@ const templates = require('../../utils/templates.js');
 const exporter = require('../../utils/exporter.js');
 const cloud = require('../../utils/cloud.js');
 const translator = require('../../utils/translator.js');
+const imageData = require('../../utils/imageData.js');
 
 const MAX_FOLDERS = 30;
 
@@ -646,63 +647,67 @@ Page({
         var destPath = wx.env.USER_DATA_PATH + '/restore_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.jpg';
         wx.getFileSystemManager().copyFileSync(file.tempFilePath, destPath);
 
-        // 2. 确定发送给 AI 识别的图片（只有原图 > 1MB 时压缩到目标范围）
-        var aiImagePath = file.tempFilePath;
-        var fileSize = file.size || 0;
-        if (fileSize > 1024 * 1024) {
-          aiImagePath = await new Promise(function (resolve) {
-            wx.compressImage({
-              src: file.tempFilePath,
-              quality: 50,
-              compressedWidth: 1200,
-              success: function (cr) {
-                // 检查压缩后是否 < 200KB，若太小则用更高品质重试
-                var compressedSize = 0;
-                try {
-                  compressedSize = wx.getFileSystemManager().statSync(cr.tempFilePath).size || 0;
-                } catch (e) {}
-                if (compressedSize > 0 && compressedSize < 200 * 1024) {
-                  wx.compressImage({
-                    src: file.tempFilePath,
-                    quality: 80,
-                    success: function (cr2) { resolve(cr2.tempFilePath); },
-                    fail: function () { resolve(cr.tempFilePath); }
-                  });
-                } else {
-                  resolve(cr.tempFilePath);
-                }
-              },
-              fail: function () { resolve(file.tempFilePath); }
+        // 2. 尝试从图片提取嵌入数据（有则跳过 AI，水印参数、模板信息等完整保留）
+        var extractedData = imageData.extract(file.tempFilePath);
+        var fields, embeddedRecord;
+
+        if (extractedData) {
+          console.log('[List] 检测到嵌入数据，直接重建记录');
+          fields = extractedData.values || extractedData;
+          embeddedRecord = extractedData;
+        } else {
+          // 无嵌入数据 → 走多模态 AI 识别
+          var aiImagePath = file.tempFilePath;
+          var fileSize = file.size || 0;
+          if (fileSize > 1024 * 1024) {
+            aiImagePath = await new Promise(function (resolve) {
+              wx.compressImage({
+                src: file.tempFilePath, quality: 50, compressedWidth: 1200,
+                success: function (cr) {
+                  var compressedSize = 0;
+                  try { compressedSize = wx.getFileSystemManager().statSync(cr.tempFilePath).size || 0; } catch (e) {}
+                  if (compressedSize > 0 && compressedSize < 200 * 1024) {
+                    wx.compressImage({
+                      src: file.tempFilePath, quality: 80,
+                      success: function (cr2) { resolve(cr2.tempFilePath); },
+                      fail: function () { resolve(cr.tempFilePath); }
+                    });
+                  } else { resolve(cr.tempFilePath); }
+                },
+                fail: function () { resolve(file.tempFilePath); }
+              });
             });
-          });
+          }
+          fields = await translator.recognizeWatermark(aiImagePath);
+          if (!fields || Object.keys(fields).length === 0) { failCount++; continue; }
         }
 
-        // 3. 调用多模态 AI 识别
-        var fields = await translator.recognizeWatermark(aiImagePath);
-        if (!fields || Object.keys(fields).length === 0) {
-          failCount++;
-          continue;
-        }
-
-        // 4. 创建记录（使用原图路径）
+        // 3. 创建记录
         var record = {
           id: storage.genId(),
           values: {},
           imagePath: destPath,
-          width: file.width || 1080,
-          height: file.height || 1440,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-          templateId: 'handwrite',
-          templateName: '',
+          width: (embeddedRecord && embeddedRecord.width) || file.width || 1080,
+          height: (embeddedRecord && embeddedRecord.height) || file.height || 1440,
+          createdAt: Date.now(), updatedAt: Date.now(),
+          templateId: (embeddedRecord && embeddedRecord.templateId) || 'handwrite',
+          templateName: (embeddedRecord && embeddedRecord.templateName) || '',
           customName: fields.customName || fields.modelo || '',
           folderId: null,
-          watermarkPosition: 'bottom-right',
-          watermarkScale: 0.42,
-          watermarkOpacity: 0.85,
-          watermarkWidthRatio: 0.42,
+          watermarkPosition: (embeddedRecord && embeddedRecord.watermarkPosition) || 'bottom-right',
+          watermarkScale: (embeddedRecord && embeddedRecord.watermarkScale) || 0.42,
+          watermarkOpacity: (embeddedRecord && embeddedRecord.watermarkOpacity) || 0.85,
+          watermarkWidthRatio: (embeddedRecord && embeddedRecord.watermarkWidthRatio) || 0.42,
           _syncStatus: 'off'
         };
+
+        if (embeddedRecord) {
+          if (embeddedRecord.watermarkX != null) record.watermarkX = embeddedRecord.watermarkX;
+          if (embeddedRecord.watermarkY != null) record.watermarkY = embeddedRecord.watermarkY;
+          if (embeddedRecord.customName) record.customName = embeddedRecord.customName;
+          record.templateId = embeddedRecord.templateId || 'handwrite';
+          record.templateName = embeddedRecord.templateName || '';
+        }
 
         var fieldKeys = ['modelo', 'desEs', 'desZh', 'precio', 'pzs', 'cajas', 'volumen', 'peso'];
         fieldKeys.forEach(function (k) {
@@ -710,10 +715,7 @@ Page({
             record.values[k] = String(fields[k]).trim();
           }
         });
-
-        if (fields.customName) {
-          record.customName = String(fields.customName).trim();
-        }
+        if (fields.customName) record.customName = String(fields.customName).trim();
 
         storage.add(record);
         successCount++;

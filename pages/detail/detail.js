@@ -3,6 +3,7 @@ const storage = require('../../utils/storage.js');
 const templates = require('../../utils/templates.js');
 const watermark = require('../../utils/watermark.js');
 const cloud = require('../../utils/cloud.js');
+const imageData = require('../../utils/imageData.js');
 
 Page({
   data: {
@@ -460,6 +461,26 @@ Page({
         } else {
           newImagePath = record.imagePath;
           console.log('[Detail] 无原始图，跳过水印重渲，仅更新字段值');
+        }
+
+        // 将记录数据嵌入图片末尾，供从相册恢复时直接读取
+        try {
+          imageData.embed(newImagePath, {
+            values: this.data.editValues,
+            templateId: record.templateId || 'handwrite',
+            templateName: record.templateName || '',
+            customName: record.customName || '',
+            watermarkScale: this.data.editScale,
+            watermarkOpacity: this.data.editOpacity,
+            watermarkWidthRatio: this.data.editWidthRatio,
+            watermarkX: actualX,
+            watermarkY: actualY,
+            width: record.width || 1080,
+            height: record.height || 1440,
+            watermarkPosition: record.watermarkPosition || 'bottom-right'
+          });
+        } catch (embedErr) {
+          console.warn('[Detail] 嵌入数据到图片失败（不影响保存）:', embedErr);
         }
 
         const patch = {
