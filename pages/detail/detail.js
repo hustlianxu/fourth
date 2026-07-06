@@ -452,7 +452,15 @@ Page({
         record.watermarkX = actualX;
         record.watermarkY = actualY;
 
-        const newImagePath = await this._rerenderWatermark();
+        // 无原始图（如从相册恢复的记录）：跳过水印重渲，否则原水印 + 新水印 = 双水印
+        var newImagePath;
+        var canRerender = record.originalPath && this._fileExists(record.originalPath);
+        if (canRerender) {
+          newImagePath = await this._rerenderWatermark();
+        } else {
+          newImagePath = record.imagePath;
+          console.log('[Detail] 无原始图，跳过水印重渲，仅更新字段值');
+        }
 
         const patch = {
           values: this.data.editValues,
@@ -517,11 +525,12 @@ Page({
       const wmPos = this._calcWmDisplayPos(rec);
       this.wmWidth = this.data.imgDisplayW * (rec.watermarkWidthRatio || 0.42);
 
-      // 切换到原始照片（无水印），避免看到两个水印
+      // 无原始图时（如从相册恢复的记录）：隐藏水印覆盖层，避免叠双水印
+      var hasOriginal = rec.originalPath && this._fileExists(rec.originalPath);
       const cleanPhoto = rec.originalPath || rec.imagePath;
       this.setData({
         editing: true,
-        showWmOverlay: true,
+        showWmOverlay: hasOriginal,
         displayPhoto: cleanPhoto,
         editValues: Object.assign({}, rec.values),
         editScale: rec.watermarkScale || 1,
