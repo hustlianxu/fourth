@@ -3,6 +3,7 @@ const storage = require('../../utils/storage.js');
 const templates = require('../../utils/templates.js');
 const exporter = require('../../utils/exporter.js');
 const cloud = require('../../utils/cloud.js');
+const translator = require('../../utils/translator.js');
 
 const MAX_FOLDERS = 30;
 
@@ -594,6 +595,128 @@ Page({
 
   goSettings() {
     wx.navigateTo({ url: '/pages/settings/settings' });
+  },
+
+  // ===== 从相册恢复数据 =====
+
+  async onRestoreFromAlbum() {
+    // 1. 检查 API 配置
+    var cfg = translator.getConfig();
+    if (!cfg || !cfg.apiKey || !cfg.baseURL) {
+      wx.showModal({
+        title: '需要配置 LLM',
+        content: '「从相册恢复」功能需要调用多模态 AI 识别照片中的水印文字。\n请前往「词典 → 翻译引擎」配置并保存 API Key（需支持视觉能力的模型，如 GPT-4o / Claude / Gemini 等）。',
+        confirmText: '去配置',
+        cancelText: '取消',
+        success: function (r) {
+          if (r.confirm) {
+            wx.navigateTo({ url: '/pages/dict/dict?tab=api' });
+          }
+        }
+      });
+      return;
+    }
+
+    // 2. 选择图片（最多 9 张）
+    var that = this;
+    wx.chooseMedia({
+      count: 9,
+      mediaType: ['image'],
+      sourceType: ['album'],
+      success: function (mediaRes) {
+        if (!mediaRes.tempFiles || mediaRes.tempFiles.length === 0) return;
+        that._processAlbumImages(mediaRes.tempFiles);
+      }
+    });
+  },
+
+  async _processAlbumImages(tempFiles) {
+    var total = tempFiles.length;
+    var successCount = 0;
+    var failCount = 0;
+    var failedNames = [];
+
+    wx.showLoading({ title: '识别中 0/' + total, mask: true });
+
+    for (var i = 0; i < total; i++) {
+      var file = tempFiles[i];
+      wx.showLoading({ title: '识别中 ' + (i + 1) + '/' + total, mask: true });
+
+      try {
+        // 压缩图片（水印文字大，压缩后仍可识别，减少传输量）
+        var compressedPath = await new Promise(function (resolve) {
+          wx.compressImage({
+            src: file.tempFilePath,
+            quality: 80,
+            success: function (cr) { resolve(cr.tempFilePath); },
+            fail: function () { resolve(file.tempFilePath); }
+          });
+        });
+
+        // 调用多模态 AI 识别
+        var fields = await translator.recognizeWatermark(compressedPath);
+        if (!fields || Object.keys(fields).length === 0) {
+          failCount++;
+          failedNames.push(file.tempFilePath.slice(-20));
+          continue;
+        }
+
+        // 复制图片到持久存储
+        var destPath = wx.env.USER_DATA_PATH + '/restore_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.jpg';
+        wx.getFileSystemManager().copyFileSync(compressedPath, destPath);
+
+        // 创建记录
+        var record = {
+          id: storage.genId(),
+          values: {},
+          imagePath: destPath,
+          width: file.width || 1080,
+          height: file.height || 1440,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          templateId: '',
+          templateName: '',
+          customName: fields.customName || fields.modelo || '',
+          folderId: null,
+          watermarkPosition: 'bottom-right',
+          watermarkScale: 0.42,
+          watermarkOpacity: 0.85,
+          watermarkWidthRatio: 0.42,
+          _syncStatus: 'off'
+        };
+
+        // 填入识别到的字段
+        var fieldKeys = ['modelo', 'desEs', 'desZh', 'precio', 'pzs', 'cajas', 'volumen', 'peso'];
+        fieldKeys.forEach(function (k) {
+          if (fields[k] != null && String(fields[k]).trim()) {
+            record.values[k] = String(fields[k]).trim();
+          }
+        });
+
+        // 额外字段（如果有）
+        if (fields.customName) {
+          record.customName = String(fields.customName).trim();
+        }
+
+        storage.add(record);
+        successCount++;
+      } catch (e) {
+        console.warn('[List] 图片识别失败:', file.tempFilePath, e);
+        failCount++;
+        failedNames.push(file.tempFilePath.slice(-20));
+      }
+    }
+
+    wx.hideLoading();
+
+    // 提示结果
+    var msg = '成功恢复 ' + successCount + ' 条记录';
+    if (failCount > 0) msg += '，' + failCount + ' 条失败';
+    wx.showToast({ title: msg, icon: successCount > 0 ? 'success' : 'none', duration: 3000 });
+
+    if (successCount > 0) {
+      this._loadList();
+    }
   },
 
   // ===== 文件夹Tab交互 =====

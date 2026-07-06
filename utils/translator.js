@@ -369,6 +369,89 @@ function callLLM(text, from, to) {
   });
 }
 
+/**
+ * 调用多模态 LLM 识别水印图片中的文字内容（复用翻译引擎的 API 配置）
+ * @param {string} imagePath - 本地图片文件路径
+ * @returns {Promise<Object|null>} { modelo, desEs, desZh, precio, pzs, cajas, volumen, peso, ... }
+ */
+function recognizeWatermark(imagePath) {
+  var cfg = getConfig();
+  if (!cfg || !cfg.apiKey || !cfg.baseURL) {
+    return Promise.reject(new Error('请先在「词典→翻译引擎」中配置并保存 LLM API（需支持多模态/视觉能力的模型）'));
+  }
+
+  // 读取图片为 base64
+  var fs = wx.getFileSystemManager();
+  var base64;
+  try {
+    base64 = fs.readFileSync(imagePath, 'base64');
+  } catch (e) {
+    return Promise.reject(new Error('读取图片失败: ' + (e.errMsg || e.message)));
+  }
+  if (!base64) {
+    return Promise.reject(new Error('图片数据为空'));
+  }
+
+  var prompt =
+    '你正在分析一张水印照片。照片上有水印文字，格式为"标签: 值"的列表。\n' +
+    '请识别所有水印文字，提取为 JSON 格式，字段名用小写英文。常见字段有：\n' +
+    '  modelo（货号/编码）, desEs（西班牙语描述）, desZh（中文描述）,\n' +
+    '  precio（价格）, pzs（每箱数量）, cajas（箱数）,\n' +
+    '  volumen（体积/cubico）, peso（重量）\n' +
+    '如果没有识别到某个字段，对应值设为空字符串。\n' +
+    '如果识别到不在上述列表中的字段，也一并加入 JSON。\n' +
+    '只返回 JSON，不要其他文字。';
+
+  var model = cfg.model || 'deepseek-chat';
+  var data = {
+    model: model,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64 } }
+      ]
+    }],
+    temperature: 0.1,
+    max_tokens: 2048
+  };
+
+  return new Promise(function (resolve, reject) {
+    wx.request({
+      url: cfg.baseURL.replace(/\/$/, '') + '/chat/completions',
+      method: 'POST',
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + cfg.apiKey
+      },
+      data: data,
+      timeout: 120000,
+      success: function (res) {
+        if (res.statusCode === 200 && res.data && res.data.choices && res.data.choices[0]) {
+          var content = res.data.choices[0].message.content;
+          try {
+            var jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              var parsed = JSON.parse(jsonMatch[0]);
+              resolve(parsed);
+            } else {
+              reject(new Error('API 返回格式异常，未找到 JSON'));
+            }
+          } catch (e) {
+            reject(new Error('解析识别结果失败: ' + e.message));
+          }
+        } else {
+          var errMsg = (res.data && res.data.error && res.data.error.message) || ('HTTP ' + res.statusCode);
+          reject(new Error('API 返回异常: ' + errMsg));
+        }
+      },
+      fail: function (err) {
+        reject(new Error('API 调用失败: ' + (err.errMsg || err.message)));
+      }
+    });
+  });
+}
+
 // ============ 免费词典层（MyMemory / 有道智云）============
 // 作为本地词典与大模型之间的中间层：本地未命中时优先调用免费词典
 // 用户可在设置页选择是否启用及采用哪种服务
@@ -1043,6 +1126,7 @@ module.exports = {
   getDefaultPromptTemplate: getDefaultPromptTemplate,
   getLLMFirst: getLLMFirst,
   setLLMFirst: setLLMFirst,
+  recognizeWatermark: recognizeWatermark,
   buildPrompt: buildPrompt,
   isWhitelist: isWhitelist,
   detectLang: detectLang,
