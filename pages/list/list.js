@@ -634,7 +634,6 @@ Page({
     var total = tempFiles.length;
     var successCount = 0;
     var failCount = 0;
-    var failedNames = [];
 
     wx.showLoading({ title: '识别中 0/' + total, mask: true });
 
@@ -643,29 +642,49 @@ Page({
       wx.showLoading({ title: '识别中 ' + (i + 1) + '/' + total, mask: true });
 
       try {
-        // 压缩图片（水印文字大，压缩后仍可识别，减少传输量）
-        var compressedPath = await new Promise(function (resolve) {
-          wx.compressImage({
-            src: file.tempFilePath,
-            quality: 80,
-            success: function (cr) { resolve(cr.tempFilePath); },
-            fail: function () { resolve(file.tempFilePath); }
-          });
-        });
+        // 1. 原图复制到持久存储（不压缩，保持画质供后续编辑水印）
+        var destPath = wx.env.USER_DATA_PATH + '/restore_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.jpg';
+        wx.getFileSystemManager().copyFileSync(file.tempFilePath, destPath);
 
-        // 调用多模态 AI 识别
-        var fields = await translator.recognizeWatermark(compressedPath);
+        // 2. 确定发送给 AI 识别的图片（只有原图 > 1MB 时压缩到目标范围）
+        var aiImagePath = file.tempFilePath;
+        var fileSize = file.size || 0;
+        if (fileSize > 1024 * 1024) {
+          aiImagePath = await new Promise(function (resolve) {
+            wx.compressImage({
+              src: file.tempFilePath,
+              quality: 50,
+              compressedWidth: 1200,
+              success: function (cr) {
+                // 检查压缩后是否 < 200KB，若太小则用更高品质重试
+                var compressedSize = 0;
+                try {
+                  compressedSize = wx.getFileSystemManager().statSync(cr.tempFilePath).size || 0;
+                } catch (e) {}
+                if (compressedSize > 0 && compressedSize < 200 * 1024) {
+                  wx.compressImage({
+                    src: file.tempFilePath,
+                    quality: 80,
+                    success: function (cr2) { resolve(cr2.tempFilePath); },
+                    fail: function () { resolve(cr.tempFilePath); }
+                  });
+                } else {
+                  resolve(cr.tempFilePath);
+                }
+              },
+              fail: function () { resolve(file.tempFilePath); }
+            });
+          });
+        }
+
+        // 3. 调用多模态 AI 识别
+        var fields = await translator.recognizeWatermark(aiImagePath);
         if (!fields || Object.keys(fields).length === 0) {
           failCount++;
-          failedNames.push(file.tempFilePath.slice(-20));
           continue;
         }
 
-        // 复制图片到持久存储
-        var destPath = wx.env.USER_DATA_PATH + '/restore_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.jpg';
-        wx.getFileSystemManager().copyFileSync(compressedPath, destPath);
-
-        // 创建记录
+        // 4. 创建记录（使用原图路径）
         var record = {
           id: storage.genId(),
           values: {},
@@ -685,7 +704,6 @@ Page({
           _syncStatus: 'off'
         };
 
-        // 填入识别到的字段
         var fieldKeys = ['modelo', 'desEs', 'desZh', 'precio', 'pzs', 'cajas', 'volumen', 'peso'];
         fieldKeys.forEach(function (k) {
           if (fields[k] != null && String(fields[k]).trim()) {
@@ -693,7 +711,6 @@ Page({
           }
         });
 
-        // 额外字段（如果有）
         if (fields.customName) {
           record.customName = String(fields.customName).trim();
         }
@@ -703,13 +720,11 @@ Page({
       } catch (e) {
         console.warn('[List] 图片识别失败:', file.tempFilePath, e);
         failCount++;
-        failedNames.push(file.tempFilePath.slice(-20));
       }
     }
 
     wx.hideLoading();
 
-    // 提示结果
     var msg = '成功恢复 ' + successCount + ' 条记录';
     if (failCount > 0) msg += '，' + failCount + ' 条失败';
     wx.showToast({ title: msg, icon: successCount > 0 ? 'success' : 'none', duration: 3000 });
