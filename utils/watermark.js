@@ -560,6 +560,5 @@ function roundRect(ctx, x, y, w, h, r, fill) {
 }
 
 module.exports = {
-  renderWatermarkedImage,
-  removeWatermark
+  renderWatermarkedImage
 };

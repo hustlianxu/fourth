@@ -5,7 +5,6 @@ const exporter = require('../../utils/exporter.js');
 const cloud = require('../../utils/cloud.js');
 const translator = require('../../utils/translator.js');
 const imageData = require('../../utils/imageData.js');
-const watermark = require('../../utils/watermark.js');
 
 const MAX_FOLDERS = 30;
 
@@ -718,33 +717,6 @@ Page({
           }
         });
         if (fields.customName) record.customName = String(fields.customName).trim();
-
-        // 有嵌入数据时：从水印照片还原出原始图作为 originalPath，后续编辑可正常重渲
-        if (embeddedRecord && embeddedRecord.templateId) {
-          try {
-            var tpl = templates.getTemplateById(embeddedRecord.templateId);
-            if (tpl) {
-              var cleanPath = await watermark.removeWatermark({
-                imagePath: destPath,
-                template: tpl,
-                values: (embeddedRecord.values || {}),
-                imgW: embeddedRecord.width || record.width,
-                imgH: embeddedRecord.height || record.height,
-                customX: embeddedRecord.watermarkX,
-                customY: embeddedRecord.watermarkY,
-                customScale: embeddedRecord.watermarkScale || 0.42,
-                opacity: embeddedRecord.watermarkOpacity || 0.85,
-                widthRatio: embeddedRecord.watermarkWidthRatio || 0.42
-              });
-              if (cleanPath) {
-                record.originalPath = cleanPath;
-                console.log('[List] 水印去除成功, originalPath:', cleanPath);
-              }
-            }
-          } catch (rmErr) {
-            console.warn('[List] 水印去除失败（不影响记录创建）:', rmErr);
-          }
-        }
 
         storage.add(record);
         successCount++;
