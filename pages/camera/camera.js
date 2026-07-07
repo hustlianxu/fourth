@@ -3,6 +3,7 @@ const templates = require('../../utils/templates.js');
 const storage = require('../../utils/storage.js');
 const watermark = require('../../utils/watermark.js');
 const ocr = require('../../utils/ocr.js');
+const imageData = require('../../utils/imageData.js');
 const cloud = require('../../utils/cloud.js');
 
 const POSITIONS = [
@@ -533,7 +534,28 @@ Page({
       console.log('[Camera] 水印图持久化:', persistentWmPath);
       if (!persistentWmPath) throw new Error('水印图保存失败');
 
-      // 2.5 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
+      // 2.6 将记录数据嵌入水印图片末尾（供从相册恢复时直接读取）
+      console.log('[Camera] 开始嵌入数据到水印图:', persistentWmPath);
+      var embedPath = imageData.embed(persistentWmPath, {
+        values: this.data.values,
+        templateId: tpl.id,
+        templateName: tpl.name,
+        customName: this.data.customName || '',
+        watermarkScale: this.data.wmScale,
+        watermarkOpacity: 0.85,
+        watermarkWidthRatio: 0.42,
+        width: imgW,
+        height: imgH,
+        watermarkPosition: this.data.wPos || 'bottom-right'
+      });
+      if (embedPath) {
+        persistentWmPath = embedPath; // 用嵌入数据的新文件替代原文件
+        console.log('[Camera] 嵌入数据成功, 新路径:', embedPath);
+      } else {
+        console.log('[Camera] 嵌入数据跳过（非 JPEG 或写入失败）');
+      }
+
+      // 2.7 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
       await this._autoSaveToAlbum(persistentPath, persistentWmPath);
 
       // 3. 入库
