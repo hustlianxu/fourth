@@ -530,7 +530,7 @@ Page({
       const persistentPath = await this._persistOriginalPhoto(photo);
       console.log('[Camera] 原图持久化:', persistentPath);
       if (!persistentPath) throw new Error('原图保存失败');
-      const persistentWmPath = await this._persistWatermarkPhoto(outPath);
+      var persistentWmPath = await this._persistWatermarkPhoto(outPath);
       console.log('[Camera] 水印图持久化:', persistentWmPath);
       if (!persistentWmPath) throw new Error('水印图保存失败');
 
