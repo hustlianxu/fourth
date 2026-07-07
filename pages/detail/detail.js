@@ -571,12 +571,12 @@ Page({
       const wmPos = this._calcWmDisplayPos(rec);
       this.wmWidth = this.data.imgDisplayW * (rec.watermarkWidthRatio || 0.42);
 
-      // 始终显示水印覆盖层（含从相册恢复的记录），以便用户调整参数和预览新字段值
-      // 注意：无原始图时保存仍会跳过重渲（见 canRerender 检查），避免双水印
+      // 有原始图时显示水印覆盖层，无原始图（如从相册恢复）则隐藏避免双水印
+      var hasOriginal = rec.originalPath && this._fileExists(rec.originalPath);
       const cleanPhoto = rec.originalPath || rec.imagePath;
       this.setData({
         editing: true,
-        showWmOverlay: true,
+        showWmOverlay: hasOriginal,
         displayPhoto: cleanPhoto,
         editValues: Object.assign({}, rec.values),
         editScale: rec.watermarkScale || 1,

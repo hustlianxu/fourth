@@ -120,7 +120,6 @@
           <!-- 选中态：红色删除按钮（与导出同等大小） -->
           <view wx:if="{{batchMode}}" class="btn batch-delete-btn" bindtap="onBatchDeleteStart" style="padding:12rpx 24rpx;margin-right:12rpx;">删除</view>
           <view class="btn secondary" bindtap="toggleExportMode" style="padding:12rpx 24rpx;margin-right:12rpx;">导出</view>
-          <view class="btn secondary" bindtap="onRestoreFromAlbum" style="padding:12rpx 24rpx;margin-right:12rpx;">📷 恢复</view>
           <view class="btn secondary" bindtap="goCamera" style="padding:12rpx 24rpx;">+ 新增</view>
         </view>
       </view>
