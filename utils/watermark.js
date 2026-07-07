@@ -136,6 +136,170 @@ async function renderWatermarkedImage(params) {
 }
 
 /**
+ * 从带水印的图片中去除水印，恢复出原始图片
+ *
+ * 原理：
+ *   1. 将水印渲染在 #808080 中性灰背景上 → 获得每个像素的水印贡献值
+ *   2. 根据 Alpha 合成公式反向推导原始像素：
+ *        watermarked = watermark_contribution + original × (1 - opacity)
+ *        → original = (watermarked - watermark_contribution) / (1 - opacity)
+ *   3. 只处理水印包围盒内的像素，盒外像素原样保留
+ *
+ * @param {Object} params - 与 renderWatermarkedImage 相同的水印参数
+ * @param {string} params.imagePath - 已有水印的图片路径
+ * @returns {Promise<string>} 去水印后的图片路径
+ */
+async function removeWatermark(params) {
+  const { imagePath, template, values, imgW, imgH, customX, customY, customScale, opacity, widthRatio } = params;
+  console.log('[Watermark] removeWatermark 开始, imagePath:', imagePath);
+
+  // 1. 创建离屏 Canvas
+  var canvas, ctx, targetW, targetH;
+  try {
+    canvas = wx.createOffscreenCanvas({ type: '2d' });
+    ctx = canvas.getContext('2d');
+  } catch (e) {
+    throw new Error('创建离屏 Canvas 失败: ' + (e.message || ''));
+  }
+
+  const rawMaxEdge = Math.max(imgW, imgH);
+  const MAX_EDGE = 4096;
+  if (rawMaxEdge > MAX_EDGE) {
+    const s = MAX_EDGE / rawMaxEdge;
+    targetW = Math.round(imgW * s);
+    targetH = Math.round(imgH * s);
+  } else {
+    targetW = imgW;
+    targetH = imgH;
+  }
+  canvas.width = targetW;
+  canvas.height = targetH;
+
+  // 计算缩放比例（用于将水印坐标映射到 canvas 像素）
+  const scaleX = targetW / imgW;
+  const scaleY = targetH / imgH;
+
+  // 2. 加载带水印的图片 → 获取其像素数据
+  const img = await loadImageOnCanvas(canvas, imagePath);
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+  var watermarkedData = ctx.getImageData(0, 0, targetW, targetH);
+  var wmPixels = watermarkedData.data;
+
+  // 3. 在中性灰背景上渲染水印 → 获取每个像素的水印贡献值
+  // 用 #808080 (128,128,128) 作为中性灰
+  ctx.clearRect(0, 0, targetW, targetH);
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, targetW, targetH);
+
+  const relX = customX != null ? (customX / imgW) * targetW : null;
+  const relY = customY != null ? (customY / imgH) * targetH : null;
+  renderTemplate(ctx, canvas, template, values, targetW, targetH, relX, relY, customScale, opacity, widthRatio);
+  var grayData = ctx.getImageData(0, 0, targetW, targetH);
+  var grayPixels = grayData.data;
+
+  // 4. 计算水印包围盒范围（只处理水印区域，提升性能）
+  // 重新计算水印位置来确定包围盒（与 renderTemplate 中相同的定位逻辑）
+  const style = template.style || {};
+  const ratio = targetW / 750;
+  const sc = customScale || 1;
+  const fontSize = Math.max(14, Math.round((style.fontSize || 22) * ratio * sc));
+  const lineHeight = Math.round(fontSize * (style.lineHeight || 1.7));
+  const padding = Math.round((style.padding || 14) * ratio * sc);
+  const borderRadius = Math.round((style.borderRadius || 10) * ratio);
+  const blockW = Math.round(targetW * (widthRatio || 0.42) * sc);
+  const indent = Math.round(fontSize * 1.4);
+  const textInnerW = blockW - padding * 2;
+
+  ctx.font = fontSize + 'px -apple-system, "PingFang SC", sans-serif';
+  var allLines = [];
+  (template.fields || []).forEach(function (f) {
+    var raw = (values && values[f.key]);
+    if (raw == null) return;
+    var v = String(raw).trim();
+    if (!v) return;
+    var labelText = f.label + ':';
+    if ((widthRatio || 0.42) >= 0.5 && !f.multiline && !v.includes('\n')) {
+      var combined = labelText + ' ' + v;
+      if (ctx.measureText(combined).width <= textInnerW) {
+        allLines.push({ text: combined }); return;
+      }
+    }
+    allLines.push({ text: labelText });
+    v.split(/\r?\n/).forEach(function (p) {
+      if (!p.trim()) { allLines.push({ text: '' }); return; }
+      var tokens = p.split(/(\s+)/).filter(function (t) { return t.length > 0; });
+      var current = '';
+      tokens.forEach(function (tk) {
+        var candidate = current ? current + (current.endsWith(' ') ? '' : ' ') + tk : tk;
+        if (ctx.measureText(candidate).width <= textInnerW - indent) { current = candidate; }
+        else { if (current) allLines.push({ text: current.trim() }); current = tk; }
+      });
+      if (current) allLines.push({ text: current.trim() });
+    });
+  });
+
+  if (allLines.length > 0) {
+    var blockH = padding * 2 + allLines.length * lineHeight;
+    var margin2 = Math.round(targetW * 0.04);
+    var cx2 = (targetW - blockW) / 2;
+    var pos = template.position || 'bottom-left';
+    var wmX = margin2, wmY = margin2;
+    if (customX != null) wmX = customX;
+    else if (pos === 'bottom-center' || pos === 'top-center' || pos === 'center') wmX = cx2;
+    else if (pos === 'top-right' || pos === 'center-right' || pos === 'bottom-right') wmX = targetW - blockW - margin2;
+    if (customY != null) wmY = customY;
+    else if (pos.indexOf('top') >= 0) wmY = margin2;
+    else if (pos.indexOf('center') >= 0) wmY = (targetH - blockH) / 2;
+    else wmY = targetH - blockH - margin2;
+    wmX = Math.max(margin2, Math.min(wmX, targetW - blockW - margin2));
+    wmY = Math.max(margin2, Math.min(wmY, targetH - blockH - margin2));
+
+    // 包围盒坐标（像素整数）
+    var boxLeft = Math.max(0, Math.floor(wmX - 2));
+    var boxTop = Math.max(0, Math.floor(wmY - 2));
+    var boxRight = Math.min(targetW, Math.ceil(wmX + blockW + 2));
+    var boxBottom = Math.min(targetH, Math.ceil(wmY + blockH + 2));
+
+    // 5. 对包围盒内每个像素做反向 Alpha 合成
+    var wmOpacity = opacity != null ? opacity : 0.72;
+    var invOpacity = 1 - wmOpacity;
+    if (invOpacity < 0.01) invOpacity = 0.01; // 避免除零
+
+    for (var py = boxTop; py < boxBottom; py++) {
+      for (var px = boxLeft; px < boxRight; px++) {
+        var idx = (py * targetW + px) * 4;
+        // 跳过完全透明的像素（水印不覆盖的区域）
+        if (grayPixels[idx + 3] < 10) continue;
+
+        // 水印贡献值 = 灰背景上渲染结果 - 灰背景被遮挡部分
+        // gray_result = wm_contribution + gray_bg × (1 - opacity)
+        // → wm_contribution = gray_result - gray_bg × (1 - opacity)
+        var grayBg = 128;
+        for (var ch = 0; ch < 3; ch++) {
+          var wmContrib = grayPixels[idx + ch] - grayBg * invOpacity;
+          // 从带水印照片中还原原始像素
+          var orig = (wmPixels[idx + ch] - wmContrib) / invOpacity;
+          wmPixels[idx + ch] = Math.max(0, Math.min(255, Math.round(orig)));
+        }
+        // Alpha 保持不透明
+        wmPixels[idx + 3] = 255;
+      }
+    }
+  }
+
+  // 6. 将还原后的像素数据写回 Canvas 并导出
+  ctx.clearRect(0, 0, targetW, targetH);
+  // 需要重新绘制原图 + 修改后的像素，或直接用 putImageData
+  // putImageData 会直接覆盖 canvas 内容
+  watermarkedData.data.set(wmPixels);
+  ctx.putImageData(watermarkedData, 0, 0);
+
+  var outPath = await exportCanvasToFile(canvas, targetW, targetH);
+  console.log('[Watermark] removeWatermark 完成:', outPath);
+  return outPath;
+}
+
+/**
  * 在 Canvas 上加载一张图片
  */
 function loadImageOnCanvas(canvas, src) {
@@ -429,5 +593,6 @@ function roundRect(ctx, x, y, w, h, r, fill) {
 }
 
 module.exports = {
-  renderWatermarkedImage
+  renderWatermarkedImage,
+  removeWatermark
 };
