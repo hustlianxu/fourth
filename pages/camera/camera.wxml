@@ -1,0 +1,106 @@
+<custom-nav title="拍照" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
+<view class="camera-wrap">
+
+
+  
+  <!-- 拍照闪光动画 -->
+  <view class="flash-overlay {{flashAnim ? 'flash' : ''}}"></view>
+
+  <!-- 相机取景框（绝对定位参考系） -->
+  <view class="camera-viewport">
+    <camera
+      class="camera"
+      device-position="back"
+      flash="auto"
+      resolution="high"
+      frame-size="large"
+    ></camera>
+
+    <!-- 水印预览浮层（可拖拽、缩放、点击字段直接编辑） -->
+    <view
+      wx:if="{{template.fields.length > 0}}"
+      class="wm-preview"
+      style="{{wmPosStyle}} {{wmTransform}}"
+    >
+      <view class="wm-preview-bg" style="font-size: {{wmPreviewFontSize}}px; padding: {{wmPadding}}px">
+        <!-- 拖拽手柄 -->
+        <view
+          class="wm-drag-handle"
+          catchtouchstart="onWmDragStart"
+          catchtouchmove="onWmDragMove"
+          catchtouchend="onWmDragEnd"
+        >⋮⋮</view>
+        <!-- 字段列表 -->
+        <view
+          wx:for="{{wmPreviewFields}}"
+          wx:key="key"
+          class="wm-field-row {{item.value ? '' : 'wm-field-empty'}} {{editingFieldKey === item.key ? 'wm-field-editing' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onFieldTap"
+        >
+          <text wx:if="{{editingFieldKey !== item.key}}" class="wm-field-text">
+            <text class="wm-field-label">{{item.label}}:</text>
+            <text class="wm-field-value">{{item.value || ''}}</text>
+          </text>
+          <view wx:else class="wm-edit-row">
+            <input
+              class="wm-edit-input"
+              value="{{editValue}}"
+              bindinput="onEditInput"
+              bindblur="onEditBlur"
+              focus="{{true}}"
+              placeholder="{{item.label}}"
+            />
+            <text class="wm-edit-ok" bindtap="onEditConfirm">✓</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 水印位置选择浮层 -->
+    <view class="pos-panel">
+      <view class="pos-label">水印位置</view>
+      <view class="pos-grid">
+        <view
+          wx:for="{{POSITIONS}}"
+          wx:key="id"
+          class="pos-dot {{wPos === item.id ? 'active' : ''}}"
+          data-pos="{{item.id}}"
+          bindtap="onSetPos"
+          style="grid-area: {{item.grid}}"
+        ></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部按钮栏（始终可见） -->
+  <view class="bottom-bar-fixed">
+    <view class="name-input-row">
+      <text class="name-label">名称</text>
+      <input class="name-input" placeholder="给照片起个名字（可选）" value="{{customName}}" bindinput="onNameInput" maxlength="50" />
+    </view>
+    <view class="btn-row">
+      <view class="btn secondary" bindtap="onPickImage">相册</view>
+      <view class="btn" bindtap="onTakePhoto">拍照</view>
+    </view>
+  </view>
+
+</view>
+
+<!-- 模板选择弹层 -->
+<view class="mask" wx:if="{{showTplPicker}}" bindtap="closePicker"></view>
+<view class="picker" wx:if="{{showTplPicker}}">
+  <view class="picker-title">选择模板</view>
+  <view class="picker-list">
+    <view wx:for="{{templates}}" wx:key="id"
+      class="picker-item {{template.id === item.id ? 'selected' : ''}}"
+      data-id="{{item.id}}" bindtap="onPickTemplate">
+      <view class="tpl-name">{{item.name}}</view>
+      <view class="tpl-desc">{{item.description}}</view>
+    </view>
+  </view>
+  <view class="btn secondary" bindtap="closePicker" style="margin-top:16rpx;">关闭</view>
+</view>
+
+</view>

@@ -1,0 +1,90 @@
+<view class="page-wrap">
+
+  <!-- 左预览层（右滑时露出 → 我的记录） -->
+  <view class="preview-layer left-preview {{dragDir === 'right' ? 'active' : ''}}" style="opacity: {{previewOpacity}};">
+    <view class="preview-icon">📋</view>
+    <view class="preview-label">我的记录</view>
+  </view>
+
+  <!-- 右预览层（左滑时露出 → 拍照） -->
+  <view class="preview-layer right-preview {{dragDir === 'left' ? 'active' : ''}}" style="opacity: {{previewOpacity}};">
+    <view class="preview-icon">📷</view>
+    <view class="preview-label">拍照</view>
+  </view>
+
+  <!-- 首页内容（可拖拽） -->
+  <view class="container"
+    style="{{slideStyle}}; {{slideTransition}}"
+    bindtouchstart="onTouchStart"
+    bindtouchmove="onTouchMove"
+    bindtouchend="onTouchEnd"
+  >
+    <view class="hero">
+      <view class="hero-title">外贸水印相机</view>
+      <view class="hero-sub">Product / Packaging / Loading · 拍照即带水印并入库</view>
+    </view>
+
+    <view class="card">
+      <view class="title">选择水印模板 · Pick Template</view>
+      <view class="tpl-grid">
+        <view
+          wx:for="{{templates}}"
+          wx:key="id"
+          class="tpl-item {{selectedId === item.id ? 'selected' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onSelectTemplate"
+        >
+          <view class="tpl-check" wx:if="{{selectedId === item.id}}">✓</view>
+          <view class="tpl-name">{{item.name}}</view>
+          <view class="tpl-desc">{{item.description}}</view>
+          <view class="tpl-tags">
+            <block wx:for="{{item.fields}}" wx:for-item="f" wx:key="key" wx:for-index="idx">
+              <text class="tag" wx:if="{{idx < 5}}">{{f.label}}</text>
+            </block>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="row between">
+      <view class="btn secondary" bindtap="goList" style="flex:1;margin-right:16rpx;">
+        我的记录 · {{total}}
+      </view>
+      <view class="btn" bindtap="goCamera" style="flex:1;">
+        开始拍照 · Start
+      </view>
+    </view>
+
+    <view class="row between" style="margin-top:16rpx;">
+      <view class="btn outline" bindtap="goTemplate" style="flex:1;">
+        管理模板 · Templates
+      </view>
+    </view>
+
+    <view class="card setting-row">
+      <view class="setting-info">
+        <view class="setting-title">自动保存到相册</view>
+        <view class="setting-desc">拍照后自动将原图和水印图存入系统相册，防止小程序数据丢失</view>
+      </view>
+      <switch checked="{{autoSaveAlbum}}" bindchange="onToggleAutoAlbum" color="#07c160"/>
+    </view>
+
+    <view class="card setting-row" wx:if="{{openid || true}}">
+      <view class="setting-info">
+        <view class="setting-title">☁️ 云同步</view>
+        <view class="setting-desc">同步照片、文件夹到所有设备</view>
+      </view>
+      <switch checked="{{syncEnabled}}" bindchange="onToggleSync" color="#07c160"/>
+    </view>
+
+    <view class="card setting-row" wx:if="{{syncEnabled || configSyncEnabled}}">
+      <view class="setting-info">
+        <view class="setting-title">⚙️ 配置同步</view>
+        <view class="setting-desc">同步自动保存、翻译引擎（含 API Key）、自定义词典、提示词等全部配置</view>
+      </view>
+      <switch checked="{{configSyncEnabled}}" bindchange="onToggleConfigSync" color="#07c160"/>
+    </view>
+
+    <view class="footer" bindtap="goAbout">使用说明</view>
+  </view>
+</view>

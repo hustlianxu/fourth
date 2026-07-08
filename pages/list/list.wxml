@@ -1,0 +1,316 @@
+<custom-nav title="我的记录" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
+
+<view class="container">
+  <!-- 骨架屏加载状态 -->
+  <view wx:if="{{loading}}" class="skeleton-list">
+    <view class="skeleton-card" wx:for="{{[1,2,3]}}" wx:key="*this">
+      <view class="skeleton-thumb"></view>
+      <view class="skeleton-body">
+        <view class="skeleton-line w60"></view>
+        <view class="skeleton-line w40"></view>
+        <view class="skeleton-line w80"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:elif="{{list.length === 0 && folders.length === 0 && activeFolderId === null}}" class="empty">
+    <view class="empty-icon">📷</view>
+    <view class="empty-title">还没有记录</view>
+    <view class="empty-sub">去拍一张带水印的照片吧</view>
+    <view class="btn" bindtap="goCamera" style="margin-top:32rpx;">开始拍照</view>
+  </view>
+
+  <view wx:else>
+    <!-- ===== 文件夹Tab栏 ===== -->
+    <scroll-view class="folder-tabs" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="folder-tabs-inner">
+        <!-- 普通模式：全部Tab；导出模式：全选/取消全选 -->
+        <view
+          class="folder-tab {{!exportMode && activeFolderId === null ? 'active' : ''}} {{exportMode && allFoldersSelected ? 'export-selected' : ''}}"
+          data-folder-id=""
+          bindtap="onSelectFolder"
+        >全部({{totalCount}})</view>
+        <!-- 未分类Tab -->
+        <view
+          wx:if="{{uncategorizedCount > 0}}"
+          class="folder-tab {{!exportMode && activeFolderId === '__uncategorized__' ? 'active' : ''}} {{exportMode && uncategorizedExportSelected ? 'export-selected' : ''}}"
+          data-folder-id="__uncategorized__"
+          bindtap="onSelectFolder"
+          bindlongpress="{{exportMode ? '' : 'onUncategorizedLongPress'}}"
+        >未分类({{uncategorizedCount}})</view>
+        <!-- 自定义文件夹Tab -->
+        <view
+          wx:for="{{folders}}"
+          wx:key="id"
+          class="folder-tab {{!exportMode && activeFolderId === item.id ? 'active' : ''}} {{exportMode && item._exportSelected ? 'export-selected' : ''}}"
+          data-folder-id="{{item.id}}"
+          bindtap="onSelectFolder"
+          bindlongpress="{{exportMode ? '' : 'onFolderLongPress'}}"
+        >{{item.name}}({{item.count}})</view>
+        <!-- + 按钮（仅普通模式显示） -->
+        <view wx:if="{{!exportMode}}" class="folder-tab folder-tab-add" bindtap="onAddFolder">+</view>
+      </view>
+    </scroll-view>
+
+    <!-- 回收站入口（仅在普通模式、非编辑/非选中态时显示） -->
+    <view wx:if="{{!exportMode && !batchMode && !trashMode}}" class="trash-bar" bindtap="onShowTrash">
+      <text class="trash-icon">🗑</text>
+      <text class="trash-count">回收站{{trashCount > 0 ? ' (' + trashCount + ')' : ''}}</text>
+    </view>
+
+    <!-- 回收站视图 -->
+    <view wx:if="{{trashMode}}" class="trash-header">
+      <text class="trash-title">回收站（30天后自动清理）</text>
+      <view class="trash-actions">
+        <text class="trash-link" bindtap="onEmptyTrash">清空</text>
+        <text class="trash-link" bindtap="onExitTrash">返回</text>
+      </view>
+    </view>
+
+    <!-- 回收站列表 -->
+    <view wx:if="{{trashMode && trashList.length > 0}}" class="trash-list">
+      <view wx:for="{{trashList}}" wx:key="id" class="trash-item" data-id="{{item.id}}">
+        <image class="trash-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
+        <view class="trash-body">
+          <view class="trash-title">{{item.customName || item.templateName}}</view>
+          <view class="trash-meta">删除于 {{formatTrashTime(item._deletedAt)}}</view>
+        </view>
+        <view class="trash-restore" bindtap="onRestoreFromTrash" data-id="{{item.id}}">恢复</view>
+      </view>
+    </view>
+
+    <!-- ===== 搜索框（仅普通模式显示，导出/批量模式隐藏） ===== -->
+    <view wx:if="{{!exportMode && !batchMode}}" class="search-bar">
+      <view class="search-input-wrap {{searchActive ? 'active' : ''}}">
+        <text class="search-icon">🔍</text>
+        <input
+          class="search-input"
+          type="text"
+          value="{{searchInput}}"
+          placeholder="搜索货号 / 描述 / 价格 / 体积..."
+          placeholder-class="search-placeholder"
+          confirm-type="search"
+          bindinput="onSearchInput"
+          bindfocus="onSearchFocus"
+          bindblur="onSearchBlur"
+        />
+        <view wx:if="{{searchInput}}" class="search-clear" bindtap="onSearchClear">✕</view>
+      </view>
+    </view>
+
+    <!-- ===== 顶部操作栏（渐进式：选中态保留导出/新增，标题变✕已选，左侧加红色删除） ===== -->
+    <block wx:if="{{!exportMode}}">
+      <view class="row between" style="margin-bottom:24rpx;">
+        <!-- 选中态：✕已选X条 + 全选/取消链接；普通态：共N条 + 词典入口 -->
+        <view class="row" style="align-items:center;">
+          <block wx:if="{{batchMode}}">
+            <view class="batch-exit" bindtap="onBatchCancel">✕</view>
+            <view class="batch-title">已选 {{batchSelectedCount}} 条</view>
+            <text class="batch-link" bindtap="onBatchSelectAll" style="margin-left:16rpx;">全选</text>
+          </block>
+          <block wx:else>
+            <view class="title" style="margin:0;">共 {{filteredCount}} 条</view>
+            <view class="dict-entry-btn" bindtap="goDict" style="margin-left:8rpx;">📚</view>
+            <view class="dict-entry-btn" bindtap="goSettings" style="margin-left:8rpx;">⚙️</view>
+          </block>
+        </view>
+        <view class="row">
+          <!-- 选中态：红色删除按钮（与导出同等大小） -->
+          <view wx:if="{{batchMode}}" class="btn batch-delete-btn" bindtap="onBatchDeleteStart" style="padding:12rpx 24rpx;margin-right:12rpx;">删除</view>
+          <view class="btn secondary" bindtap="toggleExportMode" style="padding:12rpx 24rpx;margin-right:12rpx;">导出</view>
+          <view class="btn secondary" bindtap="goCamera" style="padding:12rpx 24rpx;">+ 新增</view>
+        </view>
+      </view>
+      <view wx:if="{{batchMode}}" class="batch-hint">点击记录切换选中，右滑可选中</view>
+    </block>
+
+    <!-- ===== 导出模式操作栏 ===== -->
+    <block wx:else>
+      <view wx:if="{{selectedFolderIds.length === 0}}" class="export-hint">点击上方文件夹选择要导出的内容</view>
+      <view class="export-bar">
+        <view class="export-actions">
+          <text class="export-link" bindtap="selectAll">全选</text>
+          <text class="export-link" bindtap="deselectAll">取消</text>
+        </view>
+        <view class="export-info">已选 {{selectedCount}} 条</view>
+        <view class="btn export-confirm" bindtap="doExport">确认导出</view>
+        <view class="btn secondary" bindtap="toggleExportMode" style="padding:12rpx 20rpx;">取消</view>
+      </view>
+    </block>
+
+    <!-- 当前文件夹空提示 -->
+    <view wx:if="{{list.length === 0}}" class="folder-empty">
+      <text>{{searchKeyword ? '没有匹配的记录' : '当前文件夹为空'}}</text>
+    </view>
+
+    <!-- ===== 记录列表 ===== -->
+    <view
+      wx:for="{{list}}"
+      wx:key="id"
+      class="record-wrap {{exportMode ? 'export-selectable' : ''}} {{batchMode ? 'batch-selectable' : ''}} {{(exportMode || batchMode) && item._checked ? 'selected' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="{{exportMode ? 'toggleSelect' : (batchMode ? 'onBatchToggle' : (item._swipeX > 0 ? 'onRecordTapCollapse' : 'goDetail'))}}"
+      bindlongpress="{{(!exportMode && !batchMode) ? 'onRecordLongPress' : ''}}"
+      bindtouchstart="{{(!exportMode) ? 'onRecordTouchStart' : ''}}"
+      bindtouchmove="{{(!exportMode) ? 'onRecordTouchMove' : ''}}"
+      bindtouchend="{{(!exportMode) ? 'onRecordTouchEnd' : ''}}"
+      bindtouchcancel="{{(!exportMode) ? 'onRecordTouchEnd' : ''}}"
+    >
+      <view class="record {{item._swiping ? 'swiping' : ''}}" style="transform: translateX({{-item._swipeX}}px); transition: {{item._swipeAnim ? 'transform 0.25s ease' : 'none'}};">
+        <!-- 导出/批量模式勾选框 -->
+        <view wx:if="{{exportMode || batchMode}}" class="checkbox {{item._checked ? 'checked' : ''}}">
+          <text wx:if="{{item._checked}}">✓</text>
+        </view>
+
+        <image class="record-thumb" src="{{item.imagePath}}" mode="aspectFill"></image>
+        <view class="record-body">
+          <view class="record-title">{{item.customName || item.templateName}}<text wx:if="{{item._syncStatus === 'off'}}" class="sync-badge off">📴</text><text wx:if="{{item._syncStatus === 'synced'}}" class="sync-badge synced">☁️</text><text wx:if="{{item._syncStatus === 'pending'}}" class="sync-badge pending">⏳</text></view>
+          <view class="record-time">{{item.timeText}}<text wx:if="{{item.sizeText}}" class="record-meta">{{item.sizeText}}</text></view>
+          <view class="record-summary">{{item.summary}}</view>
+        </view>
+      </view>
+
+      <!-- 左滑操作按钮组（仅普通模式显示） -->
+      <view wx:if="{{!exportMode && !batchMode}}" class="swipe-actions" style="width: {{item._swipeActionsW || 0}}px;">
+        <view class="swipe-btn swipe-rename" data-id="{{item.id}}" catchtap="onSwipeRename">
+          <text class="swipe-icon">✎</text>
+          <text class="swipe-label">重命名</text>
+        </view>
+        <view class="swipe-btn swipe-move" data-id="{{item.id}}" catchtap="onSwipeMove">
+          <text class="swipe-icon">📁</text>
+          <text class="swipe-label">移动</text>
+        </view>
+        <view class="swipe-btn swipe-copy" data-id="{{item.id}}" catchtap="onSwipeCopy">
+          <text class="swipe-icon">⧉</text>
+          <text class="swipe-label">复制</text>
+        </view>
+        <view class="swipe-btn swipe-delete" data-id="{{item.id}}" catchtap="onSwipeDelete">
+          <text class="swipe-icon">🗑</text>
+          <text class="swipe-label">删除</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 分页加载提示 -->
+    <view wx:if="{{loadingMore}}" class="load-more-tip">加载中...</view>
+    <view wx:elif="{{hasMore}}" class="load-more-tip muted">上滑加载更多</view>
+    <view wx:elif="{{list.length > 0}}" class="load-more-tip muted">没有更多了</view>
+
+    <view class="btn danger" bindtap="onClear" style="margin-top:24rpx;">清空未同步的本地记录（已同步云端的不受影响）</view>
+  </view>
+
+  <!-- ===== 文件夹创建/重命名弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showFolderModal}}" bindtap="closeFolderModal"></view>
+  <view class="folder-modal" wx:if="{{showFolderModal}}">
+    <view class="folder-modal-title">{{editingFolderId ? '重命名文件夹' : '新建文件夹'}}</view>
+    <input
+      class="folder-modal-input"
+      placeholder="输入文件夹名称"
+      maxlength="20"
+      value="{{folderNameInput}}"
+      bindinput="onFolderNameInput"
+      focus="{{showFolderModal}}"
+    />
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeFolderModal">取消</view>
+      <view class="btn" bindtap="onConfirmFolder">确定</view>
+    </view>
+  </view>
+
+  <!-- ===== 记录重命名弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showRenameModal}}" bindtap="closeRenameModal"></view>
+  <view class="folder-modal" wx:if="{{showRenameModal}}">
+    <view class="folder-modal-title">重命名照片</view>
+    <input
+      class="folder-modal-input"
+      placeholder="输入照片名称（留空则使用模板名称）"
+      maxlength="30"
+      value="{{renameInput}}"
+      bindinput="onRenameInput"
+      focus="{{showRenameModal}}"
+    />
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeRenameModal">取消</view>
+      <view class="btn" bindtap="onConfirmRename">确定</view>
+    </view>
+  </view>
+
+  <!-- ===== 导出文件名弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showExportNameModal}}" bindtap="closeExportNameModal"></view>
+  <view class="folder-modal" wx:if="{{showExportNameModal}}">
+    <view class="folder-modal-title">导出到 Excel</view>
+    <view class="folder-modal-desc">将导出已选中的 {{selectedCount}} 条记录</view>
+    <input
+      class="folder-modal-input"
+      placeholder="输入文件名（不含扩展名）"
+      maxlength="50"
+      value="{{exportFileName}}"
+      bindinput="onExportNameInput"
+      focus="{{showExportNameModal}}"
+    />
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeExportNameModal">取消</view>
+      <view class="btn" bindtap="onConfirmExport">导出</view>
+    </view>
+  </view>
+
+  <!-- ===== 文件夹选择器底部弹层（移动/复制） ===== -->
+  <view class="mask" wx:if="{{showFolderPicker}}" bindtap="closeFolderPicker"></view>
+  <view class="picker" wx:if="{{showFolderPicker}}">
+    <view class="picker-title">
+      {{pickerMode === 'move' ? '移动到文件夹' : '复制到文件夹'}}
+    </view>
+    <view class="picker-list">
+      <!-- 未分类选项 -->
+      <view
+        class="picker-item"
+        data-folder-id="__uncategorized__"
+        bindtap="onPickTargetFolder"
+      >未分类</view>
+      <view
+        wx:for="{{folders}}"
+        wx:key="id"
+        class="picker-item {{pickerRecordId && item.id === activeFolderId && pickerMode === 'move' ? 'picker-item-disabled' : ''}}"
+        data-folder-id="{{item.id}}"
+        bindtap="onPickTargetFolder"
+      >
+        <view class="picker-item-name">{{item.name}}</view>
+        <view class="picker-item-count">{{item.count}} 条记录</view>
+      </view>
+      <view wx:if="{{folders.length === 0}}" class="picker-empty">暂无文件夹，请先创建</view>
+    </view>
+    <view class="btn secondary" bindtap="closeFolderPicker" style="margin-top:16rpx;">取消</view>
+  </view>
+
+  <!-- ===== 删除文件夹确认弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showDeleteFolderModal}}" bindtap="closeDeleteFolderModal"></view>
+  <view class="folder-modal" wx:if="{{showDeleteFolderModal}}">
+    <view class="folder-modal-title">删除文件夹</view>
+    <view class="folder-modal-desc">
+      文件夹「{{deleteFolderName}}」中有 {{deleteFolderCount}} 条记录。
+      请选择如何处理这些记录：
+    </view>
+    <view class="folder-modal-actions" style="flex-direction:column;gap:12rpx;">
+      <view class="btn danger" bindtap="onDeleteFolderWithRecords">移入回收站</view>
+      <view class="btn secondary" bindtap="onDeleteFolderKeepRecords">移入未分类</view>
+      <view class="btn secondary" bindtap="closeDeleteFolderModal" style="background:#f5f5f5;color:#999;">取消</view>
+    </view>
+  </view>
+
+  <!-- ===== 批量删除二次确认弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showBatchDeleteModal}}" bindtap="closeBatchDeleteModal"></view>
+  <view class="folder-modal" wx:if="{{showBatchDeleteModal}}">
+    <view class="folder-modal-title">批量删除确认</view>
+    <view class="folder-modal-desc">
+      确定将选中的 {{batchSelectedCount}} 条记录移入回收站吗？30天后自动清理。
+    </view>
+    <view class="folder-modal-actions">
+      <view class="btn secondary" bindtap="closeBatchDeleteModal">取消</view>
+      <view class="btn danger" bindtap="onBatchDeleteConfirm">确认删除</view>
+    </view>
+  </view>
+</view>
+
+</view>

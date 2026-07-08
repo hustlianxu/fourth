@@ -1,0 +1,419 @@
+/* 
+此文件为开发者工具生成，生成时间: 2026/6/24上午1:07:48
+使用方法：
+在 app.wxss 文件末尾引入样式
+```
+@import "./app-wxa-auto-dark.wxss";
+```
+ */
+
+@media (prefers-color-scheme: dark) {
+    page {
+        background: rgb(23, 24, 26);
+        color: rgb(231, 231, 231);
+    }
+
+    .card {
+        background: rgb(17, 17, 17);
+    }
+
+    .btn {
+        background: rgb(0, 105, 12);
+        color: rgb(255, 255, 255);
+    }
+
+    .btn.secondary {
+        background: rgb(17, 17, 17);
+        color: rgb(0, 105, 12);
+        border: rgb(0, 0, 0);
+    }
+
+    .btn.danger {
+        background: rgb(208, 19, 45);
+        color: rgb(255, 255, 255);
+    }
+
+    .btn[disabled] {
+        background: rgb(42, 42, 42);
+        color: rgb(115, 115, 115);
+    }
+
+    .muted {
+        color: rgb(115, 115, 115);
+    }
+
+    .divider {
+        background: rgb(29, 29, 29);
+    }
+
+    /* 列表页面 */
+    .folder-tabs {
+        background: rgb(17, 17, 17);
+        border-bottom-color: rgb(29, 29, 29);
+    }
+
+    .folder-tab {
+        background: rgb(29, 29, 29);
+        color: rgb(149, 149, 149);
+    }
+
+    .folder-tab.active,
+    .folder-tab.export-selected {
+        background: rgb(0, 105, 12);
+        color: rgb(255, 255, 255);
+    }
+
+    .record {
+        background: rgb(17, 17, 17);
+    }
+
+    .record-thumb {
+        background: rgb(42, 42, 42);
+    }
+
+    .record-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .record-summary {
+        color: rgb(149, 149, 149);
+    }
+
+    .record.selected {
+        background: rgb(5, 25, 15);
+        border-color: rgb(0, 105, 12);
+    }
+
+    .checkbox {
+        border-color: rgb(115, 115, 115);
+    }
+
+    .checkbox.checked {
+        background: rgb(0, 105, 12);
+        border-color: rgb(0, 105, 12);
+    }
+
+    /* 详情页面 */
+    .detail-nav {
+        background: rgb(17, 17, 17);
+    }
+
+    .nav-back {
+        background: rgb(42, 42, 42);
+        color: rgb(231, 231, 231);
+    }
+
+    .nav-back:active {
+        background: rgb(55, 55, 55);
+    }
+
+    .nav-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .nav-more {
+        background: rgb(42, 42, 42);
+        color: rgb(149, 149, 149);
+    }
+
+    .nav-more:active {
+        background: rgb(55, 55, 55);
+    }
+
+    .img-area {
+        background: rgb(42, 42, 42);
+    }
+
+    .big-img {
+        background: rgb(42, 42, 42);
+    }
+
+    .field-row {
+        border-bottom-color: rgb(29, 29, 29);
+    }
+
+    .f-k {
+        color: rgb(149, 149, 149);
+    }
+
+    .f-v {
+        color: rgb(231, 231, 231);
+    }
+
+    .f-edit {
+        background: rgb(29, 29, 29);
+        color: rgb(231, 231, 231);
+        border: 1rpx solid rgb(42, 42, 42);
+    }
+
+    .setting-label {
+        color: rgb(149, 149, 149);
+    }
+
+    .setting-val {
+        color: rgb(0, 105, 12);
+    }
+
+    .issue {
+        color: rgb(250, 173, 20);
+    }
+
+    /* 列表页面补充 */
+    .skeleton-card {
+        background: rgb(17, 17, 17);
+    }
+
+    .skeleton-thumb,
+    .skeleton-line {
+        background: rgb(42, 42, 42);
+    }
+
+    .record-time {
+        color: rgb(115, 115, 115);
+    }
+
+    .folder-tab-add {
+        background: rgb(29, 29, 29);
+        border-color: rgb(55, 55, 55);
+        color: rgb(149, 149, 149);
+    }
+
+    .folder-empty {
+        color: rgb(115, 115, 115);
+    }
+
+    .export-hint {
+        color: rgb(0, 105, 12);
+    }
+
+    .export-info {
+        color: rgb(149, 149, 149);
+    }
+
+    .export-link {
+        color: rgb(0, 105, 12);
+    }
+
+    /* 弹窗补充 */
+    .folder-modal {
+        background: rgb(17, 17, 17);
+    }
+
+    .folder-modal-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .folder-modal-desc {
+        color: rgb(149, 149, 149);
+    }
+
+    .folder-modal-input {
+        background: rgb(29, 29, 29);
+        color: rgb(231, 231, 231);
+    }
+
+    .picker-item:active {
+        background: rgb(5, 25, 15);
+    }
+
+    /* 模板管理页面 */
+    .page {
+        background: rgb(23, 24, 26);
+    }
+
+    .header {
+        background: linear-gradient(135deg, rgb(0, 105, 12) 0%, rgb(5, 80, 40) 100%);
+        color: rgb(255, 255, 255);
+    }
+
+    .label {
+        color: rgb(231, 231, 231);
+    }
+
+    .template-card {
+        background: rgb(17, 17, 17);
+    }
+
+    .tpl-name {
+        color: rgb(231, 231, 231);
+    }
+
+    .tpl-desc {
+        color: rgb(149, 149, 149);
+    }
+
+    .tpl-actions {
+        color: rgb(115, 115, 115);
+    }
+
+    .field-tag {
+        background: rgb(20, 40, 60);
+        color: rgb(100, 150, 255);
+    }
+
+    .tpl-meta {
+        color: rgb(115, 115, 115);
+    }
+
+    .modal {
+        background: rgb(17, 17, 17);
+    }
+
+    .modal-header {
+        border-bottom-color: rgb(29, 29, 29);
+    }
+
+    .modal-header text {
+        color: rgb(231, 231, 231);
+    }
+
+    .close-btn {
+        color: rgb(115, 115, 115);
+    }
+
+    .modal-footer {
+        border-top-color: rgb(29, 29, 29);
+    }
+
+    .form-input,
+    .field-input {
+        background: rgb(29, 29, 29);
+        color: rgb(231, 231, 231);
+    }
+
+    .form-label {
+        color: rgb(149, 149, 149);
+    }
+
+    .mini-btn {
+        background: rgb(5, 25, 15);
+        color: rgb(0, 105, 12);
+    }
+
+    .pos-btn {
+        background: rgb(29, 29, 29);
+        color: rgb(149, 149, 149);
+    }
+
+    .pos-btn.active {
+        background: rgb(5, 25, 15);
+        border-color: rgb(0, 105, 12);
+        color: rgb(0, 105, 12);
+    }
+
+    .field-type {
+        background: rgb(29, 29, 29);
+        color: rgb(149, 149, 149);
+    }
+
+    .delete-modal {
+        background: rgb(17, 17, 17);
+    }
+
+    .delete-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .delete-desc {
+        color: rgb(149, 149, 149);
+    }
+
+    /* 弹窗 */
+    .picker {
+        background: rgb(17, 17, 17);
+    }
+
+    .picker-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .picker-item {
+        background: rgb(29, 29, 29);
+    }
+
+    .picker-item.selected {
+        background: rgb(5, 25, 15);
+        border-color: rgb(0, 105, 12);
+    }
+
+    .picker-item-name {
+        color: rgb(231, 231, 231);
+    }
+
+    .picker-item-count {
+        color: rgb(115, 115, 115);
+    }
+
+    /* 预览页面 */
+    .toolbar {
+        background: rgba(0, 0, 0, 0.85);
+    }
+
+    .back-btn {
+        color: rgb(255, 255, 255);
+    }
+
+    .toolbar-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .bottom-panel {
+        background: rgb(17, 17, 17);
+    }
+
+    .panel-title {
+        color: rgb(231, 231, 231);
+    }
+
+    .panel-toggle {
+        background: rgb(42, 42, 42);
+    }
+
+    .toggle-icon {
+        color: rgb(149, 149, 149);
+    }
+
+    .setting-panel {
+        background: rgb(17, 17, 17);
+    }
+
+    .setting-label {
+        color: rgb(149, 149, 149);
+    }
+
+    .setting-val {
+        color: rgb(0, 105, 12);
+    }
+
+    .scale-value,
+    .opacity-value {
+        color: rgb(0, 105, 12);
+    }
+
+    .pos-btn {
+        background: rgb(29, 29, 29);
+        color: rgb(149, 149, 149);
+    }
+
+    .pos-btn.active {
+        background: rgb(5, 25, 15);
+        border-color: rgb(0, 105, 12);
+        color: rgb(0, 105, 12);
+    }
+
+    .wm-content {
+        background: rgba(0, 0, 0, 0.75);
+    }
+
+    .wm-label {
+        color: rgb(255, 230, 140);
+    }
+
+    .wm-value {
+        color: rgb(255, 255, 255);
+    }
+
+    .wm-resize-hint {
+        color: rgb(149, 149, 149);
+    }
+}

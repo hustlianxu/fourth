@@ -1,0 +1,33 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/camera/camera",
+    "pages/list/list",
+    "pages/detail/detail",
+    "pages/template/template",
+    "pages/dict/dict",
+    "pages/settings/settings",
+    "pages/share/share",
+    "pages/timeline/timeline"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "水印相机",
+    "navigationBarTextStyle": "black"
+  },
+  "permission": {
+    "scope.camera": {
+      "desc": "用于拍摄照片"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "用于保存带水印的照片到相册"
+    }
+  },
+  "requiredPrivateInfos": [
+    "chooseLocation",
+    "getLocation"
+  ],
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

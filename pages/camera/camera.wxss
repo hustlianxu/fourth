@@ -1,0 +1,320 @@
+/* ===== 整体布局 ===== */
+/* 在固定导航栏下方撑满视口，不滚动 */
+.page-content {
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.camera-wrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  position: relative;
+}
+
+/* ===== 拍照闪光动画 ===== */
+.flash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+}
+
+.flash-overlay.flash {
+  animation: flashAnim 0.3s ease-out;
+}
+
+@keyframes flashAnim {
+  0% { opacity: 0; }
+  20% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+/* ===== 相机取景框（绝对定位参考系，撑满底部按钮上方空间） ===== */
+.camera-viewport {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ===== 相机画面（绝对定位填满取景框，避免 flex 下 height:100% 解析异常导致黑屏） ===== */
+.camera {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+/* ===== 水印位置选择器（叠加在相机画面右下角） ===== */
+.pos-panel {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 12rpx;
+  padding: 12rpx 16rpx;
+  z-index: 50;
+}
+
+.pos-label {
+  font-size: 22rpx;
+  color: rgba(255,255,255,0.8);
+  margin-bottom: 8rpx;
+  text-align: center;
+}
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 48rpx);
+  grid-template-rows: repeat(3, 48rpx);
+  gap: 8rpx;
+}
+
+.pos-dot {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  border: 2rpx solid rgba(255, 255, 255, 0.3);
+}
+
+.pos-dot:active {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+.pos-dot.active {
+  background-color: #07c160;
+  border-color: #07c160;
+}
+
+/* ===== 水印预览浮层（叠加在相机画面上） ===== */
+.wm-preview {
+  position: absolute;
+  z-index: 40;
+  max-width: 45%;
+}
+
+.wm-preview-bg {
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 8rpx;
+  padding: 10rpx 16rpx;
+}
+
+.wm-preview-line {
+  display: block;
+  color: #fff;
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 9 个位置变体（基于取景框的百分比，4% margin 与 watermark.js 的 cw*0.04 保持一致） */
+.wm-preview--top-left     { top: 4%; left: 4%; }
+.wm-preview--top-center   { top: 4%; left: 50%; transform: translateX(-50%); }
+.wm-preview--top-right    { top: 4%; right: 4%; }
+.wm-preview--center-left  { top: 50%; left: 4%; transform: translateY(-50%); }
+.wm-preview--center       { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.wm-preview--center-right { top: 50%; right: 4%; transform: translateY(-50%); }
+.wm-preview--bottom-left  { bottom: 4%; left: 4%; }
+.wm-preview--bottom-center{ bottom: 4%; left: 50%; transform: translateX(-50%); }
+.wm-preview--bottom-right { bottom: 4%; right: 4%; }
+
+/* ===== 水印预览可拖拽 ===== */
+.wm-drag-handle {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  padding-bottom: 6rpx;
+  margin-bottom: 6rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.15);
+}
+
+/* ===== 字段行 ===== */
+.wm-field-row {
+  display: flex;
+  flex-direction: column;
+  padding: 2rpx 0;
+}
+
+.wm-field-value {
+  padding-left: 1em;
+}
+
+.wm-field-label {
+  color: #ffe58f;
+}
+
+.wm-field-value {
+  color: #fff;
+}
+
+.wm-field-empty .wm-field-value {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.wm-field-editing {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4rpx;
+  padding: 2rpx 4rpx;
+}
+
+/* ===== 行内编辑 ===== */
+.wm-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.wm-edit-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 2rpx 8rpx;
+  border-radius: 4rpx;
+  font-size: inherit;
+  min-width: 120rpx;
+}
+
+.wm-edit-ok {
+  color: #07c160;
+  font-size: 120%;
+  font-weight: bold;
+  padding: 0 4rpx;
+}
+
+/* ===== 底部按钮栏（占位，位于 flex 容器末尾） ===== */
+.bottom-bar-fixed {
+  position: relative;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  padding: 16rpx 24rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  z-index: 60;
+  background: #fff;
+}
+
+.name-input-row {
+  display: flex;
+  align-items: center;
+  background: #f7f8fa;
+  border-radius: 8rpx;
+  padding: 0 16rpx;
+}
+
+.name-label {
+  font-size: 26rpx;
+  color: #666;
+  margin-right: 12rpx;
+  white-space: nowrap;
+}
+
+.name-input {
+  flex: 1;
+  font-size: 26rpx;
+  color: #222;
+  padding: 16rpx 0;
+}
+
+.btn-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+/* ===== 底部按钮 ===== */
+.btn {
+  background: #07c160;
+  color: #fff;
+  border-radius: 12rpx;
+  padding: 22rpx 0;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 500;
+  flex: 1;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.btn.secondary {
+  background: rgba(255, 255, 255, 0.9);
+  color: #07c160;
+  border: 2rpx solid #07c160;
+}
+
+.btn.secondary:active {
+  opacity: 0.7;
+}
+
+.btn.primary-outline {
+  background: #07c160;
+  color: #fff;
+}
+
+/* ===== 遮罩 ===== */
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+
+/* ===== 模板选择弹层 ===== */
+.picker {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 24rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  z-index: 101;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.picker-item {
+  padding: 20rpx 16rpx;
+  border-radius: 12rpx;
+  background: #f7f8fa;
+}
+
+.picker-item.selected {
+  background: #eafff3;
+  border: 2rpx solid #07c160;
+}
+
+.tpl-name { font-size: 28rpx; font-weight: 600; }
+.tpl-desc { font-size: 24rpx; color: #666; margin-top: 4rpx; }
+
+

@@ -1,0 +1,9 @@
+{
+  "name": "authorize",
+  "version": "1.0.0",
+  "description": "授权用户 read/write/readwrite 权限",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -1,0 +1,141 @@
+<custom-nav title="记录详情" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
+<view class="container" wx:if="{{record}}">
+
+
+  <!-- 浮层菜单遮罩（全屏） -->
+  <view class="action-menu-mask" wx:if="{{showActionMenu}}" bindtap="onToggleActionMenu"></view>
+  <!-- 浮层菜单（固定定位） -->
+  <view class="action-menu" wx:if="{{showActionMenu}}">
+    <view class="action-menu-item" bindtap="onGoShare" data-eventid="share">
+      <text class="action-menu-icon">🔗</text>
+      <text>授权管理</text>
+      <text wx:if="{{authorizedCount > 0}}" class="action-badge">{{authorizedCount}}</text>
+    </view>
+    <view class="action-menu-item" bindtap="onGoTimeline">
+      <text class="action-menu-icon">🕰️</text>
+      <text>历史版本</text>
+    </view>
+    <view class="action-menu-item danger" bindtap="onDeleteFromMenu">
+      <text class="action-menu-icon">🗑</text>
+      <text>删除记录</text>
+    </view>
+  </view>
+
+  <!-- 图片区域（编辑模式下可拖拽水印，宽度自动撑满 container 内容区） -->
+  <view class="img-area"
+    style="height:{{imgDisplayH}}px;"
+    bindtouchstart="onTouchStart"
+    catchtouchmove="onTouchMove"
+    bindtouchend="onTouchEnd"
+  >
+    <image class="big-img" src="{{displayPhoto}}" mode="aspectFit" style="width:100%;height:{{imgDisplayH}}px;" bindtap="onPreview"></image>
+
+    <!-- 右上角操作浮层按钮 -->
+    <view class="action-fab" catchtap="onToggleActionMenu" id="actionFab">⋮</view>
+
+    <!-- 编辑模式：可拖动水印层 -->
+    <view wx:if="{{showWmOverlay}}" class="detail-wm-layer" id="wmLayer"
+      style="left:{{editWmX}}px;top:{{editWmY}}px;opacity:{{editOpacity}};transform:scale({{editScale}});width:{{editWidthRatio * 100}}%;">
+      <view class="detail-wm-handle">
+        <view class="wm-drag-dots">
+          <view class="wm-dot"></view><view class="wm-dot"></view><view class="wm-dot"></view>
+        </view>
+        <text class="wm-drag-label">拖动水印</text>
+      </view>
+      <view wx:for="{{displayFields}}" wx:key="key" class="detail-wm-row {{editWidthRatio > 0.5 ? 'wide' : ''}}">
+        <text class="detail-wm-label">{{item.label}}:</text>
+        <text class="detail-wm-value">{{item.value}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="row between">
+      <view class="title">{{record.customName || record.templateName}}<text wx:if="{{_syncStatus === 'off'}}" class="sync-badge">📴</text><text wx:if="{{_syncStatus === 'synced'}}" class="sync-badge">☁️</text><text wx:if="{{_syncStatus === 'pending'}}" class="sync-badge">⏳</text></view>
+      <view class="muted">{{timeText}}</view>
+    </view>
+
+    <view class="divider"></view>
+
+    <block wx:for="{{fields}}" wx:key="key">
+      <view class="field-row">
+        <view class="f-k">{{item.label}}</view>
+        <block wx:if="{{!editing}}">
+          <view class="f-v">{{item.value || '—'}}</view>
+        </block>
+        <block wx:else>
+          <input
+            wx:if="{{item.type !== 'textarea' && !item.multiline}}"
+            class="f-edit"
+            value="{{editValues[item.key]}}"
+            data-key="{{item.key}}"
+            bindinput="onFieldInput"
+            placeholder="请输入"
+            hold-keyboard="{{true}}"
+            always-embed="{{true}}"
+          />
+          <textarea
+            wx:else
+            class="f-edit-textarea"
+            value="{{editValues[item.key]}}"
+            data-key="{{item.key}}"
+            bindinput="onFieldInput"
+            placeholder="请输入"
+            auto-height
+            hold-keyboard="{{true}}"
+            always-embed="{{true}}"
+          />
+        </block>
+      </view>
+    </block>
+  </view>
+
+  <view class="card" wx:if="{{ocrResult || verifyIssues.length > 0}}">
+    <view class="title">识别与核验</view>
+    <view wx:if="{{ocrResult && ocrResult.hint}}" class="muted" style="margin-bottom:12rpx;">{{ocrResult.hint}}</view>
+    <view wx:if="{{verifyIssues.length === 0}}" class="f-v" style="color:#07c160;">
+      ✓ 字段与水印内容一致（或未进行 OCR）
+    </view>
+    <block wx:else>
+      <view wx:for="{{verifyIssues}}" wx:key="message" class="issue">
+        · {{item.message}}
+      </view>
+    </block>
+  </view>
+
+  <!-- 编辑模式：水印参数调节 -->
+  <view class="card" wx:if="{{editing}}">
+    <view class="title">水印参数</view>
+    <view class="setting-row">
+      <text class="setting-label">缩放</text>
+      <slider min="0.5" max="1.5" step="0.1" value="{{editScale}}" bindchange="onScaleChange" activeColor="#07c160" />
+      <text class="setting-val">{{scaleLabel}}</text>
+    </view>
+    <view class="setting-row">
+      <text class="setting-label">透明度</text>
+      <slider min="0.3" max="1" step="0.05" value="{{editOpacity}}" bindchange="onOpacityChange" activeColor="#07c160" />
+      <text class="setting-val">{{opacityLabel}}</text>
+    </view>
+    <view class="setting-row">
+      <text class="setting-label">宽度</text>
+      <slider min="0.28" max="0.85" step="0.03" value="{{editWidthRatio}}" bindchange="onWidthChange" activeColor="#07c160" />
+      <text class="setting-val">{{widthLabel}}</text>
+    </view>
+  </view>
+
+  <view class="row between">
+    <view class="btn secondary" bindtap="onSaveAlbum" style="flex:1;margin-right:16rpx;">保存到相册</view>
+    <view class="btn" bindtap="onEditToggle" style="flex:1;">{{editing ? '保存修改' : '编辑字段'}}</view>
+  </view>
+
+  <view class="card auto-save-card">
+    <view class="auto-save-info">
+      <view class="auto-save-title">自动保存修改到相册</view>
+      <view class="auto-save-desc">开启后，点击“保存修改”会自动将修改后的水印照片存入系统相册，防止小程序数据丢失</view>
+    </view>
+    <switch checked="{{autoSaveEditAlbum}}" bindchange="onToggleAutoSaveEdit" color="#07c160"/>
+  </view>
+</view>
+
+</view>

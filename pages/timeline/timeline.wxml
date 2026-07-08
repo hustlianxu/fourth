@@ -1,0 +1,71 @@
+<custom-nav title="历史版本" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
+<!-- pages/timeline/timeline.wxml -->
+<view class="page">
+
+
+
+  <!-- 记录信息 -->
+  <view class="record-bar" wx:if="{{record}}">
+    <image class="record-thumb" src="{{record.imagePath}}" mode="aspectFill"></image>
+    <view class="record-info">
+      <view class="record-title">{{record.customName || record.templateName}}</view>
+      <view class="record-meta">{{history.length}} 个历史版本</view>
+    </view>
+  </view>
+
+  <!-- 加载态 -->
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <!-- 空状态 -->
+  <view wx:elif="{{history.length === 0}}" class="empty">
+    <view class="empty-icon">🕰️</view>
+    <view class="empty-text">暂无历史版本</view>
+    <view class="empty-desc">每次编辑保存后会自动创建历史快照</view>
+  </view>
+
+  <!-- 时间线列表 -->
+  <view wx:else class="timeline">
+    <view
+      wx:for="{{history}}"
+      wx:key="version"
+      class="timeline-item {{item.version === currentVersion ? 'current' : ''}}"
+    >
+      <!-- 时间线节点 -->
+      <view class="timeline-dot {{item.changeType}}">
+        <text wx:if="{{item.changeType === 'create'}}">✨</text>
+        <text wx:elif="{{item.changeType === 'delete'}}">🗑</text>
+        <text wx:else>📝</text>
+      </view>
+
+      <!-- 时间线内容 -->
+      <view class="timeline-content">
+        <view class="tl-header">
+          <text class="tl-version">V{{item.version}}</text>
+          <text class="tl-time">{{formatTime(item.changedAt)}}</text>
+        </view>
+        <view class="tl-summary">{{item.changeSummary}}</view>
+
+        <!-- 字段值预览 -->
+        <view wx:if="{{item.snapshot && item.snapshot.values}}" class="tl-values">
+          <view wx:for="{{Object.keys(item.snapshot.values)}}" wx:for-item="key" wx:key="*this" class="tl-value-row">
+            <text class="tl-vk">{{key}}</text>
+            <text class="tl-vv">{{item.snapshot.values[key]}}</text>
+          </view>
+        </view>
+
+        <!-- 操作按钮 -->
+        <view class="tl-actions">
+          <button
+            class="tl-btn restore"
+            wx:if="{{item.version !== currentVersion}}"
+            data-version="{{item.version}}"
+            bindtap="onRestore"
+          >回滚到此版本</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+</view>

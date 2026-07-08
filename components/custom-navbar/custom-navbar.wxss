@@ -1,0 +1,72 @@
+.navbar-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #ffffff;
+}
+
+.navbar-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 24rpx;
+  position: relative;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+
+.nav-btn {
+  width: 88rpx;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-btn {
+  margin-left: 8rpx;
+}
+
+.icon-svg {
+  width: 44rpx;
+  height: 44rpx;
+}
+
+.navbar-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+  z-index: 1;
+}
+
+.navbar-right {
+  flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .navbar-fixed {
+    background: rgb(30, 30, 30);
+  }
+  .navbar-title {
+    color: rgb(231, 231, 231);
+  }
+  .icon-svg {
+    filter: invert(1);
+  }
+}

@@ -1,0 +1,258 @@
+<custom-nav title="词典翻译" bind:navReady="onNavReady"></custom-nav>
+<view class="page-content" style="padding-top: {{navTotalHeight}}px;">
+<view class="container">
+
+
+  
+  <!-- 顶部 Tab：自定义词典 / 白名单 / 内置词典 / API 配置 -->
+  <view class="tabs">
+    <view class="tab {{activeTab === 'custom' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="custom">我的词典</view>
+    <view class="tab {{activeTab === 'whitelist' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="whitelist">白名单</view>
+    <view class="tab {{activeTab === 'builtin' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="builtin">内置词典</view>
+    <view class="tab {{activeTab === 'api' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="api">翻译引擎</view>
+  </view>
+
+  <!-- ===== 我的词典（用户自定义） ===== -->
+  <block wx:if="{{activeTab === 'custom'}}">
+    <view class="section">
+      <view class="section-title">自定义词条</view>
+      <view class="section-desc">导出 Excel 时，这些词条会优先参与翻译匹配。</view>
+
+      <view wx:if="{{customDict.length === 0}}" class="empty">
+        <view class="empty-icon">📚</view>
+        <view class="empty-title">还没有自定义词条</view>
+        <view class="empty-sub">点击下方按钮添加你的常用术语</view>
+      </view>
+
+      <view wx:else class="dict-list">
+        <view wx:for="{{customDict}}" wx:key="index" class="dict-item">
+          <view class="dict-item-body">
+            <view class="dict-pair">
+              <text class="dict-zh">{{item.zh}}</text>
+              <text class="dict-arrow">↔</text>
+              <text class="dict-es">{{item.es}}</text>
+            </view>
+          </view>
+          <view class="dict-item-actions">
+            <text class="link edit" data-index="{{index}}" catchtap="onEditItem">编辑</text>
+            <text class="link del" data-index="{{index}}" catchtap="onDeleteItem">删除</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="btn add-btn" bindtap="onAddItem">+ 添加词条</view>
+    </view>
+  </block>
+
+  <!-- ===== 白名单 ===== -->
+  <block wx:if="{{activeTab === 'whitelist'}}">
+    <view class="section">
+      <view class="section-title">不翻译词表</view>
+      <view class="section-desc">白名单中的词在翻译时保留原文。包含内置通用词（单位/缩写）+ 你自定义的词。</view>
+
+      <view class="whitelist-group">
+        <view class="whitelist-group-title">自定义白名单（{{customWhitelist.length}}）</view>
+        <view wx:if="{{customWhitelist.length === 0}}" class="empty-mini">还没有自定义白名单词</view>
+        <view wx:else class="chip-list">
+          <view wx:for="{{customWhitelist}}" wx:key="index" class="chip chip-removable">
+            <text>{{item}}</text>
+            <text class="chip-x" data-index="{{index}}" catchtap="onRemoveWhitelist">✕</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="whitelist-add">
+        <input class="whitelist-input" placeholder="输入要不翻译的词，如：CTN" value="{{newWhitelistWord}}" bindinput="onNewWhitelistInput" confirm-type="done" bindconfirm="onAddWhitelist" />
+        <view class="btn whitelist-add-btn" bindtap="onAddWhitelist">添加</view>
+      </view>
+
+      <view class="whitelist-group">
+        <view class="whitelist-group-title">内置白名单（{{builtinWhitelist.length}}，只读）</view>
+        <view class="chip-list">
+          <view wx:for="{{builtinWhitelist}}" wx:key="*this" class="chip chip-builtin">{{item}}</view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- ===== 内置词典（只读） ===== -->
+  <block wx:if="{{activeTab === 'builtin'}}">
+    <view class="section">
+      <view class="section-title">内置外贸词典（{{builtinDict.length}} 条）</view>
+      <view class="section-desc">系统预置的中-西常用对照词，导出时自动使用，不可修改。</view>
+
+      <view class="search-bar">
+        <input class="search-input" placeholder="搜索中文或西语..." value="{{searchKeyword}}" bindinput="onSearchInput" />
+      </view>
+
+      <view class="dict-list">
+        <view wx:for="{{filteredBuiltin}}" wx:key="index" class="dict-item builtin">
+          <view class="dict-pair">
+            <text class="dict-zh">{{item.zh}}</text>
+            <text class="dict-arrow">↔</text>
+            <text class="dict-es">{{item.es}}</text>
+          </view>
+        </view>
+        <view wx:if="{{filteredBuiltin.length === 0}}" class="empty-mini">未找到匹配词条</view>
+      </view>
+    </view>
+  </block>
+
+  <!-- ===== API 配置 ===== -->
+  <block wx:if="{{activeTab === 'api'}}">
+    <!-- 免费词典层 -->
+    <view class="section">
+      <view class="section-title">免费词典层（中间层）</view>
+      <view class="section-desc">
+        本地词典未命中时，优先调用免费翻译 API（无需 API Key）。失败或未开启时再回退到下方大模型。
+      </view>
+
+      <view class="form-item switch-row">
+        <view class="form-label">启用免费词典</view>
+        <switch checked="{{freeDictEnabled}}" bindchange="onToggleFreeDict" />
+      </view>
+
+      <block wx:if="{{freeDictEnabled}}">
+        <view class="form-item">
+          <view class="form-label">选择翻译服务</view>
+          <view class="provider-list">
+            <view class="provider-chip {{freeDictProvider === 'mymemory' ? 'on' : ''}}" bindtap="onPickFreeDictProvider" data-provider="mymemory">MyMemory（免Key）</view>
+            <view class="provider-chip {{freeDictProvider === 'youdao' ? 'on' : ''}}" bindtap="onPickFreeDictProvider" data-provider="youdao">有道智云</view>
+          </view>
+        </view>
+
+        <view wx:if="{{freeDictProvider === 'mymemory'}}" class="api-warn">
+          MyMemory 匿名额度约 5000 词/天，无需配置即可使用。额度用尽会自动回退大模型。
+        </view>
+
+        <block wx:if="{{freeDictProvider === 'youdao'}}">
+          <view class="api-warn">有道智云需配置 App ID 与密钥，标准版免费额度每秒 1 次、每月 2 万字符。</view>
+          <view class="form-item">
+            <view class="form-label">App ID</view>
+            <input class="form-input" placeholder="有道智云 App ID" value="{{youdaoAppId}}" bindinput="onYoudaoAppIdInput" />
+          </view>
+          <view class="form-item">
+            <view class="form-label">密钥（Secret）</view>
+            <input class="form-input" placeholder="有道智云 Secret" value="{{youdaoSecret}}" password bindinput="onYoudaoSecretInput" />
+          </view>
+          <view class="btn save-btn" bindtap="onSaveYoudao">保存有道凭证</view>
+        </block>
+
+        <view class="btn test-btn" bindtap="onTestFreeDict">测试免费词典</view>
+        <view wx:if="{{freeDictTestResult}}" class="test-result">
+          <view class="test-result-title">测试结果：</view>
+          <view class="test-result-text">{{freeDictTestResult}}</view>
+        </view>
+      </block>
+    </view>
+
+    <view class="section">
+      <view class="section-title">LLM 翻译引擎</view>
+      <view class="section-desc">
+        本地词典未命中的词条会调用 LLM 翻译。支持 OpenAI 兼容协议（DeepSeek / 智谱 GLM / 通义千问 / 阿里百炼 / MiniMax / 小米 MiMo / 自定义）。
+      </view>
+      <view class="api-warn">
+        ⚠ API Key 仅保存在小程序本地存储，不会上传服务器。但小程序代码可被反编译，请使用专门的小流量 Key。
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">选择并启用翻译引擎（可左右滑动）</view>
+        <scroll-view class="provider-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="provider-list">
+            <view
+              wx:for="{{providerList}}"
+              wx:key="key"
+              class="provider-chip {{item.active ? 'on' : ''}}"
+              bindtap="onPickProvider"
+              data-provider="{{item.key}}"
+            >{{item.label}}</view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">Base URL</view>
+        <input class="form-input" placeholder="如 https://api.deepseek.com/v1" value="{{baseURL}}" bindinput="onBaseURLInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">Model</view>
+        <input class="form-input" placeholder="如 deepseek-chat" value="{{model}}" bindinput="onModelInput" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">API Key</view>
+        <input class="form-input" placeholder="sk-..." value="{{apiKey}}" password bindinput="onAPIKeyInput" />
+      </view>
+
+      <view class="btn save-btn" bindtap="onSaveConfig">保存配置</view>
+
+      <!-- LLM 优先模式开关 -->
+      <view class="form-item" style="margin-top:20rpx;">
+        <view class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+          <text>LLM 优先（跳过本地词典，直接调用大模型）</text>
+          <switch checked="{{llmFirst}}" bindchange="onLLMFirstToggle" />
+        </view>
+        <view class="section-desc" style="margin-top:6rpx;">
+          开启后所有翻译直接走 LLM，不再匹配本地词典。适用于本地词典频繁误翻的场景。
+        </view>
+      </view>
+
+      <!-- Prompt 编辑区 -->
+      <view class="prompt-section">
+        <view class="form-label">翻译 Prompt</view>
+        <view class="section-desc">
+          自定义后永久生效（不再用默认）。支持占位符：
+          <text class="placeholder-tag">{source}</text> 源语言、
+          <text class="placeholder-tag">{target}</text> 目标语言、
+          <text class="placeholder-tag">{whitelist}</text> 白名单词列表、
+          <text class="placeholder-tag">{text}</text> 待翻译文本。
+          注意：翻译可能中→西或西→中，prompt 不要写死方向。
+        </view>
+        <textarea
+          class="form-textarea"
+          placeholder="留空则恢复默认 prompt"
+          value="{{customPrompt}}"
+          bindinput="onPromptInput"
+          auto-height
+          maxlength="-1"
+        />
+        <view class="prompt-actions">
+          <view class="btn secondary prompt-btn" bindtap="onResetPrompt">恢复默认</view>
+          <view class="btn prompt-btn" bindtap="onSavePrompt">保存 Prompt</view>
+        </view>
+        <view wx:if="{{promptPreview}}" class="prompt-preview">
+          <view class="prompt-preview-title">当前实际 prompt 预览（ES→ZH 示例）：</view>
+          <view class="prompt-preview-text">{{promptPreview}}</view>
+        </view>
+      </view>
+
+      <view class="btn test-btn" bindtap="onTestTranslate">测试翻译</view>
+
+      <view wx:if="{{testResult}}" class="test-result">
+        <view class="test-result-title">测试结果：</view>
+        <view class="test-result-text">{{testResult}}</view>
+      </view>
+    </view>
+  </block>
+
+  <!-- ===== 词条编辑弹层 ===== -->
+  <view class="modal-mask" wx:if="{{showEditModal}}" bindtap="onCloseEdit"></view>
+  <view class="modal" wx:if="{{showEditModal}}">
+    <view class="modal-title">{{editingIndex >= 0 ? '编辑词条' : '添加词条'}}</view>
+    <view class="form-item">
+      <view class="form-label">中文</view>
+      <input class="form-input" placeholder="如：星星" value="{{editZh}}" bindinput="onEditZhInput" focus="{{showEditModal}}" />
+    </view>
+    <view class="form-item">
+      <view class="form-label">西班牙语</view>
+      <input class="form-input" placeholder="如：estrellas" value="{{editEs}}" bindinput="onEditEsInput" />
+    </view>
+    <view class="modal-actions">
+      <view class="btn secondary" bindtap="onCloseEdit">取消</view>
+      <view class="btn" bindtap="onConfirmEdit">确定</view>
+    </view>
+  </view>
+</view>
+
+</view>
