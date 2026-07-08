@@ -66,11 +66,24 @@
         </block>
         <block wx:else>
           <input
+            wx:if="{{item.type !== 'textarea' && !item.multiline}}"
             class="f-edit"
             value="{{editValues[item.key]}}"
             data-key="{{item.key}}"
             bindinput="onFieldInput"
             placeholder="请输入"
+            hold-keyboard="{{true}}"
+            confirm-type="next"
+          />
+          <textarea
+            wx:else
+            class="f-edit-textarea"
+            value="{{editValues[item.key]}}"
+            data-key="{{item.key}}"
+            bindinput="onFieldInput"
+            placeholder="请输入"
+            auto-height
+            hold-keyboard="{{true}}"
           />
         </block>
       </view>

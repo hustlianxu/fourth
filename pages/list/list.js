@@ -1492,6 +1492,8 @@ Page({
   // ===== 导出到云端（云端生成 xlsx，绕过本地存储配额）=====
 
   async _doExportToCloud(selected, customFileName) {
+    // 按创建时间正序排列（最早的在最上面）
+    selected = selected.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     wx.showToast({ title: '正在上传图片...', icon: 'none', duration: 15000 });
     var toastTimer = setTimeout(function () {
       wx.showToast({ title: '正在上传图片，请稍候...', icon: 'none', duration: 10000 });
@@ -1645,6 +1647,8 @@ Page({
   },
 
   async _doExport(selected, customFileName, format) {
+    // 按创建时间正序排列（最早的在最上面）
+    selected = selected.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
     wx.showLoading({ title: '正在生成...', mask: true });
     // 保持屏幕常亮，防止息屏导致翻译中断（切到后台仍会被微信挂起，属平台限制）
     wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: true });

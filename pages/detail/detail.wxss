@@ -199,6 +199,17 @@
   color: #222;
 }
 
+.f-edit-textarea {
+  flex: 1;
+  background: #f7f8fa;
+  padding: 12rpx;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  color: #222;
+  min-height: 120rpx;
+  line-height: 1.5;
+}
+
 .setting-row {
   display: flex;
   align-items: center;
