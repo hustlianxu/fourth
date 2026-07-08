@@ -325,6 +325,12 @@
     border: 1rpx solid rgb(55, 55, 55);
   }
 
+  .f-edit-textarea {
+    background: rgb(40, 40, 40);
+    color: rgb(231, 231, 231);
+    border: 1rpx solid rgb(55, 55, 55);
+  }
+
   .setting-label {
     color: rgb(149, 149, 149);
   }

@@ -1514,7 +1514,17 @@ Page({
         : ('export_' + ts);
       var fileName = baseName + '.xlsx';
 
-      // 3. 翻译预处理：填充缺失的 desEs/desZh（双语文案），LLM 优先模式下直接走大模型
+      // 3. 翻译预处理前，从 storage 刷新记录值（用户可能在详情页编辑过，selected 可能已过期）
+      for (var si = 0; si < selected.length; si++) {
+        var freshRec = storage.getById(selected[si].id);
+        if (freshRec && freshRec.values) {
+          selected[si].values = Object.assign({}, freshRec.values);
+          selected[si].customName = freshRec.customName || '';
+          selected[si].imagePath = freshRec.imagePath || selected[si].imagePath;
+          selected[si].width = freshRec.width || selected[si].width;
+          selected[si].height = freshRec.height || selected[si].height;
+        }
+      }
       await exporter.preTranslateRecords(selected, null);
 
       var cloudRecords = [];
@@ -1649,6 +1659,17 @@ Page({
   async _doExport(selected, customFileName, format) {
     // 按创建时间正序排列（最早的在最上面）
     selected = selected.slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+    // 从 storage 刷新记录值（用户可能在详情页编辑过，selected 可能已过期）
+    for (var si = 0; si < selected.length; si++) {
+      var freshRec = storage.getById(selected[si].id);
+      if (freshRec && freshRec.values) {
+        selected[si].values = Object.assign({}, freshRec.values);
+        selected[si].customName = freshRec.customName || '';
+        selected[si].imagePath = freshRec.imagePath || selected[si].imagePath;
+        selected[si].width = freshRec.width || selected[si].width;
+        selected[si].height = freshRec.height || selected[si].height;
+      }
+    }
     wx.showLoading({ title: '正在生成...', mask: true });
     // 保持屏幕常亮，防止息屏导致翻译中断（切到后台仍会被微信挂起，属平台限制）
     wx.setKeepScreenOn && wx.setKeepScreenOn({ keepScreenOn: true });
