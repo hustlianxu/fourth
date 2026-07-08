@@ -73,7 +73,7 @@
             bindinput="onFieldInput"
             placeholder="请输入"
             hold-keyboard="{{true}}"
-            confirm-type="next"
+            always-embed="{{true}}"
           />
           <textarea
             wx:else
@@ -84,6 +84,7 @@
             placeholder="请输入"
             auto-height
             hold-keyboard="{{true}}"
+            always-embed="{{true}}"
           />
         </block>
       </view>
