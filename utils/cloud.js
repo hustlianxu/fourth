@@ -148,12 +148,12 @@ function syncRecord(record, openid, uploadImages) {
         return _saveHistorySnapshot(existing, cloudData.values).then(function () {
           return _db().collection('records').doc(existing._id).update({ data: cloudData });
         }).then(function () {
-          return { success: true, recordId: record.id, imageFileID: cloudData.imageFileID, action: 'updated' };
+          return { success: true, recordId: record.id, imageFileID: cloudData.imageFileID, originalFileID: cloudData.originalFileID, action: 'updated' };
         });
       } else {
         // 不存在 → 新建
         return _db().collection('records').add({ data: cloudData }).then(function () {
-          return { success: true, recordId: record.id, imageFileID: cloudData.imageFileID, action: 'created' };
+          return { success: true, recordId: record.id, imageFileID: cloudData.imageFileID, originalFileID: cloudData.originalFileID, action: 'created' };
         });
       }
     });

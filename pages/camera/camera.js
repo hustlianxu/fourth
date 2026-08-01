@@ -92,6 +92,8 @@ Page({
 
   onShow() {
     this._refreshTimeFields();
+    // 进拍照页即检查本地配额，空间紧张时后台清理，避免"拍几张就满"
+    this._ensureStorageSpace();
   },
 
   // ===== 水印位置 =====
@@ -358,6 +360,26 @@ Page({
 
   onTakePhoto() {
     if (!this.validate()) return;
+    // 本地存储预检：超硬限阻止拍摄并提示；超软限先自动腾空间
+    var usage = storage.getLocalFileUsage();
+    if (usage > storage.HARD_LIMIT) {
+      wx.showModal({
+        title: '本地存储不足',
+        content: '本地缓存已接近上限（200MB），暂时无法拍摄。\n请到「设置 → 本地缓存」清理已同步照片，或开启云同步后自动释放空间。',
+        showCancel: false
+      });
+      return;
+    }
+    if (usage > storage.SOFT_LIMIT) {
+      try {
+        var freed = storage.deleteLocalFilesForSyncedRecords(usage - storage.SOFT_LIMIT);
+        if (freed.freed > 0) {
+          console.log('[Camera] 拍照前自动清理:', (freed.freed / 1024 / 1024).toFixed(1) + 'MB');
+        }
+      } catch (e) {
+        console.warn('[Camera] 拍照前清理失败:', e);
+      }
+    }
     // 闪光动画
     this.setData({ flashAnim: true });
     setTimeout(() => this.setData({ flashAnim: false }), 300);
@@ -505,6 +527,25 @@ Page({
     });
   },
 
+  // 检查本地存储配额：超软限时后台清理孤儿文件 + 已同步记录的本地文件（LRU，最旧优先）
+  _ensureStorageSpace() {
+    try {
+      const usage = storage.getLocalFileUsage();
+      if (usage <= storage.SOFT_LIMIT) return;
+      console.log('[Camera] 本地占用超软限，触发清理:', (usage / 1024 / 1024).toFixed(1) + 'MB');
+      storage.purgeOrphanFiles().then(function () {
+        var freed = storage.deleteLocalFilesForSyncedRecords(usage - storage.SOFT_LIMIT);
+        if (freed.freed > 0) {
+          console.log('[Camera] 自动清理已同步本地文件:', (freed.freed / 1024 / 1024).toFixed(1) + 'MB');
+        }
+      }).catch(function (e) {
+        console.warn('[Camera] 自动清理失败:', e);
+      });
+    } catch (e) {
+      console.warn('[Camera] 配额检查失败:', e);
+    }
+  },
+
   // 一步保存：渲染水印 → 持久化原图 → 入库 → 跳转详情页
   async _saveAndGoDetail(photo, photoInfo) {
     wx.showLoading({ title: '保存中...', mask: true });
@@ -527,7 +568,7 @@ Page({
       console.log('[Camera] 水印渲染完成:', outPath);
 
       // 2. 持久化原图和水印图（防止临时文件被回收，Mac 开发者工具上尤其明显）
-      const persistentPath = await this._persistOriginalPhoto(photo);
+      var persistentPath = await this._persistOriginalPhoto(photo);
       console.log('[Camera] 原图持久化:', persistentPath);
       if (!persistentPath) throw new Error('原图保存失败');
       var persistentWmPath = await this._persistWatermarkPhoto(outPath);
@@ -549,13 +590,39 @@ Page({
         watermarkPosition: this.data.wPos || 'bottom-right'
       });
       if (embedPath) {
+        // 删除嵌入前的中间文件（F2），避免每张照片在本地多留一份导致配额快速耗尽
+        storage.safeUnlink(persistentWmPath);
         persistentWmPath = embedPath; // 用嵌入数据的新文件替代原文件
         console.log('[Camera] 嵌入数据成功, 新路径:', embedPath);
       } else {
-        console.log('[Camera] 嵌入数据跳过（非 JPEG 或写入失败）');
+        console.log('[Camera] 水印图嵌入跳过（非 JPEG 或写入失败）');
       }
 
-      // 2.7 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
+      // 2.7 原图也嵌入相同数据（标记 _isSourceImage:true，表示干净原图可重渲）
+      console.log('[Camera] 开始嵌入数据到原图:', persistentPath);
+      var embedOrigPath = imageData.embed(persistentPath, {
+        values: this.data.values,
+        templateId: tpl.id,
+        templateName: tpl.name,
+        customName: this.data.customName || '',
+        watermarkScale: this.data.wmScale,
+        watermarkOpacity: 0.85,
+        watermarkWidthRatio: 0.42,
+        width: imgW,
+        height: imgH,
+        watermarkPosition: this.data.wPos || 'bottom-right',
+        _isSourceImage: true  // 标记为干净原图
+      });
+      if (embedOrigPath) {
+        // 删除嵌入前的中间文件（F1），同上，避免每张照片多留一份
+        storage.safeUnlink(persistentPath);
+        persistentPath = embedOrigPath;
+        console.log('[Camera] 原图嵌入成功, 新路径:', embedOrigPath);
+      } else {
+        console.log('[Camera] 原图嵌入跳过（非 JPEG 或写入失败）');
+      }
+
+      // 2.8 自动保存到系统相册（若用户开启此开关，原图+水印图都存一份，降低丢失风险）
       await this._autoSaveToAlbum(persistentPath, persistentWmPath);
 
       // 3. 入库
@@ -591,7 +658,11 @@ Page({
           }
         }).then(function (res) {
           if (res && res.success) {
-            storage.update(record.id, { _syncStatus: 'synced' });
+            // 回写云端 fileID，供后续配额不足时清理本地文件（云端有备份可懒加载）
+            var syncPatch = { _syncStatus: 'synced' };
+            if (res.imageFileID) syncPatch._cloudFileId = res.imageFileID;
+            if (res.originalFileID) syncPatch._originalCloudFileId = res.originalFileID;
+            storage.update(record.id, syncPatch);
             console.log('[Camera] 云同步成功:', res.recordId);
           }
         }).catch(function (err) {

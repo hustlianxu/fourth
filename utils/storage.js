@@ -171,6 +171,8 @@ function restoreFromTrash(id) {
 }
 
 function emptyTrash() {
+  // 先删除回收站各记录引用的本地文件，再清空元数据（文件不删会成为孤儿占满配额）
+  _getTrashRaw().forEach(function (r) { getRecordFilePaths(r).forEach(safeUnlink); });
   wx.setStorageSync(KEY_TRASH, []);
 }
 
@@ -182,12 +184,18 @@ function cleanupTrash(days) {
   days = days || 30;
   var cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   var trash = _getTrashRaw();
+  var expired = trash.filter(function (item) { return (item._deletedAt || 0) <= cutoff; });
   var remaining = trash.filter(function (item) { return (item._deletedAt || 0) > cutoff; });
+  // 删除过期记录引用的本地文件，避免成为孤儿文件继续占满配额
+  expired.forEach(function (r) { getRecordFilePaths(r).forEach(safeUnlink); });
   wx.setStorageSync(KEY_TRASH, remaining);
-  return trash.length - remaining.length;
+  return expired.length;
 }
 
 function clearAll() {
+  // 先删除所有记录（含回收站）引用的本地文件，再清空元数据
+  getAll().forEach(function (r) { getRecordFilePaths(r).forEach(safeUnlink); });
+  _getTrashRaw().forEach(function (r) { getRecordFilePaths(r).forEach(safeUnlink); });
   wx.setStorageSync(KEY_PHOTOS, []);
   wx.setStorageSync(KEY_FOLDERS, []);
   wx.setStorageSync(KEY_TRASH, []);
@@ -337,6 +345,184 @@ function setConfigSyncEnabled(enabled) {
   wx.setStorageSync(KEY_CONFIG_SYNC_ENABLED, !!enabled);
 }
 
+// ===== 本地文件存储管理 =====
+//
+// 背景：微信本地缓存文件 + 本地用户文件共享 200MB 总配额，超出后继续写文件失败且平台不自动清理。
+// 本模块提供：孤儿文件清理、已同步记录的本地文件 LRU 释放、本地占用统计，配合拍照前配额预警使用。
+
+const LOCAL_FILE_QUOTA = 200 * 1024 * 1024; // 微信本地存储总配额 200MB
+const SOFT_LIMIT = 150 * 1024 * 1024;       // 超过后自动清理已同步记录的本地文件
+const HARD_LIMIT = 190 * 1024 * 1024;       // 超过后阻止拍摄并提示
+
+// 本应用生成的图片文件前缀（用于识别 USER_DATA_PATH 中的孤儿文件）
+// 注意：restore_/copy_ 正常情况下被记录引用，未引用时即为孤儿，可一并清理
+const GENERATED_PREFIX_RE = /^(orig_|wm_|wm_embed_|photo_|copy_|restore_)/;
+
+/**
+ * 容错删除本地文件。
+ * saveFile 产物（store_ 缓存文件）只读，unlinkSync 不适用时回退 removeSavedFile；
+ * USER_DATA_PATH 下我们 writeFileSync/copyFileSync 生成的文件 unlinkSync 直接可删。
+ */
+function safeUnlink(path) {
+  if (!path) return;
+  var fs = wx.getFileSystemManager();
+  try { fs.unlinkSync(path); return; } catch (e) {}
+  try { fs.removeSavedFile({ filePath: path, fail: function () {} }); } catch (e) {}
+}
+
+/**
+ * 记录引用的本地文件路径列表（去重）
+ */
+function getRecordFilePaths(record) {
+  if (!record) return [];
+  var paths = [];
+  if (record.imagePath) paths.push(record.imagePath);
+  if (record.originalPath && record.originalPath !== record.imagePath) paths.push(record.originalPath);
+  return paths;
+}
+
+/**
+ * 同步统计本地已用空间（字节）。
+ * 包含：所有记录 + 回收站引用的文件、USER_DATA_PATH 中未被引用的孤儿文件。
+ * 注意：历史 store_ 孤儿（saveFile 产物）不在此统计内（getSavedFileList 为异步），
+ * 由 purgeOrphanFiles() 负责清理，不影响拍摄预检的准确性。
+ */
+function getLocalFileUsage() {
+  var total = 0;
+  var fs = wx.getFileSystemManager();
+  var seen = {};
+  var addFile = function (p) {
+    if (!p || seen[p]) return;
+    seen[p] = true;
+    try { total += fs.statSync(p).size || 0; } catch (e) {}
+  };
+  getAll().forEach(function (r) { getRecordFilePaths(r).forEach(addFile); });
+  getTrash().forEach(function (r) { getRecordFilePaths(r).forEach(addFile); });
+  try {
+    var files = fs.readdirSync(wx.env.USER_DATA_PATH) || [];
+    for (var i = 0; i < files.length; i++) {
+      var name = files[i];
+      if (!GENERATED_PREFIX_RE.test(name)) continue;
+      var full = wx.env.USER_DATA_PATH + '/' + name;
+      if (seen[full]) continue;
+      try { total += fs.statSync(full).size || 0; } catch (e) {}
+    }
+  } catch (e) {}
+  return total;
+}
+
+/**
+ * 统一本地路径前缀：开发者工具 USER_DATA_PATH 为 http://usr，真机为 wxfile://usr。
+ * 路径比对（getSavedFileList 返回 vs 记录存储）前归一化，避免误删仍被引用的文件。
+ */
+function _normalizePath(p) {
+  if (!p) return '';
+  return String(p).replace(/^http:\/\/usr\//, 'wxfile://usr/');
+}
+
+/**
+ * 构建所有记录 + 回收站引用的文件路径集合（键为归一化路径）
+ */
+function _buildReferencedPathSet() {
+  var set = {};
+  getAll().forEach(function (r) {
+    getRecordFilePaths(r).forEach(function (p) { if (p) set[_normalizePath(p)] = true; });
+  });
+  getTrash().forEach(function (r) {
+    getRecordFilePaths(r).forEach(function (p) { if (p) set[_normalizePath(p)] = true; });
+  });
+  return set;
+}
+
+/**
+ * 清理孤儿文件：未被任何记录引用的中间产物。
+ * ① USER_DATA_PATH 中匹配生成前缀且未被引用的文件（unlinkSync）；
+ * ② 历史 saveFile 产物（store_ 缓存文件）中未被引用的（removeSavedFile）。
+ * @returns {Promise<{removed: number, freed: number}>}
+ */
+function purgeOrphanFiles() {
+  return new Promise(function (resolve) {
+    var fs = wx.getFileSystemManager();
+    var referenced = _buildReferencedPathSet();
+    var removed = 0;
+    var freed = 0;
+
+    // ① USER_DATA_PATH 同步清理
+    try {
+      var files = fs.readdirSync(wx.env.USER_DATA_PATH) || [];
+      for (var i = 0; i < files.length; i++) {
+        var name = files[i];
+        if (!GENERATED_PREFIX_RE.test(name)) continue;
+        var full = wx.env.USER_DATA_PATH + '/' + name;
+        if (referenced[_normalizePath(full)]) continue;
+        try { freed += fs.statSync(full).size || 0; } catch (e) {}
+        try { fs.unlinkSync(full); removed++; } catch (e) {}
+      }
+    } catch (e) {}
+
+    // ② store_ 孤儿（异步，路径经归一化比对避免 scheme 不一致导致误删）
+    if (typeof fs.getSavedFileList !== 'function') {
+      resolve({ removed: removed, freed: freed });
+      return;
+    }
+    fs.getSavedFileList({
+      success: function (res) {
+        var list = res.fileList || [];
+        for (var j = 0; j < list.length; j++) {
+          var sf = list[j];
+          if (!sf || !sf.filePath) continue;
+          if (referenced[_normalizePath(sf.filePath)]) continue;
+          try { freed += sf.size || 0; } catch (e) {}
+          safeUnlink(sf.filePath);
+          removed++;
+        }
+        resolve({ removed: removed, freed: freed });
+      },
+      fail: function () {
+        resolve({ removed: removed, freed: freed });
+      }
+    });
+  });
+}
+
+/**
+ * 释放已同步记录的本地文件（LRU：最旧优先）。
+ * 仅清理 _cloudFileId 非空的记录（云端有备份，可随时懒加载下载）。
+ * 保留元数据与 _cloudFileId/_originalCloudFileId，仅清空 imagePath/originalPath。
+ * @param {number} [targetBytes=0] 需要释放的目标字节数；0 表示全部清理
+ * @returns {{cleaned: number, freed: number}}
+ */
+function deleteLocalFilesForSyncedRecords(targetBytes) {
+  targetBytes = targetBytes || 0;
+  var fs = wx.getFileSystemManager();
+  var list = getAll().slice().sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+  var freed = 0;
+  var cleaned = 0;
+  for (var i = 0; i < list.length; i++) {
+    if (targetBytes > 0 && freed >= targetBytes) break;
+    var r = list[i];
+    if (!r._cloudFileId) continue; // 未上云，删除后无法恢复，跳过
+    var patch = {};
+    if (r.imagePath) {
+      try { freed += fs.statSync(r.imagePath).size || 0; } catch (e) {}
+      safeUnlink(r.imagePath);
+      patch.imagePath = '';
+      // 干净原图场景 originalPath === imagePath，需一并清空
+      if (r.originalPath === r.imagePath) patch.originalPath = '';
+    }
+    if (r.originalPath && r.originalPath !== r.imagePath) {
+      try { freed += fs.statSync(r.originalPath).size || 0; } catch (e) {}
+      safeUnlink(r.originalPath);
+      patch.originalPath = '';
+    }
+    if (patch.imagePath !== undefined || patch.originalPath !== undefined) {
+      update(r.id, patch);
+      cleaned++;
+    }
+  }
+  return { cleaned: cleaned, freed: freed };
+}
+
 module.exports = {
   getAll,
   getById,
@@ -383,5 +569,14 @@ module.exports = {
   getTrashCount,
   restoreFromTrash,
   emptyTrash,
-  cleanupTrash
+  cleanupTrash,
+  // 本地文件存储管理
+  LOCAL_FILE_QUOTA,
+  SOFT_LIMIT,
+  HARD_LIMIT,
+  safeUnlink,
+  getRecordFilePaths,
+  getLocalFileUsage,
+  purgeOrphanFiles,
+  deleteLocalFilesForSyncedRecords
 };

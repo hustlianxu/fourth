@@ -61,6 +61,28 @@
     </view>
   </view>
 
+  <!-- ===== 本地缓存 ===== -->
+  <view class="section">
+    <view class="section-header">本地缓存</view>
+    <view class="row">
+      <view class="row-left">
+        <text class="row-title">本地占用</text>
+        <text class="row-desc">{{storageUsageText}} / 200MB{{syncEnabled ? ' · 超限自动清理' : ' · 建议开启云同步'}}</text>
+      </view>
+    </view>
+    <button class="sync-btn" bindtap="onCleanSyncedCache" loading="{{cleaningCache}}" disabled="{{cleaningCache}}">
+      {{cleaningCache ? '清理中...' : '清理已同步照片的本地缓存'}}
+    </button>
+    <button class="sync-btn" bindtap="onPurgeOrphanFiles" loading="{{purgingOrphans}}" disabled="{{purgingOrphans}}" style="margin-top:16rpx;">
+      {{purgingOrphans ? '清理中...' : '清理孤儿文件'}}
+    </button>
+    <view class="row">
+      <view class="row-left">
+        <text class="row-desc">已同步的照片已备份到云端，清理本地缓存后仍可在列表 / 详情自动从云端加载。未开启云同步时本地空间约可存 30–60 张。</text>
+      </view>
+    </view>
+  </view>
+
   <view class="section">
     <view class="section-header">关于</view>
     <view class="row">

@@ -708,6 +708,12 @@ Page({
           if (embeddedRecord.customName) record.customName = embeddedRecord.customName;
           record.templateId = embeddedRecord.templateId || 'handwrite';
           record.templateName = embeddedRecord.templateName || '';
+          // 若照片标记为干净原图（_isSourceImage:true），设同一路径为 originalPath
+          // 编辑时 _rerenderWatermark 从 originalPath 读取，输出到新文件，不修改原文件
+          if (embeddedRecord._isSourceImage) {
+            record.originalPath = record.imagePath;
+            console.log('[List] 检测到干净原图, originalPath = imagePath');
+          }
         }
 
         var fieldKeys = ['modelo', 'desEs', 'desZh', 'precio', 'pzs', 'cajas', 'volumen', 'peso'];

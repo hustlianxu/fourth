@@ -222,11 +222,17 @@ Page({
     const displayH = displayW * (imgH / imgW);
 
     const date = new Date(record.createdAt);
+    // 云优先存储下本地文件可能已被清理：缺失但有云端备份时异步补图
+    var displayPhoto = record.imagePath;
+    if ((!displayPhoto || !this._fileExists(displayPhoto)) && record._cloudFileId) {
+      displayPhoto = '';
+      this._downloadCloudPhoto(record);
+    }
     this.setData({
       record,
       fields,
       displayFields,
-      displayPhoto: record.imagePath,
+      displayPhoto: displayPhoto,
       timeText: templates.formatDateTime(date),
       imgDisplayW: displayW,
       imgDisplayH: displayH,
@@ -308,19 +314,20 @@ Page({
   },
 
   onPreview() {
-    if (!this.data.record) return;
-    wx.previewImage({
-      urls: [this.data.record.imagePath],
-      current: this.data.record.imagePath
+    this._ensureLocalImage(function (path) {
+      if (!path) { wx.showToast({ title: '图片不可用', icon: 'none' }); return; }
+      wx.previewImage({ urls: [path], current: path });
     });
   },
 
   onSaveAlbum() {
-    if (!this.data.record) return;
-    wx.saveImageToPhotosAlbum({
-      filePath: this.data.record.imagePath,
-      success: () => wx.showToast({ title: '已保存到相册', icon: 'success' }),
-      fail: () => wx.showToast({ title: '保存失败', icon: 'none' })
+    this._ensureLocalImage(function (path) {
+      if (!path) { wx.showToast({ title: '图片不可用', icon: 'none' }); return; }
+      wx.saveImageToPhotosAlbum({
+        filePath: path,
+        success: function () { wx.showToast({ title: '已保存到相册', icon: 'success' }); },
+        fail: function () { wx.showToast({ title: '保存失败', icon: 'none' }); }
+      });
     });
   },
 
@@ -454,6 +461,7 @@ Page({
         record.watermarkY = actualY;
 
         // 无原始图（如从相册恢复的记录）：跳过水印重渲，否则原水印 + 新水印 = 双水印
+        var oldImagePath = record.imagePath; // 记录旧图路径，替换成功后删除，避免孤儿文件占满配额
         var newImagePath;
         var canRerender = record.originalPath && this._fileExists(record.originalPath);
         if (canRerender) {
@@ -491,6 +499,11 @@ Page({
           }
         } catch (embedErr) {
           console.warn('[Detail] 嵌入数据到图片异常（不影响保存）:', embedErr && embedErr.errMsg ? embedErr.errMsg : embedErr);
+        }
+
+        // 删除被替换的旧水印图（仅当旧图不再是干净原图 originalPath 时，否则会误删原始图）
+        if (oldImagePath && oldImagePath !== newImagePath && oldImagePath !== record.originalPath) {
+          storage.safeUnlink(oldImagePath);
         }
 
         const patch = {
@@ -604,6 +617,37 @@ Page({
     }
   },
 
+  // 云端文件懒加载：本地文件缺失时从云端下载并刷新展示
+  _downloadCloudPhoto(record) {
+    var that = this;
+    cloud.downloadFile(record._cloudFileId).then(function (localPath) {
+      if (!localPath) return;
+      storage.update(record.id, { imagePath: localPath });
+      that.setData({ displayPhoto: localPath });
+    }).catch(function (err) {
+      console.warn('[Detail] 云端补图失败:', err);
+    });
+  },
+
+  // 确保本地有可用的图片路径；缺失时从云端下载（供预览/存相册等需要真实文件路径的操作使用）
+  _ensureLocalImage(cb) {
+    var record = this.data.record;
+    if (!record) { cb(null); return; }
+    if (record.imagePath && this._fileExists(record.imagePath)) { cb(record.imagePath); return; }
+    if (record._cloudFileId) {
+      var that = this;
+      cloud.downloadFile(record._cloudFileId).then(function (localPath) {
+        if (localPath) {
+          storage.update(record.id, { imagePath: localPath });
+          that.setData({ displayPhoto: localPath });
+        }
+        cb(localPath);
+      }).catch(function () { cb(null); });
+    } else {
+      cb(null);
+    }
+  },
+
   // 获取可用的源图路径，优先原图→水印图→云存储下载
   async _getSourceImagePath(record) {
     // 1. 原图存在且有效
@@ -614,15 +658,24 @@ Page({
     if (record.imagePath && this._fileExists(record.imagePath)) {
       return { path: record.imagePath, isOriginal: false };
     }
-    // 3. 原图路径有值但文件被清 → 尝试从云存储下载
+    // 3. 本地文件被清 → 尝试从云存储下载（优先原图，保证编辑重渲无水印叠加降质）
     if (cloud.isSyncEnabled()) {
       try {
         var cloudRecord = await cloud.fetchCloudRecord(record.id);
-        if (cloudRecord && cloudRecord.imageFileID) {
-          var localPath = await cloud.downloadFile(cloudRecord.imageFileID);
-          if (localPath) {
-            console.log('[Detail] 从云存储下载图片成功:', localPath);
-            return { path: localPath, isOriginal: false, isCloud: true };
+        if (cloudRecord) {
+          if (cloudRecord.originalFileID) {
+            var origPath = await cloud.downloadFile(cloudRecord.originalFileID);
+            if (origPath) {
+              console.log('[Detail] 从云存储下载原图成功:', origPath);
+              return { path: origPath, isOriginal: true, isCloud: true };
+            }
+          }
+          if (cloudRecord.imageFileID) {
+            var localPath = await cloud.downloadFile(cloudRecord.imageFileID);
+            if (localPath) {
+              console.log('[Detail] 从云存储下载水印图成功:', localPath);
+              return { path: localPath, isOriginal: false, isCloud: true };
+            }
           }
         }
       } catch (e) {

@@ -11,7 +11,11 @@ Page({
     syncing: false,
     exports: [],
     navTotalHeight: 0,
-    exporting: false
+    exporting: false,
+    // 本地缓存
+    storageUsageText: '',
+    cleaningCache: false,
+    purgingOrphans: false
   },
 
 
@@ -29,7 +33,8 @@ Page({
       configSyncEnabled: storage.getConfigSyncEnabled(),
       openid: oid,
       lastSyncText: this._formatLastSync(storage.getLastSyncTime()),
-      exports: localExports
+      exports: localExports,
+      storageUsageText: this._formatMB(storage.getLocalFileUsage())
     });
 
     // 配置同步开启时，自动拉取云端配置
@@ -197,6 +202,59 @@ Page({
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
     return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate())
       + ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+  },
+
+  // ===== 本地缓存 =====
+
+  _formatMB(bytes) {
+    if (!bytes) return '0 MB';
+    var mb = bytes / 1024 / 1024;
+    return mb.toFixed(1) + ' MB';
+  },
+
+  // 清理已同步照片的本地缓存（云端有备份，可随时懒加载恢复）
+  onCleanSyncedCache() {
+    var that = this;
+    this.setData({ cleaningCache: true });
+    wx.showLoading({ title: '清理中...', mask: true });
+    try {
+      var result = storage.deleteLocalFilesForSyncedRecords();
+      wx.hideLoading();
+      this.setData({ cleaningCache: false });
+      if (result.freed > 0) {
+        wx.showToast({ title: '已释放 ' + this._formatMB(result.freed), icon: 'success' });
+      } else {
+        wx.showToast({ title: '没有可清理的已同步照片', icon: 'none' });
+      }
+      this.load();
+    } catch (e) {
+      wx.hideLoading();
+      this.setData({ cleaningCache: false });
+      wx.showToast({ title: '清理失败', icon: 'none' });
+      console.warn('[Settings] 清理已同步缓存失败:', e);
+    }
+  },
+
+  // 清理孤儿文件（历史遗留的中间产物，未被任何记录引用）
+  onPurgeOrphanFiles() {
+    var that = this;
+    this.setData({ purgingOrphans: true });
+    wx.showLoading({ title: '清理中...', mask: true });
+    storage.purgeOrphanFiles().then(function (result) {
+      wx.hideLoading();
+      that.setData({ purgingOrphans: false });
+      if (result.removed > 0) {
+        wx.showToast({ title: '已清理 ' + result.removed + ' 个文件，释放 ' + that._formatMB(result.freed), icon: 'success' });
+      } else {
+        wx.showToast({ title: '无孤儿文件', icon: 'none' });
+      }
+      that.load();
+    }).catch(function (err) {
+      wx.hideLoading();
+      that.setData({ purgingOrphans: false });
+      wx.showToast({ title: '清理失败', icon: 'none' });
+      console.warn('[Settings] 清理孤儿文件失败:', err);
+    });
   },
 
   onNavReady(e) {
