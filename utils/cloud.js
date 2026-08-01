@@ -1076,9 +1076,24 @@ function _doFetchCloudRecord(recordId, openid) {
 // ===== 时光机 =====
 
 /**
+ * 从云数据库自动生成的 _id 反推创建时间。
+ * 微信云开发 _id 为 36 位字符串，第 9~16 位（0 起始下标 8~16）是 16 进制 Unix 秒级时间戳。
+ * 老数据可能没有 changedAt 字段，用此兜底保证每条变更都能显示时间并正确倒序。
+ * @param {string} id - 云数据库文档 _id
+ * @returns {number} 毫秒时间戳，无法解析时返回 0
+ */
+function _idToTimestamp(id) {
+  if (!id || typeof id !== 'string' || id.length < 16) return 0;
+  var hex = id.substring(8, 16);
+  if (!/^[0-9a-fA-F]{8}$/.test(hex)) return 0;
+  var sec = parseInt(hex, 16);
+  return isNaN(sec) ? 0 : sec * 1000;
+}
+
+/**
  * 获取指定记录的历史版本列表
  * @param {string} recordId
- * @returns {Promise<Array>} 按版本降序排列的历史快照
+ * @returns {Promise<Array>} 历史快照（changedAt 缺失时用 _id 反推创建时间兜底）
  */
 function getHistory(recordId) {
   return _db().collection('records_history')
@@ -1090,7 +1105,7 @@ function getHistory(recordId) {
         return {
           version: h.version,
           snapshot: h.snapshot,
-          changedAt: h.changedAt,
+          changedAt: h.changedAt || _idToTimestamp(h._id),
           changeType: h.changeType,
           changeSummary: h.changeSummary || '更新了记录'
         };
