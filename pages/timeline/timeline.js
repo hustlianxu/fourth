@@ -38,6 +38,17 @@ Page({
 
     var that = this;
     cloud.getHistory(this.data.recordId).then(function (list) {
+      // 按变更时间倒序（时间缺失时按版本号倒序兜底），保证时间线最新在上
+      list.sort(function (a, b) {
+        var ta = a.changedAt || 0;
+        var tb = b.changedAt || 0;
+        if (ta !== tb) return tb - ta;
+        return (b.version || 0) - (a.version || 0);
+      });
+      // 同一版本号可能存在多条快照，补充唯一 key 供 wx:for 使用（避免重复 key 渲染错乱）
+      list.forEach(function (h, i) {
+        h._key = (h.version != null ? h.version : 0) + '_' + i;
+      });
       that.setData({ history: list, loading: false });
     });
   },

@@ -28,7 +28,7 @@
   <view wx:else class="timeline">
     <view
       wx:for="{{history}}"
-      wx:key="version"
+      wx:key="_key"
       class="timeline-item {{item.version === currentVersion ? 'current' : ''}}"
     >
       <!-- 时间线节点 -->
