@@ -76,17 +76,18 @@ final class ZipStoreWriter {
         let version: UInt16 = 20
 
         var local = Data()
-        Self.littleEndian(0x04034b50, into: &local)          // local file header sig
+        // 注意：字面量必须显式标注 UInt32/UInt16，否则与两个重载产生歧义
+        Self.littleEndian(UInt32(0x04034b50), into: &local) // local file header sig
         Self.littleEndian(version, into: &local)             // version needed
         Self.littleEndian(flags, into: &local)               // flags
         Self.littleEndian(method, into: &local)              // method: 0 = store
-        Self.littleEndian(0, into: &local)                   // mod time
-        Self.littleEndian(0, into: &local)                   // mod date
+        Self.littleEndian(UInt16(0), into: &local)           // mod time
+        Self.littleEndian(UInt16(0), into: &local)           // mod date
         Self.littleEndian(crc, into: &local)                 // crc32
         Self.littleEndian(UInt32(data.count), into: &local)  // compressed size
         Self.littleEndian(UInt32(data.count), into: &local)  // uncompressed size
         Self.littleEndian(UInt16(nameData.count), into: &local) // name len
-        Self.littleEndian(0, into: &local)                   // extra len
+        Self.littleEndian(UInt16(0), into: &local)           // extra len
         local.append(nameData)
 
         try handle.write(contentsOf: local)
@@ -94,22 +95,22 @@ final class ZipStoreWriter {
 
         // 中央目录条目
         var central = Data()
-        Self.littleEndian(0x02014b50, into: &central)        // central file header sig
-        Self.littleEndian(0x031E, into: &central)            // version made by
+        Self.littleEndian(UInt32(0x02014b50), into: &central) // central file header sig
+        Self.littleEndian(UInt16(0x031E), into: &central)   // version made by
         Self.littleEndian(version, into: &central)           // version needed
         Self.littleEndian(flags, into: &central)             // flags
         Self.littleEndian(method, into: &central)            // method
-        Self.littleEndian(0, into: &central)                 // mod time
-        Self.littleEndian(0, into: &central)                 // mod date
+        Self.littleEndian(UInt16(0), into: &central)        // mod time
+        Self.littleEndian(UInt16(0), into: &central)        // mod date
         Self.littleEndian(crc, into: &central)               // crc32
         Self.littleEndian(UInt32(data.count), into: &central) // compressed size
         Self.littleEndian(UInt32(data.count), into: &central) // uncompressed size
         Self.littleEndian(UInt16(nameData.count), into: &central) // name len
-        Self.littleEndian(0, into: &central)                 // extra len
-        Self.littleEndian(0, into: &central)                 // comment len
-        Self.littleEndian(0, into: &central)                 // disk number
-        Self.littleEndian(0, into: &central)                 // internal attrs
-        Self.littleEndian(0, into: &central)                 // external attrs
+        Self.littleEndian(UInt16(0), into: &central)        // extra len
+        Self.littleEndian(UInt16(0), into: &central)        // comment len
+        Self.littleEndian(UInt16(0), into: &central)        // disk number
+        Self.littleEndian(UInt16(0), into: &central)        // internal attrs
+        Self.littleEndian(UInt16(0), into: &central)        // external attrs
         Self.littleEndian(localOffset, into: &central)       // local header offset
         central.append(nameData)
 
@@ -127,7 +128,7 @@ final class ZipStoreWriter {
         let cdSize = UInt32(centralDirectory.count)
 
         var eocd = Data()
-        Self.littleEndian(0x06054b50, into: &eocd)    // EOCD sig
+        Self.littleEndian(UInt32(0x06054b50), into: &eocd) // EOCD sig
         Self.littleEndian(UInt16(0), into: &eocd)     // disk number
         Self.littleEndian(UInt16(0), into: &eocd)     // cd start disk
         Self.littleEndian(UInt16(min(entryCount, 0xFFFF)), into: &eocd) // entries on this disk
