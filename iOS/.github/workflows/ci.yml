@@ -1,0 +1,27 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: cd iOS && xcodegen generate
+
+      - name: Build (simulator, no signing)
+        run: |
+          cd iOS
+          xcodebuild -project WatermarkCamera.xcodeproj \
+                     -scheme WatermarkCamera \
+                     -destination 'generic/platform=iOS Simulator' \
+                     -configuration Debug \
+                     CODE_SIGNING_ALLOWED=NO build

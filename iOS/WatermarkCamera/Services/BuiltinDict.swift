@@ -1,0 +1,156 @@
+import Foundation
+
+/// 中-西外贸常用词对照表（双向查询）+ 不翻译白名单
+/// 移植自小程序 utils/builtinDict.js
+enum BuiltinDict {
+
+    /// 不翻译的白名单（精确匹配，不区分大小写）
+    static let whitelist: [String] = [
+        // 单位
+        "m³", "m3", "cm³", "cm3", "kg", "g", "mg", "L", "ml",
+        "pzs", "pza", "pzas", "pcs", "pc", "ctn", "ctns",
+        "cajas", "caja", "unidades", "unidad", "uds",
+        // 货币
+        "rmb", "RMB", "usd", "USD", "eur", "EUR", "$", "¥", "€",
+        // 规格/通用缩写
+        "RGB", "LED", "USB", "DC", "AC", "W", "V", "mA", "Hz",
+        // 标点/分隔符
+        "×", "·", "-", "/", "+"
+    ]
+
+    static let entries: [DictEntry] = [
+        // 动作/特性（词组优先）
+        DictEntry(id: "d1", zh: "带灯", es: "con luz"),
+        DictEntry(id: "d2", zh: "不带灯", es: "sin luz"),
+        DictEntry(id: "d3", zh: "带音乐", es: "con música"),
+        DictEntry(id: "d4", zh: "不带音乐", es: "sin música"),
+        DictEntry(id: "d5", zh: "带电池", es: "con batería"),
+        DictEntry(id: "d6", zh: "不带电池", es: "sin batería"),
+        DictEntry(id: "d7", zh: "可充电", es: "recargable"),
+        DictEntry(id: "d8", zh: "防水", es: "impermeable"),
+        DictEntry(id: "d9", zh: "防尘", es: "a prueba de polvo"),
+        DictEntry(id: "d10", zh: "可调光", es: "regulable"),
+        DictEntry(id: "d11", zh: "可拆卸", es: "desmontable"),
+        DictEntry(id: "d12", zh: "可折叠", es: "plegable"),
+        DictEntry(id: "d13", zh: "带遥控", es: "con control remoto"),
+        DictEntry(id: "d14", zh: "不带遥控", es: "sin control remoto"),
+        DictEntry(id: "d15", zh: "带开关", es: "con interruptor"),
+        DictEntry(id: "d16", zh: "带挂钩", es: "con gancho"),
+        DictEntry(id: "d17", zh: "带底座", es: "con base"),
+        // 闪烁模式
+        DictEntry(id: "d18", zh: "闪烁", es: "destello"),
+        DictEntry(id: "d19", zh: "常亮", es: "fijo"),
+        DictEntry(id: "d20", zh: "渐变", es: "degradado"),
+        DictEntry(id: "d21", zh: "跳变", es: "saltando"),
+        DictEntry(id: "d22", zh: "呼吸", es: "respiración"),
+        DictEntry(id: "d23", zh: "模式", es: "modo"),
+        DictEntry(id: "d24", zh: "种模式", es: "modos"),
+        // 产品类别
+        DictEntry(id: "d25", zh: "挂灯", es: "lámpara colgante"),
+        DictEntry(id: "d26", zh: "台灯", es: "lámpara de mesa"),
+        DictEntry(id: "d27", zh: "壁灯", es: "lámpara de pared"),
+        DictEntry(id: "d28", zh: "灯串", es: "cadena de luces"),
+        DictEntry(id: "d29", zh: "灯带", es: "tira de luces"),
+        DictEntry(id: "d30", zh: "灯泡", es: "bombilla"),
+        DictEntry(id: "d31", zh: "灯具", es: "lámpara"),
+        DictEntry(id: "d32", zh: "星星", es: "estrellas"),
+        DictEntry(id: "d33", zh: "大星星", es: "estrellas grandes"),
+        DictEntry(id: "d34", zh: "小星星", es: "estrellas chicas"),
+        DictEntry(id: "d35", zh: "雪人", es: "muñeco de nieve"),
+        DictEntry(id: "d36", zh: "圣诞树", es: "árbol de navidad"),
+        DictEntry(id: "d37", zh: "圣诞", es: "navidad"),
+        DictEntry(id: "d38", zh: "雪花", es: "copo de nieve"),
+        DictEntry(id: "d39", zh: "铃铛", es: "campana"),
+        DictEntry(id: "d40", zh: "蝴蝶结", es: "lazo"),
+        DictEntry(id: "d41", zh: "礼物盒", es: "caja de regalo"),
+        DictEntry(id: "d42", zh: "玩偶", es: "muñeco"),
+        DictEntry(id: "d43", zh: "公仔", es: "peluche"),
+        // 颜色
+        DictEntry(id: "d44", zh: "红色", es: "rojo"),
+        DictEntry(id: "d45", zh: "蓝色", es: "azul"),
+        DictEntry(id: "d46", zh: "绿色", es: "verde"),
+        DictEntry(id: "d47", zh: "白色", es: "blanco"),
+        DictEntry(id: "d48", zh: "黑色", es: "negro"),
+        DictEntry(id: "d49", zh: "黄色", es: "amarillo"),
+        DictEntry(id: "d50", zh: "粉色", es: "rosa"),
+        DictEntry(id: "d51", zh: "紫色", es: "morado"),
+        DictEntry(id: "d52", zh: "橙色", es: "naranja"),
+        DictEntry(id: "d53", zh: "金色", es: "dorado"),
+        DictEntry(id: "d54", zh: "银色", es: "plateado"),
+        DictEntry(id: "d55", zh: "暖白", es: "blanco cálido"),
+        DictEntry(id: "d56", zh: "冷白", es: "blanco frío"),
+        DictEntry(id: "d57", zh: "彩色", es: "multicolor"),
+        DictEntry(id: "d58", zh: "透明", es: "transparente"),
+        // 尺寸/规格
+        DictEntry(id: "d59", zh: "大", es: "grande"),
+        DictEntry(id: "d60", zh: "小", es: "chico"),
+        DictEntry(id: "d61", zh: "中", es: "mediano"),
+        DictEntry(id: "d62", zh: "超", es: "súper"),
+        DictEntry(id: "d63", zh: "迷你", es: "mini"),
+        DictEntry(id: "d64", zh: "加长", es: "extra largo"),
+        DictEntry(id: "d65", zh: "长", es: "largo"),
+        DictEntry(id: "d66", zh: "短", es: "corto"),
+        DictEntry(id: "d67", zh: "厚", es: "grueso"),
+        DictEntry(id: "d68", zh: "薄", es: "delgado"),
+        DictEntry(id: "d69", zh: "高", es: "alto"),
+        DictEntry(id: "d70", zh: "低", es: "bajo"),
+        DictEntry(id: "d71", zh: "直径", es: "diámetro"),
+        DictEntry(id: "d72", zh: "长度", es: "longitud"),
+        DictEntry(id: "d73", zh: "宽度", es: "ancho"),
+        DictEntry(id: "d74", zh: "高度", es: "altura"),
+        // 材质
+        DictEntry(id: "d75", zh: "塑料", es: "plástico"),
+        DictEntry(id: "d76", zh: "金属", es: "metal"),
+        DictEntry(id: "d77", zh: "玻璃", es: "vidrio"),
+        DictEntry(id: "d78", zh: "木质", es: "madera"),
+        DictEntry(id: "d79", zh: "亚克力", es: "acrílico"),
+        DictEntry(id: "d80", zh: "硅胶", es: "silicona"),
+        DictEntry(id: "d81", zh: "陶瓷", es: "cerámica"),
+        DictEntry(id: "d82", zh: "布艺", es: "tela"),
+        // 包装/数量
+        DictEntry(id: "d83", zh: "每箱", es: "por caja"),
+        DictEntry(id: "d84", zh: "装箱数", es: "cantidad por caja"),
+        DictEntry(id: "d85", zh: "件数", es: "total"),
+        DictEntry(id: "d86", zh: "总数", es: "total"),
+        DictEntry(id: "d87", zh: "套装", es: "set"),
+        DictEntry(id: "d88", zh: "一盒", es: "una caja"),
+        DictEntry(id: "d89", zh: "一套", es: "un set"),
+        DictEntry(id: "d90", zh: "一打", es: "una docena"),
+        // 价格/贸易
+        DictEntry(id: "d91", zh: "单价", es: "precio unitario"),
+        DictEntry(id: "d92", zh: "总价", es: "precio total"),
+        DictEntry(id: "d93", zh: "批发价", es: "precio mayorista"),
+        DictEntry(id: "d94", zh: "零售价", es: "precio minorista"),
+        DictEntry(id: "d95", zh: "含税", es: "impuesto incluido"),
+        DictEntry(id: "d96", zh: "不含税", es: "sin impuesto"),
+        DictEntry(id: "d97", zh: "含运费", es: "con envío"),
+        DictEntry(id: "d98", zh: "不含运费", es: "sin envío"),
+        // 其他常用
+        DictEntry(id: "d99", zh: "新款", es: "nuevo modelo"),
+        DictEntry(id: "d100", zh: "老款", es: "modelo antiguo"),
+        DictEntry(id: "d101", zh: "热销", es: "más vendido"),
+        DictEntry(id: "d102", zh: "爆款", es: "éxito de ventas"),
+        DictEntry(id: "d103", zh: "现货", es: "en stock"),
+        DictEntry(id: "d104", zh: "缺货", es: "agotado"),
+        DictEntry(id: "d105", zh: "预售", es: "preventa"),
+        DictEntry(id: "d106", zh: "定制", es: "personalizado"),
+        DictEntry(id: "d107", zh: "样品", es: "muestra"),
+        DictEntry(id: "d108", zh: "免运费", es: "envío gratis"),
+        DictEntry(id: "d109", zh: "包邮", es: "envío gratis"),
+        // 动词/连接词
+        DictEntry(id: "d110", zh: "和", es: "y"),
+        DictEntry(id: "d111", zh: "与", es: "y"),
+        DictEntry(id: "d112", zh: "或", es: "o"),
+        DictEntry(id: "d113", zh: "及", es: "y"),
+        DictEntry(id: "d114", zh: "加", es: "más"),
+        DictEntry(id: "d115", zh: "减", es: "menos"),
+        DictEntry(id: "d116", zh: "带", es: "con"),
+        DictEntry(id: "d117", zh: "不带", es: "sin"),
+        // 灯光效果
+        DictEntry(id: "d118", zh: "亮", es: "brillante"),
+        DictEntry(id: "d119", zh: "暗", es: "oscuro"),
+        DictEntry(id: "d120", zh: "光", es: "luz"),
+        DictEntry(id: "d121", zh: "灯", es: "lámpara"),
+        DictEntry(id: "d122", zh: "电", es: "eléctrico")
+    ]
+}
