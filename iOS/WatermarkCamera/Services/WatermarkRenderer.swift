@@ -66,6 +66,7 @@ enum WatermarkRenderer {
         // 去掉首尾括号
         var str = String(s)
         str = str.trimmingCharacters(in: .whitespaces)
+        if str.hasPrefix("(") { str.removeFirst() }
         if str.hasSuffix(")") { str.removeLast() }
         let parts = str.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         guard parts.count >= 3 else { return nil }

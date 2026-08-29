@@ -17,7 +17,9 @@ struct ExportView: View {
     @State private var errorMessage: String?
 
     private var scopeRecords: [Record] {
-        storage.records(inFolder: filterFolderID)
+        // nil = 全部记录；records(inFolder: nil) 只返回未分类，不能用于"全部"
+        guard let folderID = filterFolderID else { return storage.records }
+        return storage.records(inFolder: folderID)
     }
 
     var body: some View {

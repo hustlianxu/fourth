@@ -70,9 +70,13 @@ final class CameraSession: NSObject, ObservableObject {
         guard let device = videoInput?.device,
               let desc = device.activeFormat.formatDescription else { return }
         let dims = CMVideoFormatDescriptionGetDimensions(desc)
+
         // 连接锁定为 portrait：传感器 format 为横向尺寸，需交换宽高得到竖屏显示宽高比，
         // 否则预览 aspect-fit 区域与实际竖版照片不匹配，水印位置会偏移
-        videoDimensions = CGSize(width: CGFloat(dims.height), height: CGFloat(dims.width))
+        // videoDimensions = CGSize(width: CGFloat(dims.height), height: CGFloat(dims.width))
+        let size = CGSize(width: CGFloat(dims.width), height: CGFloat(dims.height))
+        // @Published 必须在主线程更新（本方法在 sessionQueue 被调用）
+        DispatchQueue.main.async { self.videoDimensions = size }
     }
 
     func start() {

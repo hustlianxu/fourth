@@ -347,20 +347,20 @@ struct TemplateEditorView: View {
 
 extension Color {
     init?(hex: String) {
-        var h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        if h.count == 6 { h = "ff" + h }
-        guard h.count == 8, let v = UInt64(h, radix: 16) else { return nil }
-        self.init(red: Double((v >> 24) & 0xFF) / 255.0,
-                  green: Double((v >> 16) & 0xFF) / 255.0,
-                  blue: Double((v >> 8) & 0xFF) / 255.0,
-                  opacity: Double(v & 0xFF) / 255.0)
+        let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard h.count == 6, let v = UInt64(h, radix: 16) else { return nil }
+        self.init(red: Double((v >> 16) & 0xFF) / 255.0,
+                  green: Double((v >> 8) & 0xFF) / 255.0,
+                  blue: Double(v & 0xFF) / 255.0,
+                  opacity: 1)
     }
 
+    /// 输出 #RRGGBB（WatermarkRenderer.parseColor 要求 # 前缀）
     var hexString: String? {
         let ui = UIColor(self)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
-        return String(format: "%02X%02X%02X",
+        return String(format: "#%02X%02X%02X",
                       Int(round(r * 255)), Int(round(g * 255)), Int(round(b * 255)))
     }
 }

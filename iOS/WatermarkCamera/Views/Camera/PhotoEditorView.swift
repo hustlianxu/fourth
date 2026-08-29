@@ -18,6 +18,7 @@ struct PhotoEditorView: View {
     @State private var showFields = true
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var didInitPlacement = false
 
     init(image: UIImage,
          folderId: String? = nil,
@@ -105,9 +106,13 @@ struct PhotoEditorView: View {
                         .background(Color(.systemBackground))
                     }
                 }
-                .onAppear { containerSize = geo.size }
+                .onAppear {
+                    containerSize = geo.size
+                    initPlacementIfNeeded()
+                }
                 .onChange(of: geo.size) { newSize in
                     containerSize = newSize
+                    initPlacementIfNeeded()
                 }
             }
             .overlay(alignment: .top) {
@@ -140,6 +145,13 @@ struct PhotoEditorView: View {
     }
 
     // MARK: - 布局
+
+    /// 预览尺寸首次就绪时，按模板预设位置初始化浮层（而非默认居中）
+    private func initPlacementIfNeeded() {
+        guard !didInitPlacement, containerSize.width > 0, containerSize.height > 0 else { return }
+        didInitPlacement = true
+        placement = OverlayMapper.defaultPlacement(for: template, canvasPoints: fitRect(in: containerSize).size)
+    }
 
     private func fitRect(in size: CGSize) -> CGRect {
         guard image.size.width > 0, image.size.height > 0, size.width > 0, size.height > 0 else { return .zero }

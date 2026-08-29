@@ -43,7 +43,7 @@ enum PhotoSaver {
         }
 
         let now = Date().timeIntervalSince1970
-        var rec = Record(id: id,
+        let rec = Record(id: id,
                          folderId: folderId,
                          customName: nil,
                          createdAt: now,

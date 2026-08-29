@@ -157,17 +157,18 @@ struct CameraCaptureView: View {
                 .frame(maxHeight: .infinity, alignment: .bottom)
             }
         }
-        .sheet(isPresented: $showPhotoPicker, onDismiss: {
-            if let img = pickedImage {
-                pickedImage = nil
-                editSheetImage = img
-                showEditSheet = true
-            }
-        }) {
+        .sheet(isPresented: $showPhotoPicker) {
             PhotoLibraryPicker { image in
                 pickedImage = image
             }
             .ignoresSafeArea()
+        }
+        .onChange(of: pickedImage) { img in
+            // loadObject 异步回调可能晚于 sheet onDismiss，必须用 onChange 驱动编辑页
+            guard let img = img else { return }
+            pickedImage = nil
+            editSheetImage = img
+            showEditSheet = true
         }
         .sheet(isPresented: $showEditSheet) {
             if let img = editSheetImage {
@@ -186,6 +187,12 @@ struct CameraCaptureView: View {
             if values.isEmpty {
                 values = BuiltinTemplates.defaultValues(for: template)
             }
+        }
+        .onChange(of: fitRect) { fit in
+            // 预览尺寸首次就绪时，按模板预设位置初始化浮层（而非默认居中）
+            guard !didInitPlacement, fit.width > 0, fit.height > 0 else { return }
+            didInitPlacement = true
+            placement = OverlayMapper.defaultPlacement(for: template, canvasPoints: fit.size)
         }
         .overlay {
             if camera.isAuthorized == false {
@@ -298,4 +305,5 @@ struct CameraCaptureView: View {
     // MARK: - 相册选图编辑
 
     @State private var editSheetImage: UIImage?
+    @State private var didInitPlacement = false
 }

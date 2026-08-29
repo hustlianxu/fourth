@@ -141,14 +141,13 @@ enum OverlayMapper {
             dx = 0
         }
 
+        // dy 向下为正：top 取负、bottom 取正
         if pos.contains("top") {
-            dy = 0.5 - blockH / (2 * canvasPoints.height) - marginFraction
-        } else if pos.contains("center") && !pos.contains("top") && !pos.contains("bottom") {
-            dy = 0
-        } else if pos.contains("center") {
-            dy = 0
-        } else {
             dy = -(0.5 - blockH / (2 * canvasPoints.height) - marginFraction)
+        } else if pos.contains("bottom") {
+            dy = 0.5 - blockH / (2 * canvasPoints.height) - marginFraction
+        } else {
+            dy = 0
         }
 
         return OverlayPlacement(dx: dx, dy: dy, scale: 1)
