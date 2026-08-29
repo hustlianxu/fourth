@@ -2,12 +2,18 @@ import SwiftUI
 
 // MARK: - 水印浮层放置状态（拖动 + 缩放）
 
-struct OverlayPlacement {
+struct OverlayPlacement: Codable, Hashable {
     /// 归一化中心偏移：屏幕中心为 (0,0)，数值为相对容器宽/高的比例
     var dx: CGFloat = 0
     var dy: CGFloat = 0
     /// 缩放系数（相对模板原始尺寸）
     var scale: CGFloat = 1
+
+    init(dx: CGFloat = 0, dy: CGFloat = 0, scale: CGFloat = 1) {
+        self.dx = dx
+        self.dy = dy
+        self.scale = scale
+    }
 }
 
 // MARK: - 可拖动 / 可缩放的水印浮层
@@ -22,6 +28,8 @@ struct WatermarkOverlay: View {
     @Binding var placement: OverlayPlacement
     /// true 时不响应手势（纯展示，如相册缩略预览）
     var interactive: Bool = true
+    /// 点按水印块的回调（编辑器中用于直接在图片上编辑水印内容）
+    var onTap: (() -> Void)? = nil
 
     @GestureState private var dragOffset: CGSize = .zero
     @GestureState private var pinchScale: CGFloat = 1
@@ -54,6 +62,7 @@ struct WatermarkOverlay: View {
                             .frame(width: size.width, height: size.height)
                             .position(x: centerX, y: centerY)
                     )
+                    .onTapGesture { onTap?() }
             }
         }
         .contentShape(Rectangle())

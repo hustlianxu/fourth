@@ -15,6 +15,8 @@ struct ExportView: View {
     @State private var progressText = ""
     @State private var shareURL: URL?
     @State private var errorMessage: String?
+    /// 图片压缩选项（默认压缩至 1MB 内，避免 iOS 预览打不开大文件）
+    @State private var compression: ExportImageCompression = .under1MB
 
     private var scopeRecords: [Record] {
         // nil = 全部记录；records(inFolder: nil) 只返回未分类，不能用于"全部"
@@ -43,6 +45,21 @@ struct ExportView: View {
                             Text("\(folder.name)（\(storage.records(inFolder: folder.id).count)）").tag(String?.some(folder.id))
                         }
                     }
+                }
+
+                // 图片压缩
+                Section {
+                    Picker("图片压缩", selection: $compression) {
+                        ForEach(ExportImageCompression.allCases) { c in
+                            Text(c.displayName).tag(c)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: {
+                    Text("图片压缩")
+                } footer: {
+                    Text(compressionEstimateText)
                 }
 
                 // 记录选择
@@ -162,6 +179,25 @@ struct ExportView: View {
         }
     }
 
+    /// 压缩选项说明 + 压缩后像素预估（基于已选记录中最大的图片）
+    private var compressionEstimateText: String {
+        let recs = scopeRecords.filter { selected.contains($0.id) }
+        switch compression {
+        case .original:
+            return "嵌入原始字节，保留原像素；文件较大，iOS 端 Office 预览可能无法打开"
+        case .half, .quarter:
+            guard let w = recs.map(\.width).max(), let h = recs.map(\.height).max(), w > 0, h > 0 else {
+                return "选择记录后显示预估压缩后像素"
+            }
+            if let est = compression.estimatedSize(width: w, height: h) {
+                return "已选最大图片 \(w)×\(h)，压缩后约 \(est.w)×\(est.h) 像素/张"
+            }
+            return ""
+        case .under1MB:
+            return "自动调整质量与尺寸，每张图片压缩至 1MB 以内；iOS 预览兼容性最好"
+        }
+    }
+
     private func startExport() {
         guard !selected.isEmpty else { return }
         let records = scopeRecords.filter { selected.contains($0.id) }
@@ -169,7 +205,9 @@ struct ExportView: View {
         progressText = "正在准备 \(records.count) 条记录..."
         Task {
             do {
-                let url = try await ExportService.shared.exportToXlsx(records: records, customFileName: fileName.isEmpty ? Self.defaultFileName() : fileName) { text in
+                let url = try await ExportService.shared.exportToXlsx(records: records,
+                                                                      customFileName: fileName.isEmpty ? Self.defaultFileName() : fileName,
+                                                                      compression: compression) { text in
                     Task { @MainActor in
                         progressText = text
                     }

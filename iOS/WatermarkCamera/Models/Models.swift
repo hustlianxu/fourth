@@ -74,6 +74,10 @@ struct Record: Codable, Hashable, Identifiable {
     var height: Int
     var values: [String: String] = [:]
     var deletedAt: TimeInterval?   // 非 nil => 在回收站
+    // 水印上下文（详情编辑后可按原位置/原模板重渲染图片）
+    // 旧记录缺失时解码为 nil，向后兼容
+    var wmTemplateID: String?
+    var wmPlacement: OverlayPlacement?
 }
 
 struct Folder: Codable, Hashable, Identifiable {

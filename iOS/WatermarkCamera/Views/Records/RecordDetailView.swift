@@ -15,7 +15,10 @@ struct RecordDetailView: View {
 
     init(record: Record) {
         self.record = record
-        let tpl = BuiltinTemplates.template(withID: AppSettings.activeTemplateID) ?? BuiltinTemplates.handwrite
+        // 模板优先取记录里存的水印模板（保证详情编辑/重渲染与拍摄时一致），
+        // 其次当前激活模板
+        let tpl = BuiltinTemplates.template(withID: record.wmTemplateID ?? AppSettings.activeTemplateID)
+            ?? BuiltinTemplates.handwrite
         _template = State(initialValue: tpl)
         _values = State(initialValue: record.values)
     }
@@ -109,7 +112,9 @@ struct RecordDetailView: View {
                 PhotoEditorView(image: base,
                                 folderId: record.folderId,
                                 recordID: record.id,
-                                initialValues: values) {
+                                initialValues: values,
+                                initialTemplateID: record.wmTemplateID,
+                                initialPlacement: record.wmPlacement) {
                     showEditWatermark = false
                 }
                 .environmentObject(storage)
@@ -131,8 +136,14 @@ struct RecordDetailView: View {
         guard var r = storage.record(withID: record.id) else { return }
         r.values = values
         r.updatedAt = Date().timeIntervalSince1970
-        storage.updateRecord(r)
-        toastMessage = "已保存修改"
+        // 按原水印位置/模板重渲染图片（详情编辑与「重新编辑水印」行为一致）
+        if PhotoSaver.rerenderValues(recordID: record.id, values: values, storage: storage) {
+            toastMessage = "已保存修改并更新水印图片"
+        } else {
+            // 无原图可重绘（如旧记录缺 orig）：仅保存字段
+            storage.updateRecord(r)
+            toastMessage = "已保存修改（原图缺失，图片未重绘）"
+        }
     }
 
     private func saveToAlbum(_ image: UIImage) {
