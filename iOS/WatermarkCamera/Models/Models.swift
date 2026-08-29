@@ -91,11 +91,42 @@ struct DictEntry: Codable, Hashable, Identifiable {
     var es: String
 }
 
-struct TranslationAPIConfig: Codable, Hashable {
+struct TranslationAPIConfig: Codable, Hashable, Identifiable {
+    var id: String = UUID().uuidString
     var provider: String = "deepseek"
     var baseURL: String = ""
     var model: String = ""
     var apiKey: String = ""
+
+    /// 列表显示名（如 "deepseek · deepseek-chat"）
+    var displayName: String {
+        let p = provider.isEmpty ? "自定义" : provider
+        return model.isEmpty ? p : "\(p) · \(model)"
+    }
+
+    /// 密钥是否已配置（列表里避免明文展示 key）
+    var hasKey: Bool { !apiKey.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    init(provider: String = "deepseek",
+         baseURL: String = "",
+         model: String = "",
+         apiKey: String = "") {
+        self.id = UUID().uuidString
+        self.provider = provider
+        self.baseURL = baseURL
+        self.model = model
+        self.apiKey = apiKey
+    }
+
+    // 兼容旧版存储（无 id / 字段缺失时不解码失败）
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? "deepseek"
+        baseURL = try c.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
+        model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
+        apiKey = try c.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+    }
 }
 
 struct FreeDictConfig: Codable, Hashable {
@@ -127,18 +158,40 @@ enum AppSettings {
     }
 
     // ===== 翻译引擎 =====
-    static var apiConfig: TranslationAPIConfig {
+
+    /// 已保存的多个大模型接口配置（多服务商 / 多密钥）
+    static var apiConfigs: [TranslationAPIConfig] {
         get {
-            guard let data = defaults.data(forKey: "translator_api_config"),
-                  let cfg = try? JSONDecoder().decode(TranslationAPIConfig.self, from: data)
-            else { return TranslationAPIConfig() }
-            return cfg
+            if let data = defaults.data(forKey: "translator_api_configs"),
+               let list = try? JSONDecoder().decode([TranslationAPIConfig].self, from: data) {
+                return list
+            }
+            // 旧版单配置迁移
+            if let data = defaults.data(forKey: "translator_api_config"),
+               let cfg = try? JSONDecoder().decode(TranslationAPIConfig.self, from: data),
+               !cfg.baseURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                return [cfg]
+            }
+            return []
         }
         set {
             if let data = try? JSONEncoder().encode(newValue) {
-                defaults.set(data, forKey: "translator_api_config")
+                defaults.set(data, forKey: "translator_api_configs")
             }
         }
+    }
+
+    /// 当前激活的配置 id
+    static var activeAPIConfigID: String {
+        get { defaults.string(forKey: "translator_active_api_config") ?? "" }
+        set { defaults.set(newValue, forKey: "translator_active_api_config") }
+    }
+
+    /// 翻译引擎实际使用的配置（激活项；无激活则取第一个）
+    static var apiConfig: TranslationAPIConfig {
+        let list = apiConfigs
+        if let cfg = list.first(where: { $0.id == activeAPIConfigID }) { return cfg }
+        return list.first ?? TranslationAPIConfig()
     }
 
     static var freeDictConfig: FreeDictConfig {
