@@ -5,6 +5,7 @@ import AVFoundation
 
 struct CameraCaptureView: View {
     @EnvironmentObject var storage: StorageManager
+    @Environment(\.dismiss) private var dismiss
     var folderId: String? = nil
     var onFinished: (() -> Void)? = nil
 
@@ -20,6 +21,15 @@ struct CameraCaptureView: View {
     @State private var pickedImage: UIImage?
     @State private var showEditSheet = false
     @State private var errorMessage: String?
+    /// 闪光灯提示（拍照瞬间才生效，需显式告知用户）
+    @State private var flashHint: String?
+
+    /// 关闭相机页：调用方可能未传 onFinished（如 fullScreenCover 直接呈现），
+    /// 必须用 dismiss 兜底，否则关闭按钮无响应
+    private func closeCamera() {
+        onFinished?()
+        dismiss()
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -49,7 +59,7 @@ struct CameraCaptureView: View {
                 VStack {
                     HStack {
                         Button {
-                            onFinished?()
+                            closeCamera()
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 18, weight: .semibold))
@@ -57,9 +67,11 @@ struct CameraCaptureView: View {
                                 .padding(12)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
                         }
+                        .accessibilityLabel("关闭")
                         Spacer()
                         Button {
                             camera.toggleFlash()
+                            showFlashHint(camera.flashOn ? "闪光灯已开启（拍照瞬间生效）" : "闪光灯已关闭")
                         } label: {
                             Image(systemName: camera.flashOn ? "bolt.fill" : "bolt.slash")
                                 .font(.system(size: 18, weight: .semibold))
@@ -67,6 +79,7 @@ struct CameraCaptureView: View {
                                 .padding(12)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
                         }
+                        .accessibilityLabel(camera.flashOn ? "关闭闪光灯" : "开启闪光灯")
                         Button {
                             camera.switchCamera()
                         } label: {
@@ -76,18 +89,33 @@ struct CameraCaptureView: View {
                                 .padding(12)
                                 .background(Circle().fill(Color.black.opacity(0.45)))
                         }
+                        .accessibilityLabel("切换摄像头")
                     }
                     .padding(.horizontal, 16)
                     Spacer()
+                    // 闪光灯提示（拍照瞬间才生效，避免用户以为无效）
+                    if let hint = flashHint {
+                        Text(hint)
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.black.opacity(0.6)))
+                            .transition(.opacity)
+                            .padding(.top, 8)
+                    }
                 }
                 .padding(.top, 4)
 
                 // 底部控制区
                 VStack(spacing: 0) {
-                    // 字段面板
+                    // 字段面板（展开/收起均带柔和 spring + 位移+透明度组合过渡）
                     if showFields {
                         fieldsPanel
-                            .transition(.move(edge: .bottom))
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal: .move(edge: .bottom).combined(with: .opacity)
+                            ))
                     }
 
                     // 模板选择 + 提示
@@ -138,9 +166,9 @@ struct CameraCaptureView: View {
                         }
                         .disabled(isCapturing || isSaving)
 
-                        // 展开字段
+                        // 展开字段（bounceFraction 让收起/展开都有回弹缓冲，不生硬）
                         Button {
-                            withAnimation(.spring(duration: 0.3)) { showFields.toggle() }
+                            withAnimation(.spring(duration: 0.35, bounceFraction: 0.2)) { showFields.toggle() }
                         } label: {
                             VStack(spacing: 4) {
                                 Image(systemName: showFields ? "keyboard.chevron.compact.down" : "keyboard")
@@ -272,6 +300,16 @@ struct CameraCaptureView: View {
 
     // MARK: - 拍照
 
+    /// 闪光灯状态提示：1.6 秒后自动消失
+    private func showFlashHint(_ text: String) {
+        withAnimation(.easeOut(duration: 0.15)) { flashHint = text }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [self] in
+            if flashHint == text {
+                withAnimation(.easeIn(duration: 0.2)) { flashHint = nil }
+            }
+        }
+    }
+
     private func triggerCapture() {
         guard !isCapturing, !isSaving else { return }
         isCapturing = true
@@ -291,7 +329,7 @@ struct CameraCaptureView: View {
                                         storage: storage,
                                         autoSaveAlbum: AppSettings.autoSaveAlbum)
                     isSaving = false
-                    onFinished?()
+                    closeCamera()
                 }
             case .failure(let error):
                 Task { @MainActor in

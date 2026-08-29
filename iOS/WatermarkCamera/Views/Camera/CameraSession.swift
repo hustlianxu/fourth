@@ -15,6 +15,8 @@ final class CameraSession: NSObject, ObservableObject {
     private let sessionQueue = DispatchQueue(label: "com.watermark.camera.session")
     private var videoInput: AVCaptureDeviceInput?
     private var captureCompletion: ((Result<UIImage, Error>) -> Void)?
+    /// 会话是否已完成配置（幂等防重）
+    private var isConfigured = false
 
     /// 当前输入视频尺寸（用于预览区 aspect 换算）
     @Published private(set) var videoDimensions = CGSize(width: 1080, height: 1440)
@@ -28,17 +30,41 @@ final class CameraSession: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             DispatchQueue.main.async { self.isAuthorized = true }
-            sessionQueue.async { [weak self] in self?.configureSession() }
+            sessionQueue.async { [weak self] in
+                self?.configureIfNeeded()
+                self?.startSession()
+            }
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async { self?.isAuthorized = granted }
                 if granted {
-                    self?.sessionQueue.async { self?.configureSession() }
+                    self?.sessionQueue.async {
+                        self?.configureIfNeeded()
+                        self?.startSession()
+                    }
                 }
             }
         default:
             DispatchQueue.main.async { self.isAuthorized = false }
         }
+    }
+
+    /// 幂等配置：授权后仅配置一次（切换摄像头走 switchCamera 单独路径）
+    private func configureIfNeeded() {
+        guard !isConfigured,
+              AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { return }
+        configureSession()
+        isConfigured = true
+    }
+
+    /// 在 sessionQueue 上启动会话（内部检查运行状态）
+    private func startSession() {
+        assert(!Thread.isMainThread)
+        guard isConfigured else { return }
+        if !session.isRunning {
+            session.startRunning()
+        }
+        DispatchQueue.main.async { self.isRunning = self.session.isRunning }
     }
 
     private func configureSession() {
@@ -81,11 +107,13 @@ final class CameraSession: NSObject, ObservableObject {
     }
 
     func start() {
-        guard isAuthorized else { return }
+        // 不能依赖 @Published isAuthorized（异步设置的，onAppear 时必为 false，
+        // 曾导致会话永不启动 → 黑屏 + "Cannot Record"）。改为队列内直接
+        // 检查系统授权状态并幂等配置
         sessionQueue.async { [weak self] in
-            guard let self = self, !self.session.isRunning else { return }
-            self.session.startRunning()
-            DispatchQueue.main.async { self.isRunning = true }
+            guard let self = self else { return }
+            self.configureIfNeeded()
+            self.startSession()
         }
     }
 
@@ -117,7 +145,11 @@ final class CameraSession: NSObject, ObservableObject {
                 self.session.addInput(current)
                 self.videoInput = current
             }
-            self.updateConnectionOrientation(input: self.videoInput!)
+            guard let activeInput = self.videoInput else {
+                self.session.commitConfiguration()
+                return
+            }
+            self.updateConnectionOrientation(input: activeInput)
             self.updateVideoDimensions()
             self.session.commitConfiguration()
             DispatchQueue.main.async {

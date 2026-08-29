@@ -43,7 +43,11 @@ enum XlsxWriter {
         }
         var imageEntries: [ImageEntry] = []
         var imgIdx = 0
-        for (i, rec) in records.enumerated() where !(rec["imagePath"] ?? "").isEmpty {
+        for (i, rec) in records.enumerated() {
+            let path = rec["imagePath"] ?? ""
+            // 必须先确认数据可读：否则 drawing 会引用不存在的 media 部件，
+            // Excel 打开同样报 OfficeImportErrorDomain 912
+            guard !path.isEmpty, let d = imageData(path), !d.isEmpty else { continue }
             imgIdx += 1
             imageEntries.append(ImageEntry(rId: "rId\(imgIdx)", idx: imgIdx, recordIdx: i, ext: "jpeg"))
         }
@@ -85,12 +89,14 @@ enum XlsxWriter {
         try zip.addEntry(named: "xl/workbook.xml", string: workbook)
 
         // ===== 4. xl/_rels/workbook.xml.rels =====
+        // 注意：drawing 是 worksheet 级关系（由 sheet1.xml.rels 的 rId3 引用），
+        // 不能出现在 workbook 级 rels —— 无效关系会导致 Excel 报
+        // "OfficeImportErrorDomain 错误 912"
         let wbRels =
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
             + "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
             + "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>"
             + "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>"
-            + "<Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing1.xml\"/>"
             + "</Relationships>"
         try zip.addEntry(named: "xl/_rels/workbook.xml.rels", string: wbRels)
 
