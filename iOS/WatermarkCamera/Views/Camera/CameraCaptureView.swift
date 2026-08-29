@@ -166,9 +166,9 @@ struct CameraCaptureView: View {
                         }
                         .disabled(isCapturing || isSaving)
 
-                        // 展开字段（bounceFraction 让收起/展开都有回弹缓冲，不生硬）
+                        // 展开字段（response/dampingFraction 让收起/展开都有回弹缓冲，不生硬）
                         Button {
-                            withAnimation(.spring(duration: 0.35, bounceFraction: 0.2)) { showFields.toggle() }
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showFields.toggle() }
                         } label: {
                             VStack(spacing: 4) {
                                 Image(systemName: showFields ? "keyboard.chevron.compact.down" : "keyboard")
