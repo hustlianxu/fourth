@@ -231,7 +231,7 @@ struct RecordRowView: View {
 
     private var secondaryTitle: String {
         let modelo = record.values["modelo"] ?? ""
-        return modelo.isEmpty ? "记录 \(Int(Date(timeIntervalSince1970: record.updatedAt)))" : "记录 · \(modelo)"
+        return modelo.isEmpty ? "记录 \(Int(record.updatedAt))" : "记录 · \(modelo)"
     }
 
     @ViewBuilder

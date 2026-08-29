@@ -154,7 +154,9 @@ struct TemplateEditorView: View {
         _textColor = State(initialValue: Color(hex: template.style.colorHex) ?? .white)
         let bg = template.style.backgroundRGBA
         _useBg = State(initialValue: bg.contains("rgba") ? !bg.contains("rgba(0,0,0,0)") : !bg.isEmpty)
-        _bgOpacity = State(initialValue: extractAlpha(bg) ?? 0.7)
+        // init 阶段不能调用实例方法（@State 尚未初始化会报 used before being
+        // initialized），改用 WatermarkRenderer.extractAlpha 静态版本
+        _bgOpacity = State(initialValue: WatermarkRenderer.extractAlpha(bg) ?? 0.7)
         _borderRadius = State(initialValue: template.style.borderRadius)
         _lineHeight = State(initialValue: template.style.lineHeight)
         _fields = State(initialValue: template.fields)
