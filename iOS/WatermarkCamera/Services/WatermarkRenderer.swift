@@ -44,14 +44,14 @@ enum WatermarkRenderer {
         // rgba(r,g,b,a)
         if color.hasPrefix("rgba(") {
             if let c = extractRGB(color[color.index(color.startIndex, offsetBy: 4)...]) {
-                let alpha = overrideAlpha ?? c.0.alpha
-                return UIColor(red: c.0.r, green: c.0.g, blue: c.0.b, alpha: alpha)
+                let alpha = overrideAlpha ?? c.a
+                return UIColor(red: c.r, green: c.g, blue: c.b, alpha: alpha)
             }
         }
         // rgb(r,g,b)
         if color.hasPrefix("rgb(") {
             if let c = extractRGB(color[color.index(color.startIndex, offsetBy: 3)...]) {
-                return UIColor(red: c.0.r, green: c.0.g, blue: c.0.b, alpha: overrideAlpha ?? 1)
+                return UIColor(red: c.r, green: c.g, blue: c.b, alpha: overrideAlpha ?? 1)
             }
         }
         // #hex
@@ -61,8 +61,8 @@ enum WatermarkRenderer {
         return UIColor(white: 0, alpha: overrideAlpha ?? 0.6)
     }
 
-    /// 从 "(r,g,b,a)" 片段解析颜色；返回 (rgb 归一化、alpha)
-    private static func extractRGB(_ s: Substring) -> (UIColor, CGFloat)? {
+    /// 从 "(r,g,b,a)" 片段解析颜色；返回归一化 RGBA 分量（UIColor 无 r/g/b/alpha 成员，须以分量传递）
+    private static func extractRGB(_ s: Substring) -> (r: CGFloat, g: CGFloat, b: CGFloat, a: CGFloat)? {
         // 去掉首尾括号
         var str = String(s)
         str = str.trimmingCharacters(in: .whitespaces)
@@ -73,7 +73,7 @@ enum WatermarkRenderer {
         guard let r = Double(parts[0]), let g = Double(parts[1]), let b = Double(parts[2]) else { return nil }
         var a: Double = 1
         if parts.count >= 4, let av = Double(parts[3]) { a = av }
-        return (UIColor(red: CGFloat(r / 255), green: CGFloat(g / 255), blue: CGFloat(b / 255), alpha: 1), CGFloat(a))
+        return (r: CGFloat(r / 255), g: CGFloat(g / 255), b: CGFloat(b / 255), a: CGFloat(a))
     }
 
     private static func hexColor(_ hex: String, alpha: CGFloat) -> UIColor {
@@ -108,7 +108,7 @@ enum WatermarkRenderer {
         let ratio = cw / 750
         let scale = customScale ?? 1
         let wRatio = widthRatio == nil ? template.widthRatio : widthRatio!
-        let fontSize = max(14, (style.fontSize * Double(ratio) * scale).rounded())
+        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale)).rounded())
         let lineHeight = (fontSize * CGFloat(style.lineHeight)).rounded()
         let padding = (CGFloat(style.padding) * ratio * scale).rounded()
         let borderRadius = (CGFloat(style.borderRadius) * ratio).rounded()
@@ -125,7 +125,9 @@ enum WatermarkRenderer {
         guard !lines.isEmpty else { return nil }
 
         let margin = (cw * 0.04).rounded()
-        let blockH = padding * 2 + CGFloat(lines.count) * lineHeight
+        // 注意：CGFloat 乘整数字面量（如 * 2）在 CGFloat/Double 隐式互转下会产生
+        // "Ambiguous use of operator '*'"，须用浮点字面量 2.0 显式定宽
+        let blockH = padding * 2.0 + CGFloat(lines.count) * lineHeight
         let cx = (cw - blockW) / 2
         let position = template.position
 
@@ -359,14 +361,14 @@ enum WatermarkRenderer {
         let padding = (CGFloat(style.padding) * ratio * scale).rounded()
         let blockW = (canvasWidth * CGFloat(wRatio) * scale).rounded()
         let indent = (fontSize * 1.4).rounded()
-        let textInnerW = max(blockW - padding * 2, 10)
+        let textInnerW = max(blockW - padding * 2.0, 10)
         let font = UIFont.systemFont(ofSize: fontSize)
         let wide = wRatio >= 0.5
         let lines = computeLines(template: template, values: values,
                                  textInnerW: textInnerW, indent: indent,
                                  font: font, isWide: wide)
         guard !lines.isEmpty else { return nil }
-        let blockH = padding * 2 + CGFloat(lines.count) * lineHeight
+        let blockH = padding * 2.0 + CGFloat(lines.count) * lineHeight
         return CGSize(width: blockW, height: blockH)
     }
 
@@ -386,7 +388,7 @@ enum WatermarkRenderer {
         let padding = (CGFloat(style.padding) * ratio * scale).rounded()
         let indent = (fontSize * 1.4).rounded()
         let blockW = size.width
-        let textInnerW = max(blockW - padding * 2, 10)
+        let textInnerW = max(blockW - padding * 2.0, 10)
         let wide = template.widthRatio >= 0.5
         let font = UIFont.systemFont(ofSize: fontSize)
         let lines = computeLines(template: template, values: values,
