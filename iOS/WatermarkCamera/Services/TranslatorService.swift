@@ -357,7 +357,10 @@ final class TranslatorService {
                 let groupItems = indices.map { llmItems[$0] }
                 let from = groupItems[0].from
                 let to = groupItems[0].to
-                var results = await callGroup(groupItems, from: from, to: to)
+                // callGroup 接收 BatchItem（text/from/to），此处映射掉本地扩展字段 origIdx
+                var results = await callGroup(groupItems.map {
+                    BatchItem(text: $0.text, from: $0.from, to: $0.to)
+                }, from: from, to: to)
                 // 缺失项降级：本地结果
                 for (offset, i) in indices.enumerated() {
                     if results[offset] == nil {
