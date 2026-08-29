@@ -70,7 +70,9 @@ final class CameraSession: NSObject, ObservableObject {
         guard let device = videoInput?.device,
               let desc = device.activeFormat.formatDescription else { return }
         let dims = CMVideoFormatDescriptionGetDimensions(desc)
-        videoDimensions = CGSize(width: CGFloat(dims.width), height: CGFloat(dims.height))
+        // 连接锁定为 portrait：传感器 format 为横向尺寸，需交换宽高得到竖屏显示宽高比，
+        // 否则预览 aspect-fit 区域与实际竖版照片不匹配，水印位置会偏移
+        videoDimensions = CGSize(width: CGFloat(dims.height), height: CGFloat(dims.width))
     }
 
     func start() {
@@ -195,6 +197,10 @@ struct CameraPreviewView: UIViewRepresentable {
     final class PreviewUIView: UIView {
         let layerRef = AVCaptureVideoPreviewLayer()
         var onChange: (() -> Void)?
+        /// 当前视频宽高比（切换摄像头后由 updateUIView 刷新）
+        var videoAspect: CGSize = CGSize(width: 4, height: 3) {
+            didSet { recomputeFit() }
+        }
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -207,21 +213,30 @@ struct CameraPreviewView: UIViewRepresentable {
         override func layoutSubviews() {
             super.layoutSubviews()
             layerRef.frame = bounds
-            onChange?()
+            recomputeFit()
+        }
+
+        private func recomputeFit() {
+            guard bounds.width > 0, bounds.height > 0 else { return }
+            let aspect = videoAspect.width > 0 && videoAspect.height > 0 ? videoAspect : CGSize(width: 4, height: 3)
+            onChange?(AVMakeRect(aspectRatio: aspect, insideRect: bounds))
         }
     }
 
     func makeUIView(context: Context) -> PreviewUIView {
         let view = PreviewUIView()
         view.layerRef.session = session
-        view.onChange = { [weak view] in
-            guard let view = view else { return }
-            let aspect = videoAspect.width > 0 && videoAspect.height > 0 ? videoAspect : CGSize(width: 4, height: 3)
-            let fit = AVMakeRect(aspectRatio: aspect, insideRect: view.bounds)
+        view.videoAspect = videoAspect
+        view.onChange = { [weak view] fit in
             onFitChange?(fit)
         }
         return view
     }
 
-    func updateUIView(_ uiView: PreviewUIView, context: Context) {}
+    func updateUIView(_ uiView: PreviewUIView, context: Context) {
+        // videoDimensions 变化（如切换前后摄）时刷新 aspect-fit 区域
+        if uiView.videoAspect != videoAspect {
+            uiView.videoAspect = videoAspect
+        }
+    }
 }
