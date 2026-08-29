@@ -55,7 +55,7 @@ struct DictionaryView: View {
                 }
             }
 
-            Section("不翻译白名单（\(whitelist.count)）") {
+            Section {
                 TextField("每行一个词，如：RGB / LED / pcs", text: $whitelistText, axis: .vertical)
                     .lineLimit(4...10)
                 Button("保存白名单") {
@@ -66,6 +66,8 @@ struct DictionaryView: View {
                     AppSettings.customWhitelist = cleaned
                 }
                 .disabled(whitelistText.isEmpty)
+            } header: {
+                Text("不翻译白名单（\(whitelist.count)）")
             } footer: {
                 Text("数字、货号、单位（m³、kg、pcs 等）自带白名单，无需重复添加。")
             }

@@ -61,7 +61,7 @@ final class ExportService {
             return d
         }
 
-        let baseName = sanitizeFileName(customFileName)
+        let baseName = sanitizeFileName(customFileName ?? "")
         let fileName = baseName + ".xlsx"
         let fileURL = StorageManager.shared.exportsDirectory.appendingPathComponent(fileName)
         try? FileManager.default.removeItem(at: fileURL)

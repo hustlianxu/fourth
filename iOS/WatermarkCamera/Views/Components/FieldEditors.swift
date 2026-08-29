@@ -112,9 +112,25 @@ private struct DateFieldRow: View {
     }
 
     var body: some View {
-        DatePicker("", selection: Binding(get: { dateValue }, set: { dateValue = $0 }),
+        DatePicker("", selection: Binding(get: { dateValue },
+                                          set: { value = formatted($0) }),
                    displayedComponents: displayComponents)
             .labelsHidden()
+    }
+
+    /// 按字段类型格式化 Date 为存储字符串（闭包内直接写 @Binding value，
+    /// 不能经由计算属性 setter——escaping 闭包中 self 不可变）
+    private func formatted(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        if showDate && showTime {
+            df.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        } else if showDate {
+            df.dateFormat = "yyyy-MM-dd"
+        } else {
+            df.dateFormat = "HH:mm:ss"
+        }
+        return df.string(from: date)
     }
 
     private var displayComponents: DatePickerComponents {

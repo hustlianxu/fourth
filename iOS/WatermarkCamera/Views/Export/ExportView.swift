@@ -114,7 +114,7 @@ struct ExportView: View {
                     .foregroundColor(selected.contains(rec.id) ? .accentColor : .secondary)
                 PhotoThumbnail(record: rec, size: 44)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(rec.values["modelo"]?.isEmpty == false ? "记录 · \(rec.values["modelo"] ?? "")" : "记录 \(Int(Date(timeIntervalSince1970: rec.createdAt)))")
+                    Text(rec.values["modelo"]?.isEmpty == false ? "记录 · \(rec.values["modelo"] ?? "")" : "记录 \(Int(rec.createdAt))")
                         .font(.subheadline)
                         .lineLimit(1)
                     Text(formatDateTime(Date(timeIntervalSince1970: rec.createdAt)))
