@@ -79,10 +79,12 @@ enum BuiltinTemplates {
                 values[f.key] = formatDateTime(now)
             case .date:
                 let df = DateFormatter()
+                df.locale = Locale(identifier: "en_US_POSIX")
                 df.dateFormat = "yyyy-MM-dd"
                 values[f.key] = df.string(from: now)
             case .time:
                 let tf = DateFormatter()
+                tf.locale = Locale(identifier: "en_US_POSIX")
                 tf.dateFormat = "HH:mm:ss"
                 values[f.key] = tf.string(from: now)
             case .select:

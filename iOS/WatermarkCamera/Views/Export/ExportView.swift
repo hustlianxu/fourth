@@ -189,8 +189,9 @@ struct ExportView: View {
 
     private static func defaultFileName() -> String {
         let f = DateFormatter()
-        f.dateFormat = "export_yyyyMMdd_HHmm"
-        return f.string(from: Date())
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyyMMdd_HHmm"
+        return "export_\(f.string(from: Date()))"
     }
 }
 

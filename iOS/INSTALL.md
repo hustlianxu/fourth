@@ -55,10 +55,14 @@ xcodegen generate
 
 1. 打开终端，执行第 1.2 节的 `xcodegen generate`。
 2. `open WatermarkCamera.xcodeproj` 用 Xcode 打开工程。
-3. 选中工程 → `TARGETS → WatermarkCamera → Signing & Capabilities`：
-   - 勾选 **Automatically manage signing**；
-   - Team 下拉框选择 **Add an Account…** → 登录你的 Apple ID；
-   - 添加后选择你的 Apple ID 个人团队（显示 "Personal Team"）。
+3. 配置签名（"选中工程"指的是 Xcode 左侧**文件导航区最顶部的蓝色工程图标 `WatermarkCamera`**，点击它之后，中间编辑区顶部会切换为工程设置页）：
+   - 点击左侧导航区顶部的蓝色 `WatermarkCamera` 工程图标；
+   - 中间编辑区会出现两级列表：左侧一栏是 **PROJECT / TARGETS**，右侧一栏是各目标；
+   - 先点左栏的 **TARGETS → WatermarkCamera**（注意：不是 PROJECT，PROJECT 里没有 Signing & Capabilities 签名页）；
+   - 顶部标签页选择 **Signing & Capabilities**：
+     - 勾选 **Automatically manage signing**；
+     - Team 下拉框选择 **Add an Account…** → 登录你的 Apple ID；
+     - 添加后选择你的 Apple ID 个人团队（显示 "Personal Team"）。
    - Bundle Identifier 保持 `com.watermark.camera`（或改成你自己的，须唯一）。
 4. 若 Xcode 提示 "No profiles for ... were found"，点 **Try Again** 即可自动生成。
 
@@ -86,6 +90,57 @@ xcodegen generate
 
 1. Xcode → Window → Devices and Simulators → 勾选你的 iPhone 的 **Connect via network**。
 2. 拔线后保持同一 Wi-Fi，Xcode 仍然可以部署调试。
+
+### 3.5 远程分发：把安装包发给异地手机安装
+
+以上方式 A（免费 Apple ID 直传）要求**手机连着你的 Mac**，无法远程分发。若对方手机不在你身边，按有无付费开发者账号选择以下方案：
+
+#### 方案一：TestFlight（推荐，需 ¥688/年 开发者账号）
+
+最正规的远程分发渠道，对方**无需电脑、无需数据线、无需 UDID**：
+
+1. 按第 5 节构建并上传 IPA 到 App Store Connect；
+2. 在 App Store Connect → 你的 App → **TestFlight** 页，等构建处理完成（约几分钟）；
+3. 添加测试员：输入对方邮箱（内部测试最多 100 人，立即生效；外部测试需简单审核，最多 10000 人）；
+4. 对方手机安装 **TestFlight** App（App Store 免费）→ 打开邮件邀请链接 → 点安装，即完成。
+
+- 有效期 90 天，重新上传新构建即可续期；
+- 数据仍在手机本机，与签名方式无关。
+
+#### 方案二：Ad Hoc + 安装链接（需开发者账号，登记对方 UDID）
+
+适合不想走 TestFlight 审核的内部小范围分发（最多 100 台/年）：
+
+1. 让对方获取 **UDID**：用 Safari 打开 `https://get.udid.io` 按提示安装描述文件，复制 UDID 发给你（或让对方 Mac/PC 连 iTunes 查看）；
+2. 开发者后台 developer.apple.com → Devices → 注册该 UDID；
+3. Xcode 打包时选择 **Ad Hoc** 分发方式导出 `.ipa`；
+4. 上传 `.ipa` 到内测分发平台（如 **Diawi**：`diawi.com`，免费拖拽上传），把生成的**安装链接**发给对方；
+5. 对方 Safari 打开链接 → 点 Install → 下载后到 设置→通用→VPN与设备管理 信任企业描述文件即可。
+
+- 有效期 1 年（付费证书周期）；
+- 也可直接把 `.ipa` 文件发给对方，用下方方案三安装。
+
+#### 方案三：把 IPA 发给对方自行侧载（零成本，双方免费 Apple ID 均可）
+
+无开发者账号时的唯一远程途径——**每个接收者用自己的免费 Apple ID 自签**：
+
+1. 你在本机 Xcode 用 Personal Team 签名后：`Product → Archive → Distribute App → Development` 导出 `.ipa`（或将工程源码直接发给对方）；
+2. 对方在自己电脑安装 **Sideloadly**（sideloadly.io，支持 Windows/macOS）或 **AltStore**（altstore.io）；
+3. 拖入 `.ipa`，输入**对方自己的** Apple ID 与密码 → 连接其手机安装；
+4. 对方手机上 信任开发者（同 3.3 节路径）。
+
+- 有效期 7 天，到期由对方在自己电脑上重装/续签（AltStore 可自动续签）；
+- 免费账号每台设备最多 3 个自签 App、每账号最多 10 台设备。
+
+#### 远程分发对比
+
+| 方案 | 费用 | 对方需要 | 有效期 | 人数 |
+|---|---|---|---|---|
+| TestFlight | ¥688/年 | 仅手机装 TestFlight | 90 天/构建 | 100 内测 + 10000 外测 |
+| Ad Hoc + Diawi | ¥688/年 | 提供 UDID + 手机点链接 | 1 年 | 100 台/年 |
+| IPA 自行侧载 | 免费 | 电脑 + 自己的 Apple ID | 7 天 | 不限 |
+
+> 无论哪种分发方式，App 内照片与 Excel 都保存在接收者手机本机，功能完全一致。
 
 ---
 
