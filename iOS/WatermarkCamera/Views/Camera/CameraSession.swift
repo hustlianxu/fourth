@@ -67,8 +67,9 @@ final class CameraSession: NSObject, ObservableObject {
     }
 
     private func updateVideoDimensions() {
-        guard let device = videoInput?.device,
-              let desc = device.activeFormat.formatDescription else { return }
+        guard let device = videoInput?.device else { return }
+        // formatDescription 在当前 SDK 为非可选，不能使用 guard let 解包
+        let desc = device.activeFormat.formatDescription
         let dims = CMVideoFormatDescriptionGetDimensions(desc)
 
         // 连接锁定为 portrait：传感器 format 为横向尺寸，需交换宽高得到竖屏显示宽高比，
@@ -200,7 +201,8 @@ struct CameraPreviewView: UIViewRepresentable {
 
     final class PreviewUIView: UIView {
         let layerRef = AVCaptureVideoPreviewLayer()
-        var onChange: (() -> Void)?
+        /// 预览回调：最新的视频 aspect-fit 区域（容器坐标系）
+        var onChange: ((CGRect) -> Void)?
         /// 当前视频宽高比（切换摄像头后由 updateUIView 刷新）
         var videoAspect: CGSize = CGSize(width: 4, height: 3) {
             didSet { recomputeFit() }
@@ -231,7 +233,7 @@ struct CameraPreviewView: UIViewRepresentable {
         let view = PreviewUIView()
         view.layerRef.session = session
         view.videoAspect = videoAspect
-        view.onChange = { [weak view] fit in
+        view.onChange = { fit in
             onFitChange?(fit)
         }
         return view
