@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 导出的 xlsx 目录（getExternalFilesDir/exports） -->
+    <external-files-path name="exports" path="exports/" />
+    <!-- 临时分享目录 -->
+    <cache-path name="cache" path="/" />
+</paths>
