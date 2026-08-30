@@ -186,6 +186,16 @@ final class StorageManager: ObservableObject {
 
     // MARK: - 文件夹
 
+    /// 名称是否已被现有文件夹占用（忽略首尾空白与大小写）
+    func folderNameExists(_ name: String) -> Bool {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty else { return false }
+        return folders.contains {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .caseInsensitiveCompare(n) == .orderedSame
+        }
+    }
+
     func addFolder(name: String) -> Folder {
         var folder = Folder(id: genId(prefix: "f"), name: name.isEmpty ? "未命名" : name,
                             createdAt: Date().timeIntervalSince1970, updatedAt: Date().timeIntervalSince1970)

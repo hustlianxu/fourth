@@ -11,10 +11,15 @@ struct HomeView: View {
     @State private var newFolderName = ""
     /// 待移动的记录 id（触发文件夹选择弹窗）
     @State private var moveRecordID: String?
+    /// 折叠的分组（文件夹 id；未分类用固定 key）
+    @State private var collapsedGroups: Set<String> = []
+    /// 待删除的文件夹 id
+    @State private var deleteFolderID: String?
 
     var body: some View {
         Group {
-            if storage.records.isEmpty {
+            // 记录为空但已建文件夹时仍显示列表：否则空文件夹不可见、无法删除
+            if storage.records.isEmpty && storage.folders.isEmpty {
                 emptyState
             } else {
                 recordList
@@ -63,6 +68,10 @@ struct HomeView: View {
             ExportView()
                 .environmentObject(storage)
         }
+        .sheet(isPresented: $showNewFolder) {
+            newFolderSheet
+                .environmentObject(storage)
+        }
         .confirmationDialog("移动到文件夹", isPresented: folderPickerBinding, titleVisibility: .visible) {
             Button("未分类") {
                 moveRecord(moveRecordID, to: nil)
@@ -73,16 +82,6 @@ struct HomeView: View {
                 }
             }
             Button("取消", role: .cancel) {}
-        }
-        .alert("新建文件夹", isPresented: $showNewFolder) {
-            TextField("文件夹名称", text: $newFolderName)
-            Button("创建") {
-                storage.addFolder(name: newFolderName)
-                newFolderName = ""
-            }
-            Button("取消", role: .cancel) {
-                newFolderName = ""
-            }
         }
     }
 
@@ -103,13 +102,17 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - 记录列表（文件夹分组）
+    // MARK: - 记录列表（文件夹分组，可折叠）
+
+    /// 未分类分组的折叠 key（与文件夹 id 区分）
+    private static let uncategorizedKey = "__uncategorized__"
 
     private var recordList: some View {
         List {
             let uncategorized = storage.records(inFolder: nil)
             if !uncategorized.isEmpty {
-                Section("未分类（\(uncategorized.count)）") {
+                groupSection(title: "未分类", key: Self.uncategorizedKey, count: uncategorized.count,
+                             showDelete: false) {
                     ForEach(uncategorized) { rec in
                         RecordRowView(record: rec, onMove: { id in
                             moveRecordID = id
@@ -119,21 +122,131 @@ struct HomeView: View {
                 }
             }
 
+            // 空文件夹也显示：否则创建后看不见，也无法删除
             ForEach(storage.folders) { folder in
                 let items = storage.records(inFolder: folder.id)
-                if !items.isEmpty {
-                    Section("\(folder.name)（\(items.count)）") {
-                        ForEach(items) { rec in
-                            RecordRowView(record: rec, onMove: { id in
-                                moveRecordID = id
-                            })
-                            .environmentObject(storage)
-                        }
+                groupSection(title: folder.name, key: folder.id, count: items.count,
+                             showDelete: true) {
+                    ForEach(items) { rec in
+                        RecordRowView(record: rec, onMove: { id in
+                            moveRecordID = id
+                        })
+                        .environmentObject(storage)
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .confirmationDialog("删除文件夹「\(pendingDeleteFolderName)」？",
+                            isPresented: folderDeleteBinding,
+                            titleVisibility: .visible) {
+            Button("删除（照片移至未分类）", role: .destructive) {
+                if let id = deleteFolderID {
+                    withAnimation { storage.removeFolder(id) }
+                    collapsedGroups.remove(id)
+                }
+                deleteFolderID = nil
+            }
+            Button("取消", role: .cancel) { deleteFolderID = nil }
+        } message: {
+            Text("文件夹内的照片会保留并移动到未分类")
+        }
+    }
+
+    /// 可折叠分组：点 header 切换折叠；文件夹分组长按 header 可删除
+    private func groupSection<Content: View>(title: String, key: String, count: Int,
+                                             showDelete: Bool,
+                                             @ViewBuilder content: () -> Content) -> some View {
+        let collapsed = collapsedGroups.contains(key)
+        return Section {
+            if !collapsed {
+                content()
+            }
+        } header: {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    if collapsed {
+                        collapsedGroups.remove(key)
+                    } else {
+                        collapsedGroups.insert(key)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .rotationEffect(.degrees(collapsed ? 0 : 90))
+                    Text("\(title)（\(count)）")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+                .padding(.vertical, 2)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                if showDelete {
+                    Button(role: .destructive) {
+                        deleteFolderID = key
+                    } label: {
+                        Label("删除文件夹", systemImage: "trash")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 新建文件夹（带重名校验）
+
+    /// 输入名称 trim 后为空或与现有文件夹重名时不可创建
+    private var trimmedNewFolderName: String {
+        newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var newFolderNameError: String? {
+        let n = trimmedNewFolderName
+        if n.isEmpty { return "名称不能为空" }
+        if storage.folderNameExists(n) { return "已存在同名文件夹" }
+        return nil
+    }
+
+    private var newFolderSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("文件夹名称", text: $newFolderName)
+                } header: {
+                    Text("名称")
+                } footer: {
+                    if let err = newFolderNameError {
+                        Label(err, systemImage: "exclamationmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("新建文件夹")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        newFolderName = ""
+                        showNewFolder = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("创建") {
+                        storage.addFolder(name: trimmedNewFolderName)
+                        newFolderName = ""
+                        showNewFolder = false
+                    }
+                    .disabled(newFolderNameError != nil)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 
     // MARK: - 悬浮快门
@@ -163,6 +276,18 @@ struct HomeView: View {
             get: { moveRecordID != nil },
             set: { if !$0 { moveRecordID = nil } }
         )
+    }
+
+    private var folderDeleteBinding: Binding<Bool> {
+        Binding(
+            get: { deleteFolderID != nil },
+            set: { if !$0 { deleteFolderID = nil } }
+        )
+    }
+
+    /// 待删除文件夹显示名（未找到时兜底空串，避免弹窗标题出现 optional）
+    private var pendingDeleteFolderName: String {
+        storage.folders.first(where: { $0.id == deleteFolderID })?.name ?? ""
     }
 
     private func moveRecord(_ id: String?, to folderID: String?) {
