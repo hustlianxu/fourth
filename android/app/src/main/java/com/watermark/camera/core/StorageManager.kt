@@ -131,13 +131,37 @@ object StorageManager {
 
     fun decodeScaled(f: File, maxDim: Int): Bitmap? {
         if (!f.exists()) return null
-        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(f.absolutePath, opts)
-        var sample = 1
-        while (max(opts.outWidth, opts.outHeight) / sample > maxDim * 2) sample *= 2
-        val real = BitmapFactory.Options().apply { inSampleSize = sample }
-        val bmp = BitmapFactory.decodeFile(f.absolutePath, real) ?: return null
-        return applyExifRotation(f, bmp)
+        return try {
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(f.absolutePath, opts)
+            val srcMax = max(opts.outWidth, opts.outHeight)
+            if (srcMax <= 0) return null
+
+            // 降采样：让解码后长边 ≤ maxDim（修复原公式 > maxDim*2 导致大图不降采样的 OOM）
+            var sample = 1
+            while (srcMax / sample > maxDim) sample *= 2
+
+            val real = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            val bmp = BitmapFactory.decodeFile(f.absolutePath, real) ?: return null
+
+            // 精确缩放：保证长边严格 ≤ maxDim
+            val decodedMax = max(bmp.width, bmp.height)
+            val scaled = if (decodedMax > maxDim) {
+                val s = maxDim.toFloat() / decodedMax
+                val sw = (bmp.width * s).toInt().coerceAtLeast(1)
+                val sh = (bmp.height * s).toInt().coerceAtLeast(1)
+                val r = Bitmap.createScaledBitmap(bmp, sw, sh, true)
+                if (r !== bmp) bmp.recycle()
+                r
+            } else bmp
+
+            applyExifRotation(f, scaled)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** 按 EXIF 方向摆正（相册选图/拍摄照片常带旋转标记） */
@@ -155,9 +179,14 @@ object StorageManager {
             if (rotation == 0f) bmp
             else {
                 val m = android.graphics.Matrix().apply { postRotate(rotation) }
-                Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                // 旋转产生了新位图，释放原图
+                if (rotated !== bmp) bmp.recycle()
+                rotated
             }
         } catch (_: Exception) {
+            bmp
+        } catch (_: OutOfMemoryError) {
             bmp
         }
     }

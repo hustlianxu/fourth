@@ -31,49 +31,60 @@ object PhotoSaver {
                      placement: OverlayPlacement,
                      canvasW: Float, canvasH: Float,
                      folderId: String?): Record? = withContext(Dispatchers.IO) {
-        val params = OverlayMapper.renderParams(template, values, placement,
-            canvasW, canvasH, image.width.toFloat(), image.height.toFloat())
-            ?: return@withContext null
-        val wmImage = WatermarkRenderer.render(template, values, image,
-            params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
-            ?: return@withContext null
+        try {
+            val params = OverlayMapper.renderParams(template, values, placement,
+                canvasW, canvasH, image.width.toFloat(), image.height.toFloat())
+                ?: return@withContext null
+            val wmImage = WatermarkRenderer.render(template, values, image,
+                params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
+                ?: return@withContext null
 
-        val id = genId("r")
-        val dir = StorageManager.recordDir(id)
-        dir.mkdirs()
-        val origFile = File(dir, StorageManager.origFile)
-        val wmFile = File(dir, StorageManager.wmFile)
-        origFile.writeBytes(bitmapBytes(image, 90))
-        wmFile.writeBytes(bitmapBytes(wmImage, 90))
-
-        val now = System.currentTimeMillis() / 1000
-        val rec = Record(
-            id = id, folderId = folderId, customName = null,
-            createdAt = now, updatedAt = now,
-            imagePath = "records/$id/${StorageManager.wmFile}",
-            originalPath = "records/$id/${StorageManager.origFile}",
-            width = wmImage.width, height = wmImage.height,
-            values = values.toMutableMap(),
-            deletedAt = null,
-            wmTemplateID = template.id,
-            wmPlacement = placement
-        )
-        StorageManager.addRecord(rec)
-
-        // 拍照后自动保存到系统相册（对齐 iOS autoSaveAlbum）
-        if (AppSettings.autoSaveAlbum) {
-            AlbumSaver.saveToAlbum(StorageManager.appContext, wmImage)
-        }
-
-        // 云端扩展点：仅在已配置（OSS/S3/WebDAV）时上传
-        if (CloudSyncManager.isConfigured) {
             try {
-                CloudSyncManager.provider.upload(
-                    localFile = wmFile,
-                    remotePath = "watermark/$id/${StorageManager.wmFile}")
-            } catch (_: Exception) { }
+                val id = genId("r")
+                val dir = StorageManager.recordDir(id)
+                dir.mkdirs()
+                val origFile = File(dir, StorageManager.origFile)
+                val wmFile = File(dir, StorageManager.wmFile)
+                origFile.writeBytes(bitmapBytes(image, 90))
+                wmFile.writeBytes(bitmapBytes(wmImage, 90))
+
+                val now = System.currentTimeMillis() / 1000
+                val rec = Record(
+                    id = id, folderId = folderId, customName = null,
+                    createdAt = now, updatedAt = now,
+                    imagePath = "records/$id/${StorageManager.wmFile}",
+                    originalPath = "records/$id/${StorageManager.origFile}",
+                    width = wmImage.width, height = wmImage.height,
+                    values = values.toMutableMap(),
+                    deletedAt = null,
+                    wmTemplateID = template.id,
+                    wmPlacement = placement
+                )
+                StorageManager.addRecord(rec)
+
+                // 拍照后自动保存到系统相册（对齐 iOS autoSaveAlbum）
+                if (AppSettings.autoSaveAlbum) {
+                    AlbumSaver.saveToAlbum(StorageManager.appContext, wmImage)
+                }
+
+                // 云端扩展点：仅在已配置（OSS/S3/WebDAV）时上传
+                if (CloudSyncManager.isConfigured) {
+                    try {
+                        CloudSyncManager.provider.upload(
+                            localFile = wmFile,
+                            remotePath = "watermark/$id/${StorageManager.wmFile}")
+                    } catch (_: Exception) { }
+                }
+                rec
+            } finally {
+                // 渲染产出的水印图用完即释放，避免与原图同时驻留导致内存峰值过高
+                if (wmImage !== image) wmImage.recycle()
+            }
+        } catch (_: Exception) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
         }
-        rec
     }
 
     /** 详情编辑后：按原位置/原模板重渲染并覆盖 wm.jpg（对齐 iOS rerenderValues） */
@@ -84,26 +95,38 @@ object PhotoSaver {
             val origFile = record.originalPath?.let { StorageManager.fileFor(it) }
                 ?: StorageManager.fileFor(record.imagePath)
                 ?: return@withContext false
-            val image = StorageManager.decodeScaled(origFile, 4096) ?: return@withContext false
+            val image = StorageManager.decodeScaled(origFile, 2048) ?: return@withContext false
 
-            // 用保存时记录的画布比例反推 canvasPoints，保证位置一致：
-            // 保存时 customX/customY 是图片像素坐标；直接按模板位置换算
-            val placement = record.wmPlacement ?: OverlayPlacement()
-            val params = OverlayMapper.renderParams(template, values, placement,
-                image.width * 1f, image.height * 1f, image.width.toFloat(), image.height.toFloat())
-                ?: return@withContext false
-            // renderParams 以画布=全图计算，等价于按记录位置重绘
-            val wmImage = WatermarkRenderer.render(template, values, image,
-                params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
-                ?: return@withContext false
-            val wmFile = StorageManager.fileFor(record.imagePath) ?: return@withContext false
-            wmFile.writeBytes(bitmapBytes(wmImage, 90))
-            record.values = values.toMutableMap()
-            record.width = wmImage.width
-            record.height = wmImage.height
-            record.updatedAt = System.currentTimeMillis() / 1000
-            StorageManager.updateRecord(record)
-            true
+            try {
+                // 用保存时记录的画布比例反推 canvasPoints，保证位置一致：
+                // 保存时 customX/customY 是图片像素坐标；直接按模板位置换算
+                val placement = record.wmPlacement ?: OverlayPlacement()
+                val params = OverlayMapper.renderParams(template, values, placement,
+                    image.width * 1f, image.height * 1f, image.width.toFloat(), image.height.toFloat())
+                    ?: return@withContext false
+                // renderParams 以画布=全图计算，等价于按记录位置重绘
+                val wmImage = WatermarkRenderer.render(template, values, image,
+                    params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
+                    ?: return@withContext false
+                try {
+                    val wmFile = StorageManager.fileFor(record.imagePath) ?: return@withContext false
+                    wmFile.writeBytes(bitmapBytes(wmImage, 90))
+                    record.values = values.toMutableMap()
+                    record.width = wmImage.width
+                    record.height = wmImage.height
+                    record.updatedAt = System.currentTimeMillis() / 1000
+                    StorageManager.updateRecord(record)
+                    true
+                } finally {
+                    if (wmImage !== image) wmImage.recycle()
+                }
+            } catch (_: Exception) {
+                false
+            } catch (_: OutOfMemoryError) {
+                false
+            } finally {
+                image.recycle()
+            }
         }
 
     /** 编辑已有记录：重新渲染并覆盖（对齐 iOS PhotoSaver.update） */
@@ -114,33 +137,43 @@ object PhotoSaver {
                        placement: OverlayPlacement,
                        canvasW: Float, canvasH: Float): Boolean =
         withContext(Dispatchers.IO) {
-            val rec = StorageManager.record(recordID) ?: return@withContext false
-            val params = OverlayMapper.renderParams(template, values, placement,
-                canvasW, canvasH, image.width.toFloat(), image.height.toFloat())
-                ?: return@withContext false
-            val wmImage = WatermarkRenderer.render(template, values, image,
-                params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
-                ?: return@withContext false
+            try {
+                val rec = StorageManager.record(recordID) ?: return@withContext false
+                val params = OverlayMapper.renderParams(template, values, placement,
+                    canvasW, canvasH, image.width.toFloat(), image.height.toFloat())
+                    ?: return@withContext false
+                val wmImage = WatermarkRenderer.render(template, values, image,
+                    params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
+                    ?: return@withContext false
 
-            val dir = StorageManager.recordDir(recordID)
-            val origFile = File(dir, StorageManager.origFile)
-            val wmFile = File(dir, StorageManager.wmFile)
-            if (!origFile.exists()) origFile.writeBytes(bitmapBytes(image, 90))
-            wmFile.writeBytes(bitmapBytes(wmImage, 90))
+                try {
+                    val dir = StorageManager.recordDir(recordID)
+                    val origFile = File(dir, StorageManager.origFile)
+                    val wmFile = File(dir, StorageManager.wmFile)
+                    if (!origFile.exists()) origFile.writeBytes(bitmapBytes(image, 90))
+                    wmFile.writeBytes(bitmapBytes(wmImage, 90))
 
-            rec.values = values.toMutableMap()
-            rec.wmTemplateID = template.id
-            rec.wmPlacement = placement
-            rec.width = wmImage.width
-            rec.height = wmImage.height
-            rec.updatedAt = System.currentTimeMillis() / 1000
-            StorageManager.updateRecord(rec)
+                    rec.values = values.toMutableMap()
+                    rec.wmTemplateID = template.id
+                    rec.wmPlacement = placement
+                    rec.width = wmImage.width
+                    rec.height = wmImage.height
+                    rec.updatedAt = System.currentTimeMillis() / 1000
+                    StorageManager.updateRecord(rec)
 
-            // 编辑保存时自动备份水印图到系统相册（对齐 iOS autoSaveEditAlbum）
-            if (AppSettings.autoSaveEditAlbum) {
-                AlbumSaver.saveToAlbum(StorageManager.appContext, wmImage)
+                    // 编辑保存时自动备份水印图到系统相册（对齐 iOS autoSaveEditAlbum）
+                    if (AppSettings.autoSaveEditAlbum) {
+                        AlbumSaver.saveToAlbum(StorageManager.appContext, wmImage)
+                    }
+                    true
+                } finally {
+                    if (wmImage !== image) wmImage.recycle()
+                }
+            } catch (_: Exception) {
+                false
+            } catch (_: OutOfMemoryError) {
+                false
             }
-            true
         }
 
     private fun bitmapBytes(bmp: Bitmap, quality: Int): ByteArray {

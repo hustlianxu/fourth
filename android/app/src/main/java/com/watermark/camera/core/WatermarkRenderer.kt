@@ -283,26 +283,37 @@ object WatermarkRenderer {
                customX: Float? = null, customY: Float? = null,
                customScale: Float = 1f, customScaleX: Float = 1f, customScaleY: Float = 1f,
                opacity: Float? = null): Bitmap? {
-        // 长边最大 4096
-        var imgW = image.width.toFloat()
-        var imgH = image.height.toFloat()
-        val maxEdge = 4096f
-        var bmp = image
-        if (max(imgW, imgH) > maxEdge) {
-            val s = maxEdge / max(imgW, imgH)
-            imgW = (imgW * s).roundToInt().toFloat()
-            imgH = (imgH * s).roundToInt().toFloat()
-            bmp = Bitmap.createScaledBitmap(image, imgW.toInt(), imgH.toInt(), true)
-        }
+        return try {
+            // 长边最大 2048（控制内存峰值，原 4096 在大屏设备上易 OOM）
+            var imgW = image.width.toFloat()
+            var imgH = image.height.toFloat()
+            val maxEdge = 2048f
+            var bmp = image
+            var scaledByUs = false
+            if (max(imgW, imgH) > maxEdge) {
+                val s = maxEdge / max(imgW, imgH)
+                imgW = (imgW * s).roundToInt().toFloat()
+                imgH = (imgH * s).roundToInt().toFloat()
+                bmp = Bitmap.createScaledBitmap(image, imgW.toInt(), imgH.toInt(), true)
+                scaledByUs = bmp !== image
+            }
 
-        val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
-        val canvas = Canvas(out)
-        val layout = computeLayout(template, values, imgW, imgH, customX, customY,
-            customScale, customScaleX, customScaleY) ?: return out
-        val op = opacity ?: (extractAlpha(template.style.backgroundRGBA) ?: 0.72f)
-        drawBlock(layout, canvas, layout.x, layout.y,
-            parseColor(template.style.backgroundRGBA, op))
-        return out
+            val out = bmp.copy(Bitmap.Config.ARGB_8888, true)
+            // copy 成功后可释放缩放中间位图
+            if (scaledByUs) bmp.recycle()
+
+            val canvas = Canvas(out)
+            val layout = computeLayout(template, values, imgW, imgH, customX, customY,
+                customScale, customScaleX, customScaleY) ?: return out
+            val op = opacity ?: (extractAlpha(template.style.backgroundRGBA) ?: 0.72f)
+            drawBlock(layout, canvas, layout.x, layout.y,
+                parseColor(template.style.backgroundRGBA, op))
+            out
+        } catch (_: Exception) {
+            null
+        } catch (_: OutOfMemoryError) {
+            null
+        }
     }
 
     /** 水印块尺寸（px），与 computeLayout 同参，用于预览与坐标换算 */

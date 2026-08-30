@@ -128,8 +128,13 @@ fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
     var capturing by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
 
-    // ImageCapture 实例（绑定相机时创建）
-    val imageCapture = remember { ImageCapture.Builder().build() }
+    // ImageCapture 实例（限制输出分辨率，避免华为等大底传感器输出 40MP+ 导致 OOM）
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setTargetResolution(android.util.Size(2048, 2048))
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .build()
+    }
 
     // 相机绑定（前后切换 / 闪光灯变化时重新绑定）
     val previewView = remember { PreviewView(context) }
@@ -199,18 +204,21 @@ fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
                 override fun onImageSaved(results: ImageCapture.OutputFileResults) {
                     scope.launch {
                         val rec = withContext(Dispatchers.IO) {
-                            // 解码（含 EXIF 摆正、长边 ≤4096 防 OOM）
-                            val image = StorageManager.decodeScaled(f, 4096)
+                            // 解码（含 EXIF 摆正、长边 ≤2048 防 OOM）
+                            val image = StorageManager.decodeScaled(f, 2048)
                             var saved: com.watermark.camera.core.Record? = null
                             if (image != null) {
-                                saved = runCatching {
+                                saved = try {
                                     PhotoSaver.save(
                                         image = image, template = template, values = values,
                                         placement = placement,
                                         canvasW = containerW, canvasH = containerH,
                                         folderId = null
                                     )
-                                }.getOrNull()
+                                } catch (_: Exception) { null }
+                                catch (_: OutOfMemoryError) { null }
+                                // 解码位图用完即释放
+                                image.recycle()
                             }
                             f.delete()
                             saved
