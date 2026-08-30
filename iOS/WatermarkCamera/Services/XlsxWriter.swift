@@ -3,13 +3,13 @@ import Foundation
 // MARK: - 真实 .xlsx 生成器（OOXML，图片字节嵌入）
 //
 // 为保证 iOS「文件/微信预览」（OfficeImportErrorDomain 912）与桌面 WPS/Office
-// 的兼容性，生成流程重写为：
+// 的兼容性，生成流程为：
 //   1. 先把全部 OOXML 部件（含 docProps 元数据）与图片字节写入临时目录；
-//   2. 用系统 NSFileCoordinator(.forUploading) 将目录打成 ZIP —— 由 Apple
-//      自带的 zip 实现（DEFLATE 压缩、合法时间戳、标准元数据），与主流
-//      表格软件生成的 .xlsx 完全一致；
-//   3. 系统 zip 因任何原因失败时，回退到内置 ZipStoreWriter（STORE 模式、
-//      合法 DOS 时间戳），保证导出不中断。
+//   2. 用内置 ZipStoreWriter 直接打包（STORE 模式、合法 DOS 时间戳、
+//      [Content_Types].xml 排序后位于包首）。
+//      不再用 NSFileCoordinator 系统 zip：其对目录打包的条目顺序/前缀随
+//      系统版本不确定，而自写写入器的每个字节都已用标准解析器逐字节验证，
+//      输出完全确定。
 //
 // 包结构：[Content_Types].xml / _rels/.rels / docProps/{app,core}.xml
 //   xl/workbook.xml / xl/_rels/workbook.xml.rels / xl/styles.xml
@@ -31,8 +31,6 @@ enum XlsxWriter {
         var recordIdx: Int
         var data: Data
     }
-
-    private enum ZipError: Error { case appleZipFailed }
 
     /// 构建 .xlsx 并写入指定路径
     /// - Parameters:
@@ -99,13 +97,9 @@ enum XlsxWriter {
             }
         }
 
-        // 3. 打包：优先系统 zip，失败回退内置 STORE 写入器
+        // 3. 打包：自写 ZIP 写入器（STORE 模式；[Content_Types].xml 排序后天然位于包首）
         try? FileManager.default.removeItem(at: fileURL)
-        do {
-            try appleZipDirectory(tmpRoot, to: fileURL)
-        } catch {
-            try storeZipDirectory(tmpRoot, to: fileURL)
-        }
+        try storeZipDirectory(tmpRoot, to: fileURL)
     }
 
     // MARK: - XML 部件
@@ -322,44 +316,7 @@ enum XlsxWriter {
 
     // MARK: - 打包
 
-    /// 系统 zip（NSFileCoordinator .forUploading 会把目录同步打包为 ZIP）
-    private static func appleZipDirectory(_ src: URL, to dest: URL) throws {
-        var coordError: NSError?
-        var copyError: Error?
-        let coordinator = NSFileCoordinator()
-        coordinator.coordinate(readingItemAt: src, options: .forUploading, error: &coordError) { zippedURL in
-            do {
-                try FileManager.default.copyItem(at: zippedURL, to: dest)
-            } catch {
-                copyError = error
-            }
-        }
-        if let e = coordError { throw e }
-        if let e = copyError { throw e }
-
-        // 校验产物确实是 ZIP，且首条目是包根的 [Content_Types].xml：
-        // 系统 zip 目录时可能把目录名作为顶层前缀打入包内，导致
-        // [Content_Types].xml 不在包根（Office/WPS 均会拒开），此时走回退
-        guard let first = firstEntryName(of: dest), first == "[Content_Types].xml"
-        else { throw ZipError.appleZipFailed }
-    }
-
-    /// 读取 ZIP 第一个 local file header 的条目名（失败返回 nil）
-    private static func firstEntryName(of url: URL) -> String? {
-        guard let h = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? h.close() }
-        guard let sig = try? h.read(upToCount: 4), sig.count == 4,
-              sig[0] == 0x50, sig[1] == 0x4B, sig[2] == 0x03, sig[3] == 0x04,
-              let rest = try? h.read(upToCount: 22), rest.count == 22
-        else { return nil }
-        // local header：sig(4) ver(2) flags(2) method(2) time(2) date(2)
-        //                crc(4) csize(4) usize(4) nameLen(2) extraLen(2)
-        let nameLen = Int(rest[18]) | (Int(rest[19]) << 8)
-        guard let name = try? h.read(upToCount: nameLen), name.count == nameLen else { return nil }
-        return String(data: name, encoding: .utf8)
-    }
-
-    /// 回退：内置 STORE 模式写 ZIP（[Content_Types].xml 排序后天然排在首位）
+    /// STORE 模式写 ZIP（[Content_Types].xml 排序后天然排在首位）
     private static func storeZipDirectory(_ src: URL, to dest: URL) throws {
         try? FileManager.default.removeItem(at: dest)
         let zip = try ZipStoreWriter(fileURL: dest)

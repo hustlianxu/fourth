@@ -106,8 +106,11 @@ final class ZipStoreWriter {
         Self.littleEndian(UInt16(0), into: &central)        // comment len
         Self.littleEndian(UInt16(0), into: &central)        // disk number
         Self.littleEndian(UInt16(0), into: &central)        // internal attrs
-        Self.littleEndian(UInt16(0), into: &central)        // external attrs
-        Self.littleEndian(localOffset, into: &central)       // local header offset
+        // external attrs 必须是 4 字节（UInt32）！此前误写 UInt16 导致每个
+        // 中央目录条目少 2 字节，后续条目解析错位，整个包损坏
+        // （Office/WPS 报“无法识别的格式”、iOS 报 912 的直接原因）
+        Self.littleEndian(UInt32(0), into: &central)        // external attrs
+        Self.littleEndian(localOffset, into: &central)      // local header offset
         central.append(nameData)
 
         centralDirectory.append(central)

@@ -153,7 +153,9 @@ struct HomeView: View {
         }
     }
 
-    /// 可折叠分组：点 header 切换折叠；文件夹分组长按 header 可删除
+    /// 可折叠分组：点标题区切换折叠；文件夹分组尾部「…」按钮触发删除
+    /// （不用 contextMenu：header 整体是 Button 时长按手势会被按压吞掉；
+    ///   swipeActions 也只对列表行生效、对 Section header 无效）
     private func groupSection<Content: View>(title: String, key: String, count: Int,
                                              showDelete: Bool,
                                              @ViewBuilder content: () -> Content) -> some View {
@@ -163,36 +165,45 @@ struct HomeView: View {
                 content()
             }
         } header: {
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                    if collapsed {
-                        collapsedGroups.remove(key)
-                    } else {
-                        collapsedGroups.insert(key)
+            HStack(spacing: 0) {
+                // 标题区：点击折叠/展开
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        if collapsed {
+                            collapsedGroups.remove(key)
+                        } else {
+                            collapsedGroups.insert(key)
+                        }
                     }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .rotationEffect(.degrees(collapsed ? 0 : 90))
+                        Text("\(title)（\(count)）")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 2)
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .rotationEffect(.degrees(collapsed ? 0 : 90))
-                    Text("\(title)（\(count)）")
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer()
-                }
-                .foregroundStyle(.secondary)
-                .contentShape(Rectangle())
-                .padding(.vertical, 2)
-            }
-            .buttonStyle(.plain)
-            .contextMenu {
+                .buttonStyle(.plain)
+
+                // 文件夹分组：显式「…」删除入口（点按即触发，不依赖长按）
                 if showDelete {
-                    Button(role: .destructive) {
+                    Button {
                         deleteFolderID = key
                     } label: {
-                        Label("删除文件夹", systemImage: "trash")
+                        Image(systemName: "ellipsis")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 34, height: 28)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("删除文件夹 \(title)")
                 }
             }
         }
