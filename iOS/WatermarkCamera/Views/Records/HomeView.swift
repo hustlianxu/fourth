@@ -188,6 +188,9 @@ struct HomeView: View {
     /// 单条记录行：多选模式下点击切换选中，否则进入详情
     private func recordRow(_ rec: Record) -> some View {
         RecordRowView(record: rec,
+                      onMove: { id in
+                          moveRecordID = id
+                      },
                       selectionMode: selectionMode,
                       isSelected: selectedRecordIDs.contains(rec.id),
                       onToggleSelect: {
@@ -196,9 +199,6 @@ struct HomeView: View {
                           } else {
                               selectedRecordIDs.insert(rec.id)
                           }
-                      },
-                      onMove: { id in
-                          moveRecordID = id
                       })
             .environmentObject(storage)
     }
