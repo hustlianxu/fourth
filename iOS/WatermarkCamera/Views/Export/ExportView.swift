@@ -17,11 +17,21 @@ struct ExportView: View {
     @State private var errorMessage: String?
     /// 图片压缩选项（默认压缩至 1MB 内，避免 iOS 预览打不开大文件）
     @State private var compression: ExportImageCompression = .under1MB
+    /// 导出排序（列表展示顺序 = 实际导出行顺序）
+    @State private var sortOrder: ExportSortOrder = .newestFirst
 
     private var scopeRecords: [Record] {
         // nil = 全部记录；records(inFolder: nil) 只返回未分类，不能用于"全部"
-        guard let folderID = filterFolderID else { return storage.records }
-        return storage.records(inFolder: folderID)
+        let base: [Record]
+        if let folderID = filterFolderID {
+            base = storage.records(inFolder: folderID)
+        } else {
+            base = storage.records
+        }
+        // 按所选顺序排列：列表所见顺序即导出到 Excel 的行顺序
+        return base.sorted { a, b in
+            sortOrder == .newestFirst ? a.createdAt > b.createdAt : a.createdAt < b.createdAt
+        }
     }
 
     var body: some View {
@@ -60,6 +70,21 @@ struct ExportView: View {
                     Text("图片压缩")
                 } footer: {
                     Text(compressionEstimateText)
+                }
+
+                // 导出排序
+                Section {
+                    Picker("排序", selection: $sortOrder) {
+                        ForEach(ExportSortOrder.allCases) { o in
+                            Text(o.displayName).tag(o)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: {
+                    Text("导出排序")
+                } footer: {
+                    Text("决定每张图片在 Excel 中的行顺序；下方列表的排列顺序即导出后的行顺序。")
                 }
 
                 // 记录选择

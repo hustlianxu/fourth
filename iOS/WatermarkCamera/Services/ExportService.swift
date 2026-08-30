@@ -40,6 +40,25 @@ enum ExportImageCompression: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - 导出排序
+
+/// 导出 Excel 时记录（图片）行的排列顺序
+enum ExportSortOrder: String, CaseIterable, Identifiable {
+    /// 时间倒序：最新照片排第一行
+    case newestFirst
+    /// 时间正序：最早照片排第一行
+    case oldestFirst
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .newestFirst: return "时间倒序（最新在前）"
+        case .oldestFirst: return "时间正序（最早在前）"
+        }
+    }
+}
+
 // MARK: - 导出服务
 //
 // 对齐小程序 utils/exporter.js：
