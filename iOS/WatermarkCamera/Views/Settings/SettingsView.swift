@@ -5,11 +5,12 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var storage: StorageManager
     @State private var exportFiles: [URL] = []
+    @State private var showClearExportsConfirm = false
 
     var body: some View {
         List {
             // 存储
-            Section("存储") {
+            Section {
                 LabeledContent("本机占用") {
                     Text(formatBytes(storage.totalStorageBytes()))
                 }
@@ -17,6 +18,10 @@ struct SettingsView: View {
                     TrashView()
                         .environmentObject(storage)
                 }
+            } header: {
+                Text("存储")
+            } footer: {
+                Text("每张照片保存两份（干净原图 + 水印成品图），移入回收站的照片在彻底删除前仍占用空间；导出的 Excel 文件单独列在下方。清理途径：回收站彻底删除、删除不需要的照片、清空导出文件。")
             }
 
             // 拍摄
@@ -108,7 +113,7 @@ struct SettingsView: View {
 
             // 导出文件
             if !exportFiles.isEmpty {
-                Section("导出文件（.xlsx）") {
+                Section {
                     ForEach(exportFiles, id: \.self) { url in
                         HStack {
                             Image(systemName: "doc.richtext")
@@ -132,6 +137,13 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    Button(role: .destructive) {
+                        showClearExportsConfirm = true
+                    } label: {
+                        Text("清空全部导出文件")
+                    }
+                } header: {
+                    Text("导出文件（.xlsx）")
                 }
             }
 
@@ -149,6 +161,17 @@ struct SettingsView: View {
         .navigationTitle("设置")
         .onAppear {
             refreshExportFiles()
+        }
+        .confirmationDialog("清空全部 \(exportFiles.count) 个导出文件？",
+                            isPresented: $showClearExportsConfirm,
+                            titleVisibility: .visible) {
+            Button("清空", role: .destructive) {
+                for url in exportFiles {
+                    try? FileManager.default.removeItem(at: url)
+                }
+                refreshExportFiles()
+            }
+            Button("取消", role: .cancel) {}
         }
     }
 

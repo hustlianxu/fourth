@@ -146,6 +146,22 @@ final class StorageManager: ObservableObject {
         save()
     }
 
+    /// 批量移入回收站（一次落盘，避免逐条触发 JSON 重写）
+    func batchMoveToTrash(_ ids: Set<String>) {
+        guard !ids.isEmpty else { return }
+        let now = Date().timeIntervalSince1970
+        var trashed: [Record] = []
+        for r in records where ids.contains(r.id) {
+            var x = r
+            x.deletedAt = now
+            trashed.append(x)
+        }
+        guard !trashed.isEmpty else { return }
+        trash.insert(contentsOf: trashed, at: 0)
+        records.removeAll { ids.contains($0.id) }
+        save()
+    }
+
     func restoreFromTrash(_ id: String) {
         guard let i = trash.firstIndex(where: { $0.id == id }) else { return }
         var r = trash.remove(at: i)

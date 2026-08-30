@@ -18,7 +18,7 @@ struct ExportView: View {
     /// 图片压缩选项（默认压缩至 1MB 内，避免 iOS 预览打不开大文件）
     @State private var compression: ExportImageCompression = .under1MB
     /// 导出排序（列表展示顺序 = 实际导出行顺序）
-    @State private var sortOrder: ExportSortOrder = .newestFirst
+    @State private var sortOrder: ExportSortOrder = .createdAtDesc
 
     private var scopeRecords: [Record] {
         // nil = 全部记录；records(inFolder: nil) 只返回未分类，不能用于"全部"
@@ -29,9 +29,7 @@ struct ExportView: View {
             base = storage.records
         }
         // 按所选顺序排列：列表所见顺序即导出到 Excel 的行顺序
-        return base.sorted { a, b in
-            sortOrder == .newestFirst ? a.createdAt > b.createdAt : a.createdAt < b.createdAt
-        }
+        return sortOrder.sort(base)
     }
 
     var body: some View {

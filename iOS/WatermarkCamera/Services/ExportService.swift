@@ -44,17 +44,35 @@ enum ExportImageCompression: String, CaseIterable, Identifiable {
 
 /// 导出 Excel 时记录（图片）行的排列顺序
 enum ExportSortOrder: String, CaseIterable, Identifiable {
-    /// 时间倒序：最新照片排第一行
-    case newestFirst
-    /// 时间正序：最早照片排第一行
-    case oldestFirst
+    /// 创建时间倒序：最新照片排第一行
+    case createdAtDesc
+    /// 创建时间正序：最早照片排第一行
+    case createdAtAsc
+    /// 更新时间倒序：最近编辑过的排第一行
+    case updatedAtDesc
+    /// 更新时间正序：最久未编辑的排第一行
+    case updatedAtAsc
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .newestFirst: return "时间倒序（最新在前）"
-        case .oldestFirst: return "时间正序（最早在前）"
+        case .createdAtDesc: return "创建时间倒序（最新在前）"
+        case .createdAtAsc: return "创建时间正序（最早在前）"
+        case .updatedAtDesc: return "更新时间倒序（最近编辑在前）"
+        case .updatedAtAsc: return "更新时间正序（最久未编辑在前）"
+        }
+    }
+
+    /// 按此顺序排序记录
+    func sort(_ records: [Record]) -> [Record] {
+        records.sorted { a, b in
+            switch self {
+            case .createdAtDesc: return a.createdAt > b.createdAt
+            case .createdAtAsc: return a.createdAt < b.createdAt
+            case .updatedAtDesc: return a.updatedAt > b.updatedAt
+            case .updatedAtAsc: return a.updatedAt < b.updatedAt
+            }
         }
     }
 }
