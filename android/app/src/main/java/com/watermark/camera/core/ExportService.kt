@@ -59,6 +59,20 @@ object PhotoSaver {
             wmPlacement = placement
         )
         StorageManager.addRecord(rec)
+
+        // 拍照后自动保存到系统相册（对齐 iOS autoSaveAlbum）
+        if (AppSettings.autoSaveAlbum) {
+            AlbumSaver.saveToAlbum(StorageManager.appContext, wmImage)
+        }
+
+        // 云端扩展点：仅在已配置（OSS/S3/WebDAV）时上传
+        if (CloudSyncManager.isConfigured) {
+            try {
+                CloudSyncManager.provider.upload(
+                    localFile = wmFile,
+                    remotePath = "watermark/$id/${StorageManager.wmFile}")
+            } catch (_: Exception) { }
+        }
         rec
     }
 
@@ -70,7 +84,7 @@ object PhotoSaver {
             val origFile = record.originalPath?.let { StorageManager.fileFor(it) }
                 ?: StorageManager.fileFor(record.imagePath)
                 ?: return@withContext false
-            val image = BitmapFactory.decodeFile(origFile.absolutePath) ?: return@withContext false
+            val image = StorageManager.decodeScaled(origFile, 4096) ?: return@withContext false
 
             // 用保存时记录的画布比例反推 canvasPoints，保证位置一致：
             // 保存时 customX/customY 是图片像素坐标；直接按模板位置换算
@@ -121,6 +135,11 @@ object PhotoSaver {
             rec.height = wmImage.height
             rec.updatedAt = System.currentTimeMillis() / 1000
             StorageManager.updateRecord(rec)
+
+            // 编辑保存时自动备份水印图到系统相册（对齐 iOS autoSaveEditAlbum）
+            if (AppSettings.autoSaveEditAlbum) {
+                AlbumSaver.saveToAlbum(StorageManager.appContext, wmImage)
+            }
             true
         }
 
@@ -211,13 +230,19 @@ object ExportService {
 
     /**
      * 导出 Excel：图片 + 记录字段 + 时间。
+     * @param onProgress 翻译/导出进度回调（如 "批量翻译 3 条描述..."）
      * @return 生成的文件
      */
     suspend fun exportExcel(records: List<Record>,
                             template: WatermarkTemplate,
-                            compression: ExportImageCompression): File? =
+                            compression: ExportImageCompression,
+                            translate: Boolean = true,
+                            onProgress: ((String) -> Unit)? = null): File? =
         withContext(Dispatchers.IO) {
             if (records.isEmpty()) return@withContext null
+
+            // 翻译预处理：desEs/desZh 空缺时自动补全（对齐 iOS preTranslateRecords）
+            val effectiveRecords = if (translate) preTranslateRecords(records, onProgress) else records
 
             // 列：图片 + 名称 + 模板字段 + 拍摄时间
             val columns = mutableListOf(
@@ -234,7 +259,7 @@ object ExportService {
             val imgDisplayHeights = mutableListOf<Int>()
             val imageBytesCache = mutableMapOf<String, ByteArray?>()
 
-            records.forEach { rec ->
+            effectiveRecords.forEach { rec ->
                 val row = mutableMapOf(
                     "imagePath" to rec.imagePath,
                     "customName" to (rec.customName ?: rec.values["modelo"] ?: ""),
@@ -301,5 +326,59 @@ object ExportService {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, "分享导出文件"))
+    }
+
+    // MARK: - 翻译预处理（对齐 iOS preTranslateRecords）
+
+    /**
+     * desEs/desZh 空缺时按文本真实语言自动补全。
+     * 返回翻译后的记录副本（原记录不变）。
+     */
+    private suspend fun preTranslateRecords(records: List<Record>,
+                                             onProgress: ((String) -> Unit)?): List<Record> {
+        data class Task(val recordIdx: Int, val from: String, val to: String,
+                        val text: String, val fillTo: String,
+                        val moveOriginalTo: String?, val original: String)
+
+        val copies = records.map { it.copy(values = it.values.toMutableMap()) }.toMutableList()
+        val tasks = mutableListOf<Task>()
+        for ((i, rec) in copies.withIndex()) {
+            val desEs = (rec.values["desEs"] ?: "").trim()
+            val desZh = (rec.values["desZh"] ?: "").trim()
+
+            if (desEs.isNotEmpty() && desZh.isEmpty()) {
+                when (TranslatorService.detectLang(desEs)) {
+                    "zh" -> tasks.add(Task(i, "zh", "es", desEs, "desEs", "desZh", desEs))
+                    "es" -> tasks.add(Task(i, "es", "zh", desEs, "desZh", null, desEs))
+                }
+            } else if (desZh.isNotEmpty() && desEs.isEmpty()) {
+                when (TranslatorService.detectLang(desZh)) {
+                    "zh" -> tasks.add(Task(i, "zh", "es", desZh, "desEs", null, desZh))
+                    "es" -> tasks.add(Task(i, "es", "zh", desZh, "desEs", null, desZh))
+                }
+            }
+        }
+
+        if (tasks.isEmpty()) return copies
+        onProgress?.invoke("批量翻译 ${tasks.size} 条描述...")
+
+        val items = tasks.map { TranslatorService.BatchItem(it.text, it.from, it.to) }
+        val results = TranslatorService.translateBatch(items)
+        for (idx in results.indices) {
+            val r = results[idx]
+            val t = tasks[idx]
+            if (r.result.isEmpty()) continue
+            val translated = r.source != "local_no_api" && r.source != "local_api_fail"
+            val rec = copies[t.recordIdx]
+            if (translated) {
+                rec.values[t.fillTo] = r.result
+                t.moveOriginalTo?.let { rec.values[it] = t.original }
+            } else if (t.moveOriginalTo != null) {
+                rec.values[t.fillTo] = ""
+                rec.values[t.moveOriginalTo] = t.original
+            }
+            copies[t.recordIdx] = rec
+        }
+        return copies
     }
 }

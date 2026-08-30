@@ -1,7 +1,6 @@
 package com.watermark.camera.ui
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -63,6 +63,8 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 // MARK: - 照片水印编辑器（完整显示图片 + 手势编辑水印 + 浮动内容面板）
+//
+// 入口：相册选图（新记录）/ 记录「重新编辑水印」（已有记录）
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,12 +95,14 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
     var showContentPanel by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
-    var fitRect by remember { mutableStateOf(androidx.compose.ui.geometry.Rect(0f, 0f, 0f, 0f)) }
+    var placementInitialized by remember { mutableStateOf(false) }
+    var canvasW by remember { mutableStateOf(0f) }
+    var canvasH by remember { mutableStateOf(0f) }
 
-    // 预解码原图（后台，避免白屏）
+    // 预解码原图（后台、限制长边避免大图 OOM）
     val bitmap by produceState<Bitmap?>(null, filePath) {
         value = withContext(Dispatchers.IO) {
-            filePath?.let { BitmapFactory.decodeFile(it) }
+            filePath?.let { StorageManager.decodeScaled(java.io.File(it), 4096) }
         }
     }
 
@@ -124,8 +128,22 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
                 val dispH = bmp.height * scale
                 val imgLeft = (boxW - dispW) / 2
                 val imgTop = (boxH - dispH) / 2
-                fitRect = androidx.compose.ui.geometry.Rect(
-                    imgLeft, imgTop, imgLeft + dispW, imgTop + dispH)
+
+                // 保存用的画布尺寸（图像显示区）——SideEffect 中写入避免反向写入
+                SideEffect {
+                    if (canvasW != dispW || canvasH != dispH) {
+                        canvasW = dispW; canvasH = dispH
+                    }
+                }
+
+                // 首次就绪时按模板预设位置初始化
+                LaunchedEffect(template.id, dispW, dispH) {
+                    if (!placementInitialized && dispW > 0 && dispH > 0
+                        && record?.wmPlacement == null) {
+                        placement = OverlayMapper.defaultPlacement(template, dispW, dispH)
+                        placementInitialized = true
+                    }
+                }
 
                 Image(
                     bitmap = bmp.asImageBitmap(),
@@ -135,22 +153,17 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
                 )
 
                 // 水印浮层（以图像显示区为画布，位置与保存映射一致）
-                Box(
-                    Modifier.padding(0.dp)
-                        .absoluteOffsetPx(imgLeft.roundToInt(), imgTop.roundToInt())
-                ) {
-                    Box(Modifier.size(dispW.dp, dispH.dp)) {
-                        WatermarkOverlay(
-                            template = template,
-                            values = values,
-                            containerWidth = dispW,
-                            containerHeight = dispH,
-                            placement = placement,
-                            interactive = true,
-                            onTap = { showContentPanel = !showContentPanel },
-                            onPlacementChange = { placement = it }
-                        )
-                    }
+                Box(Modifier.absoluteOffsetPx(imgLeft.roundToInt(), imgTop.roundToInt())) {
+                    WatermarkOverlay(
+                        template = template,
+                        values = values,
+                        containerWidth = dispW,
+                        containerHeight = dispH,
+                        placement = placement,
+                        interactive = true,
+                        onTap = { showContentPanel = !showContentPanel },
+                        onPlacementChange = { placement = it }
+                    )
                 }
             }
 
@@ -166,32 +179,38 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
                 Row {
                     // 归位按钮：恢复模板预设位置
                     OutlinedButton(onClick = {
-                        if (fitRect.width > 0 && fitRect.height > 0) {
-                            placement = OverlayMapper.defaultPlacement(
-                                template, fitRect.width, fitRect.height)
+                        if (canvasW > 0 && canvasH > 0) {
+                            placement = OverlayMapper.defaultPlacement(template, canvasW, canvasH)
                         }
                     }) { Text("归位", color = Color.White) }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
                             if (saving) return@Button
+                            if (canvasW <= 0 || canvasH <= 0) {
+                                toast = "画布尚未就绪，请稍候重试"; return@Button
+                            }
                             saving = true
                             val b = bmp
                             scope.launch {
-                                val ok = if (isNew) {
-                                    PhotoSaver.save(
-                                        image = b, template = template, values = values,
-                                        placement = placement,
-                                        canvasW = fitRect.width, canvasH = fitRect.height,
-                                        folderId = null
-                                    ) != null
-                                } else {
-                                    PhotoSaver.update(
-                                        recordID = record?.id ?: "", image = b,
-                                        template = template, values = values,
-                                        placement = placement,
-                                        canvasW = fitRect.width, canvasH = fitRect.height
-                                    )
+                                val ok = withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        if (isNew) {
+                                            PhotoSaver.save(
+                                                image = b, template = template, values = values,
+                                                placement = placement,
+                                                canvasW = canvasW, canvasH = canvasH,
+                                                folderId = null
+                                            ) != null
+                                        } else {
+                                            PhotoSaver.update(
+                                                recordID = record?.id ?: "", image = b,
+                                                template = template, values = values,
+                                                placement = placement,
+                                                canvasW = canvasW, canvasH = canvasH
+                                            )
+                                        }
+                                    }.getOrDefault(false)
                                 }
                                 saving = false
                                 if (ok) {
@@ -241,7 +260,9 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
                         template.fields.forEach { f ->
                             OutlinedTextField(
                                 value = values[f.key] ?: "",
-                                onValueChange = { values[f.key] = it },
+                                onValueChange = { text ->
+                                    values = values.toMutableMap().apply { put(f.key, text) }
+                                },
                                 label = { Text(f.label) },
                                 placeholder = f.placeholder?.let { p -> { Text(p) } },
                                 minLines = if (f.multiline) 2 else 1,

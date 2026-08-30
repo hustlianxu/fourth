@@ -68,13 +68,14 @@ fun WatermarkOverlay(
         placement.scale.toFloat(), placement.scaleX.toFloat(), placement.scaleY.toFloat()
     ) ?: return
 
-    // 预览位图：scale 变化时重渲染（量化到 5% 步进，降低重建频率）
+    // 预览位图：scale/内容变化时重渲染（scale 量化到 5% 步进，降低重建频率）
     val renderKey = remember(placement.scale, placement.scaleX, placement.scaleY,
         containerWidth, template, values) {
-        Triple(
+        listOf(
             (placement.scale * 20).roundToInt(),
             (placement.scaleX * 20).roundToInt(),
-            (placement.scaleY * 20).roundToInt()
+            (placement.scaleY * 20).roundToInt(),
+            values.hashCode()
         )
     }
     val blockBitmap = remember(renderKey) {

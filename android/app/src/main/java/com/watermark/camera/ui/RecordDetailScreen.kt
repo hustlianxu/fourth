@@ -212,7 +212,9 @@ fun RecordDetailScreen(recordId: String,
                     template.fields.forEach { f ->
                         OutlinedTextField(
                             value = values[f.key] ?: "",
-                            onValueChange = { values[f.key] = it },
+                            onValueChange = { text ->
+                                values = values.toMutableMap().apply { put(f.key, text) }
+                            },
                             label = { Text(f.label) },
                             placeholder = f.placeholder?.let { p -> { Text(p) } },
                             minLines = if (f.multiline) 2 else 1,

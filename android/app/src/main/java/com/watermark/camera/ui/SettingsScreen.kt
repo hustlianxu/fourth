@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -36,18 +37,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.watermark.camera.core.AppSettings
 import com.watermark.camera.core.BuiltinTemplates
+import com.watermark.camera.core.CloudSyncManager
 import com.watermark.camera.core.ExportService
 import com.watermark.camera.core.StorageManager
 import com.watermark.camera.core.formatBytes
 
-// MARK: - 设置（模板/存储/回收站/导出文件）
+// MARK: - 设置（模板/拍摄/翻译/存储/云端扩展/回收站/导出文件）
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit,
                    onOpenTrash: () -> Unit,
-                   onOpenTemplateEditor: (String?) -> Unit) {
+                   onOpenTemplateEditor: (String?) -> Unit,
+                   onOpenDictionary: () -> Unit,
+                   onOpenTranslationConfig: () -> Unit) {
     val context = LocalContext.current
     val storage = StorageManager
     var clearExportsConfirm by remember { mutableStateOf(false) }
@@ -119,6 +124,103 @@ fun SettingsScreen(onBack: () -> Unit,
                 Spacer(Modifier.padding(4.dp))
                 Text("新建模板")
             }
+
+            Divider(Modifier.padding(vertical = 12.dp))
+
+            // 拍摄
+            Text(
+                "拍摄",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("拍照后保存到系统相册", Modifier.weight(1f))
+                Switch(
+                    checked = AppSettings.autoSaveAlbum,
+                    onCheckedChange = { AppSettings.updateAutoSaveAlbum(it) }
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("编辑保存时也备份到相册", Modifier.weight(1f))
+                Switch(
+                    checked = AppSettings.autoSaveEditAlbum,
+                    onCheckedChange = { AppSettings.updateAutoSaveEditAlbum(it) }
+                )
+            }
+
+            Divider(Modifier.padding(vertical = 12.dp))
+
+            // 翻译引擎
+            Text(
+                "翻译引擎",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            OutlinedButton(
+                onClick = onOpenDictionary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp).fillMaxWidth()
+            ) { Text("自定义词典") }
+            OutlinedButton(
+                onClick = onOpenTranslationConfig,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp).fillMaxWidth()
+            ) { Text("翻译接口配置") }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("优先调用大模型翻译", Modifier.weight(1f))
+                Switch(
+                    checked = AppSettings.llmFirst,
+                    onCheckedChange = { AppSettings.updateLlmFirst(it) }
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("允许使用免费在线词典（MyMemory）", Modifier.weight(1f))
+                Switch(
+                    checked = AppSettings.freeDictEnabled,
+                    onCheckedChange = { AppSettings.updateFreeDictEnabled(it) }
+                )
+            }
+            Text(
+                "导出时描述（西语/中文）空缺会自动翻译补全：优先本地词典，其次免费词典，最后大模型接口。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            Divider(Modifier.padding(vertical = 12.dp))
+
+            // 云端存储（预留扩展）
+            Text(
+                "云端存储（扩展）",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("当前模式", Modifier.weight(1f))
+                Text(
+                    CloudSyncManager.provider.displayName,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                "当前为纯本机模式，照片与 Excel 全部保存在手机内，不受存储配额限制。后续接入 OSS / S3 / NAS(WebDAV) 后，可在应用内配置远端地址自动同步。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
 
             Divider(Modifier.padding(vertical = 12.dp))
 

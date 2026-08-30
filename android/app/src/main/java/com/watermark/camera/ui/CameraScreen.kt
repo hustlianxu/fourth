@@ -30,10 +30,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -49,6 +53,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,18 +68,40 @@ import androidx.core.content.ContextCompat
 import com.watermark.camera.core.BuiltinTemplates
 import com.watermark.camera.core.OverlayMapper
 import com.watermark.camera.core.OverlayPlacement
+import com.watermark.camera.core.PhotoSaver
 import com.watermark.camera.core.StorageManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 // MARK: - 相机拍摄页（实时水印浮层 + 字段面板 + 拍摄/相册选图）
+//
+// 行为对齐 iOS CameraCaptureView：
+//   - 顶部：关闭 / 闪光灯（拍照瞬间生效）/ 前后摄像头切换
+//   - 底部：相册选图（进编辑器）/ 快门 / 字段面板开关
+//   - 拍照后直接渲染水印保存为记录并关闭相机页（不进编辑器）
+//   - 相册选图进入编辑器编辑后保存
+
+private suspend fun awaitCameraProvider(context: android.content.Context): ProcessCameraProvider =
+    kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        val future = ProcessCameraProvider.getInstance(context)
+        future.addListener({
+            try { cont.resume(future.get()) }
+            catch (e: Exception) { cont.resumeWithException(e) }
+        }, ContextCompat.getMainExecutor(context))
+    }
 
 @Composable
-fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
+fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -95,37 +122,71 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
     var placementInitialized by remember { mutableStateOf(false) }
     var showFields by rememberSaveable { mutableStateOf(false) }
     var templateMenuOpen by remember { mutableStateOf(false) }
+    var flashOn by rememberSaveable { mutableStateOf(false) }
+    var frontCamera by rememberSaveable { mutableStateOf(false) }
+    var flashHint by remember { mutableStateOf<String?>(null) }
     var capturing by remember { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
 
     // ImageCapture 实例（绑定相机时创建）
     val imageCapture = remember { ImageCapture.Builder().build() }
+
+    // 相机绑定（前后切换 / 闪光灯变化时重新绑定）
+    val previewView = remember { PreviewView(context) }
+    LaunchedEffect(hasPermission, frontCamera) {
+        if (!hasPermission) return@LaunchedEffect
+        try {
+            val provider = awaitCameraProvider(context)
+            val selector = if (frontCamera) CameraSelector.DEFAULT_FRONT_CAMERA
+            else CameraSelector.DEFAULT_BACK_CAMERA
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+            provider.unbindAll()
+            provider.bindToLifecycle(lifecycleOwner, selector, preview, imageCapture)
+        } catch (_: Exception) {
+            toast = "相机启动失败，请重试"
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            // bindToLifecycle 已随生命周期自动解绑，无需手动清理
+        }
+    }
 
     // 相册选图
     val pickImage = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            val f = File(context.cacheDir,
-                "pick_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg")
-            runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    f.outputStream().use { input.copyTo(it) }
+            scope.launch {
+                val f = File(context.cacheDir,
+                    "pick_${SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())}.jpg")
+                val ok = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            f.outputStream().use { input.copyTo(it) }
+                        } ?: false
+                    }.isSuccess && f.exists() && f.length() > 0
                 }
-            }
-            if (f.exists() && f.length() > 0) {
-                PendingCapture.apply {
-                    filePath = f.absolutePath
-                    templateId = template.id
-                    this.values = values
-                    this.placement = placement
-                    recordId = null
+                if (ok) {
+                    PendingCapture.apply {
+                        filePath = f.absolutePath
+                        templateId = template.id
+                        this.values = values
+                        this.placement = placement
+                        recordId = null
+                    }
+                    onPicked()
+                } else {
+                    toast = "读取所选图片失败"
                 }
-                onCaptured()
             }
         }
     }
 
-    fun doCapture() {
+    // 拍照：直接渲染水印保存为记录并关闭（对齐 iOS triggerCapture）
+    fun doCapture(containerW: Float, containerH: Float) {
         if (capturing) return
         capturing = true
         val f = File(context.cacheDir,
@@ -136,19 +197,36 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(results: ImageCapture.OutputFileResults) {
-                    capturing = false
-                    PendingCapture.apply {
-                        filePath = f.absolutePath
-                        templateId = template.id
-                        this.values = values
-                        this.placement = placement
-                        recordId = null
+                    scope.launch {
+                        val rec = withContext(Dispatchers.IO) {
+                            // 解码（含 EXIF 摆正、长边 ≤4096 防 OOM）
+                            val image = StorageManager.decodeScaled(f, 4096)
+                            var saved: com.watermark.camera.core.Record? = null
+                            if (image != null) {
+                                saved = runCatching {
+                                    PhotoSaver.save(
+                                        image = image, template = template, values = values,
+                                        placement = placement,
+                                        canvasW = containerW, canvasH = containerH,
+                                        folderId = null
+                                    )
+                                }.getOrNull()
+                            }
+                            f.delete()
+                            saved
+                        }
+                        capturing = false
+                        if (rec != null) {
+                            onClose()
+                        } else {
+                            toast = "保存失败，请重试"
+                        }
                     }
-                    onCaptured()
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     capturing = false
+                    toast = "拍照失败：${exception.message ?: "未知错误"}"
                 }
             }
         )
@@ -162,24 +240,7 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
 
                 // 相机预览
                 AndroidView(
-                    factory = { ctx ->
-                        val previewView = PreviewView(ctx)
-                        val providerFuture = ProcessCameraProvider.getInstance(ctx)
-                        providerFuture.addListener({
-                            runCatching {
-                                val provider = providerFuture.get()
-                                val preview = Preview.Builder().build().also {
-                                    it.setSurfaceProvider(previewView.surfaceProvider)
-                                }
-                                provider.unbindAll()
-                                provider.bindToLifecycle(
-                                    lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA,
-                                    preview, imageCapture
-                                )
-                            }
-                        }, ContextCompat.getMainExecutor(ctx))
-                        previewView
-                    },
+                    factory = { previewView },
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -202,7 +263,7 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
                     onPlacementChange = { placement = it }
                 )
 
-                // 顶部：关闭 + 模板选择
+                // 顶部：关闭 / 闪光灯 / 前后切换
                 Row(
                     Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -211,25 +272,39 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
                     IconButton(onClick = onClose) {
                         Icon(Icons.Filled.Close, "关闭", tint = Color.White)
                     }
-                    Box {
-                        OutlinedButton(onClick = { templateMenuOpen = true }) {
-                            Text(template.name, color = Color.White)
-                            Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White)
+                    Row {
+                        IconButton(onClick = {
+                            flashOn = !flashOn
+                            flashHint = if (flashOn) "闪光灯已开启（拍照瞬间生效）" else "闪光灯已关闭"
+                        }) {
+                            Icon(
+                                if (flashOn) Icons.Filled.FlashOn else Icons.Filled.FlashOff,
+                                if (flashOn) "关闭闪光灯" else "开启闪光灯",
+                                tint = Color.White
+                            )
                         }
-                        DropdownMenu(expanded = templateMenuOpen,
-                            onDismissRequest = { templateMenuOpen = false }) {
-                            (BuiltinTemplates.all + StorageManager.customTemplates).forEach { t ->
-                                DropdownMenuItem(
-                                    text = { Text(t.name) },
-                                    onClick = {
-                                        template = t
-                                        templateMenuOpen = false
-                                        placementInitialized = false
-                                    }
-                                )
-                            }
+                        IconButton(onClick = { frontCamera = !frontCamera }) {
+                            Icon(Icons.Filled.FlipCameraAndroid, "切换摄像头", tint = Color.White)
                         }
                     }
+                }
+
+                // 闪光灯提示（自动消失）
+                flashHint?.let { hint ->
+                    LaunchedEffect(hint) {
+                        kotlinx.coroutines.delay(1600)
+                        flashHint = null
+                    }
+                    Text(
+                        hint,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.align(Alignment.TopCenter)
+                            .statusBarsPadding().padding(top = 52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x99000000))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
                 }
 
                 // 底部：相册选图 / 快门 / 字段面板
@@ -249,7 +324,9 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
                                 template.fields.forEach { f ->
                                     OutlinedTextField(
                                         value = values[f.key] ?: "",
-                                        onValueChange = { values[f.key] = it },
+                                        onValueChange = { text ->
+                                            values = values.toMutableMap().apply { put(f.key, text) }
+                                        },
                                         label = { Text(f.label) },
                                         placeholder = f.placeholder?.let { p -> { Text(p) } },
                                         minLines = if (f.multiline) 2 else 1,
@@ -260,6 +337,30 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
                         }
                         Spacer(Modifier.height(12.dp))
                     }
+
+                    // 模板选择
+                    Box(Modifier.align(Alignment.CenterHorizontally)) {
+                        OutlinedButton(onClick = { templateMenuOpen = true }) {
+                            Text(template.name, color = Color.White)
+                            Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White)
+                        }
+                        DropdownMenu(expanded = templateMenuOpen,
+                            onDismissRequest = { templateMenuOpen = false }) {
+                            (BuiltinTemplates.all + StorageManager.customTemplates).forEach { t ->
+                                DropdownMenuItem(
+                                    text = { Text(t.name) },
+                                    onClick = {
+                                        template = t
+                                        templateMenuOpen = false
+                                        placementInitialized = false
+                                        // 对齐 iOS：切换模板持久化为当前拍摄模板
+                                        StorageManager.activeTemplateID = t.id
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
 
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 32.dp),
@@ -275,16 +376,26 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
                         }
 
                         Button(
-                            onClick = { doCapture() },
+                            onClick = {
+                                imageCapture.flashMode =
+                                    if (flashOn) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF
+                                doCapture(containerW, containerH)
+                            },
                             modifier = Modifier.size(76.dp),
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Box(
-                                Modifier.size(62.dp).clip(CircleShape)
-                                    .background(Color(0xFF4472C4))
-                            )
+                            if (capturing) {
+                                CircularProgressIndicator(
+                                    Modifier.size(28.dp), strokeWidth = 3.dp,
+                                    color = Color(0xFF4472C4))
+                            } else {
+                                Box(
+                                    Modifier.size(62.dp).clip(CircleShape)
+                                        .background(Color(0xFF4472C4))
+                                )
+                            }
                         }
 
                         OutlinedButton(
@@ -320,6 +431,21 @@ fun CameraScreen(onClose: () -> Unit, onCaptured: () -> Unit) {
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = onClose) { Text("取消") }
+            }
+        }
+
+        // Toast
+        toast?.let { msg ->
+            LaunchedEffect(msg) {
+                kotlinx.coroutines.delay(2000)
+                toast = null
+            }
+            Surface(
+                color = Color(0xCC000000),
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Text(msg, color = Color.White, modifier = Modifier.padding(14.dp))
             }
         }
     }

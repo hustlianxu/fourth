@@ -136,7 +136,30 @@ object StorageManager {
         var sample = 1
         while (max(opts.outWidth, opts.outHeight) / sample > maxDim * 2) sample *= 2
         val real = BitmapFactory.Options().apply { inSampleSize = sample }
-        return BitmapFactory.decodeFile(f.absolutePath, real)
+        val bmp = BitmapFactory.decodeFile(f.absolutePath, real) ?: return null
+        return applyExifRotation(f, bmp)
+    }
+
+    /** 按 EXIF 方向摆正（相册选图/拍摄照片常带旋转标记） */
+    private fun applyExifRotation(f: File, bmp: Bitmap): Bitmap {
+        return try {
+            val exif = android.media.ExifInterface(f.absolutePath)
+            val rotation = when (exif.getAttributeInt(
+                android.media.ExifInterface.TAG_ORIENTATION,
+                android.media.ExifInterface.ORIENTATION_NORMAL)) {
+                android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+            if (rotation == 0f) bmp
+            else {
+                val m = android.graphics.Matrix().apply { postRotate(rotation) }
+                Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+            }
+        } catch (_: Exception) {
+            bmp
+        }
     }
 
     fun addRecord(rec: Record) {
