@@ -103,17 +103,22 @@ enum WatermarkRenderer {
                               customX: CGFloat? = nil,
                               customY: CGFloat? = nil,
                               customScale: CGFloat? = nil,
+                              customScaleX: CGFloat? = nil,
+                              customScaleY: CGFloat? = nil,
                               widthRatio: Double? = nil) -> WMLayout? {
         let style = template.style
         let ratio = cw / 750
         let scale = customScale ?? 1
+        let sx = customScaleX ?? 1
+        let sy = customScaleY ?? 1
         let wRatio = widthRatio == nil ? template.widthRatio : widthRatio!
-        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale)).rounded())
+        // 垂直方向缩放作用于字号（文字变高、行距变大）；水平方向缩放仅作用于块宽（文字重排）
+        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale) * Double(sy)).rounded())
         let lineHeight = (fontSize * CGFloat(style.lineHeight)).rounded()
-        let padding = (CGFloat(style.padding) * ratio * scale).rounded()
+        let padding = (CGFloat(style.padding) * ratio * scale * sy).rounded()
         let borderRadius = (CGFloat(style.borderRadius) * ratio).rounded()
 
-        let blockW = (cw * CGFloat(wRatio) * scale).rounded()
+        let blockW = (cw * CGFloat(wRatio) * scale * sx).rounded()
         let indent = (fontSize * 1.4).rounded()
         let textInnerW = blockW - padding * 2
 
@@ -317,6 +322,8 @@ enum WatermarkRenderer {
                        customX: CGFloat? = nil,
                        customY: CGFloat? = nil,
                        customScale: CGFloat? = nil,
+                       customScaleX: CGFloat? = nil,
+                       customScaleY: CGFloat? = nil,
                        opacity: CGFloat? = nil,
                        widthRatio: Double? = nil) -> UIImage? {
         // 像素尺寸
@@ -339,6 +346,8 @@ enum WatermarkRenderer {
                                              cw: imgW, ch: imgH,
                                              customX: customX, customY: customY,
                                              customScale: customScale,
+                                             customScaleX: customScaleX,
+                                             customScaleY: customScaleY,
                                              widthRatio: widthRatio) else { return }
             let opacity = opacity ?? extractAlpha(template.style.backgroundRGBA)
             drawBlock(layout, origin: CGPoint(x: layout.x, y: layout.y),
@@ -352,14 +361,16 @@ enum WatermarkRenderer {
     static func blockSize(template: WatermarkTemplate,
                           values: [String: String],
                           canvasWidth: CGFloat,
-                          scale: CGFloat = 1) -> CGSize? {
+                          scale: CGFloat = 1,
+                          scaleX: CGFloat = 1,
+                          scaleY: CGFloat = 1) -> CGSize? {
         let style = template.style
         let ratio = canvasWidth / 750
         let wRatio = template.widthRatio
-        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale)).rounded())
+        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale) * Double(scaleY)).rounded())
         let lineHeight = (fontSize * CGFloat(style.lineHeight)).rounded()
-        let padding = (CGFloat(style.padding) * ratio * scale).rounded()
-        let blockW = (canvasWidth * CGFloat(wRatio) * scale).rounded()
+        let padding = (CGFloat(style.padding) * ratio * scale * scaleY).rounded()
+        let blockW = (canvasWidth * CGFloat(wRatio) * scale * scaleX).rounded()
         let indent = (fontSize * 1.4).rounded()
         let textInnerW = max(blockW - padding * 2.0, 10)
         let font = UIFont.systemFont(ofSize: fontSize)
@@ -373,19 +384,22 @@ enum WatermarkRenderer {
     }
 
     /// 仅绘制水印块（透明背景），用于相机/编辑器的实时浮层
-    /// canvasWidth = 预览画布显示宽度（pts）；scale = 用户缩放手势系数
+    /// canvasWidth = 预览画布显示宽度（pts）；scale = 双指等比缩放系数；scaleX/scaleY = 边缘拖动的方向缩放
     static func blockPreview(template: WatermarkTemplate,
                              values: [String: String],
                              canvasWidth: CGFloat,
                              scale: CGFloat = 1,
+                             scaleX: CGFloat = 1,
+                             scaleY: CGFloat = 1,
                              opacity: CGFloat?) -> UIImage? {
         guard let size = blockSize(template: template, values: values,
-                                   canvasWidth: canvasWidth, scale: scale) else { return nil }
+                                   canvasWidth: canvasWidth, scale: scale,
+                                   scaleX: scaleX, scaleY: scaleY) else { return nil }
         let style = template.style
         let ratio = canvasWidth / 750
-        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale)).rounded())
+        let fontSize = max(14, (style.fontSize * Double(ratio) * Double(scale) * Double(scaleY)).rounded())
         let lineHeight = (fontSize * CGFloat(style.lineHeight)).rounded()
-        let padding = (CGFloat(style.padding) * ratio * scale).rounded()
+        let padding = (CGFloat(style.padding) * ratio * scale * scaleY).rounded()
         let indent = (fontSize * 1.4).rounded()
         let blockW = size.width
         let textInnerW = max(blockW - padding * 2.0, 10)

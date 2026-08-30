@@ -135,7 +135,7 @@ struct PhotoEditorView: View {
                 .background(Color(.systemBackground))
             }
             .overlay(alignment: .top) {
-                Text("拖动移动 · 双指缩放 · 点按水印编辑内容")
+                Text("单指拖动水印移动 · 双指等比缩放 · 拖边缘手柄调宽高 · 点按水印改内容")
                     .font(.caption)
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)

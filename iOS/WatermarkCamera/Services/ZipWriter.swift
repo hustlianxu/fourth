@@ -50,15 +50,7 @@ final class ZipStoreWriter {
 
     // MARK: - 添加条目
 
-    /// 文本条目（UTF-8 编码写入）
-    func addEntry(named name: String, string: String) throws {
-        guard let data = string.data(using: .utf8) else {
-            throw ExportError.invalidEncoding(name)
-        }
-        try addEntry(named: name, data: data)
-    }
-
-    /// 二进制条目：直接从磁盘文件流式读入（单张图片最大内存占用）
+    /// 二进制条目：直接从磁盘文件读入（单张图片最大内存占用）
     func addEntry(named name: String, fromFile url: URL) throws {
         guard let data = try? Data(contentsOf: url) else {
             throw ExportError.cannotReadImage(url.lastPathComponent)
@@ -72,8 +64,12 @@ final class ZipStoreWriter {
         let nameData = Data(name.utf8)
         let crc = Self.crc32(data)
         let method: UInt16 = 0 // store
-        let flags: UInt16 = 0x0800 // UTF-8 文件名
+        let flags: UInt16 = 0  // 条目名均为 ASCII，无需 UTF-8 标志
         let version: UInt16 = 20
+        // DOS 时间 00:00:00（合法）；日期必须 ≥ 1980-01-01（0x0021），
+        // 日期 0 表示 1980-00-00 属非法值，部分严格解析器会拒绝整个包
+        let dosTime: UInt16 = 0
+        let dosDate: UInt16 = 0x0021
 
         var local = Data()
         // 注意：字面量必须显式标注 UInt32/UInt16，否则与两个重载产生歧义
@@ -81,8 +77,8 @@ final class ZipStoreWriter {
         Self.littleEndian(version, into: &local)             // version needed
         Self.littleEndian(flags, into: &local)               // flags
         Self.littleEndian(method, into: &local)              // method: 0 = store
-        Self.littleEndian(UInt16(0), into: &local)           // mod time
-        Self.littleEndian(UInt16(0), into: &local)           // mod date
+        Self.littleEndian(dosTime, into: &local)             // mod time
+        Self.littleEndian(dosDate, into: &local)             // mod date
         Self.littleEndian(crc, into: &local)                 // crc32
         Self.littleEndian(UInt32(data.count), into: &local)  // compressed size
         Self.littleEndian(UInt32(data.count), into: &local)  // uncompressed size
@@ -96,13 +92,13 @@ final class ZipStoreWriter {
         // 中央目录条目
         var central = Data()
         Self.littleEndian(UInt32(0x02014b50), into: &central) // central file header sig
-        Self.littleEndian(UInt16(0x031E), into: &central)   // version made by
+        Self.littleEndian(UInt16(0x0014), into: &central)   // version made by: 20, MS-DOS
         Self.littleEndian(version, into: &central)           // version needed
         Self.littleEndian(flags, into: &central)             // flags
         Self.littleEndian(method, into: &central)            // method
-        Self.littleEndian(UInt16(0), into: &central)        // mod time
-        Self.littleEndian(UInt16(0), into: &central)        // mod date
-        Self.littleEndian(crc, into: &central)               // crc32
+        Self.littleEndian(dosTime, into: &central)           // mod time
+        Self.littleEndian(dosDate, into: &central)           // mod date
+        Self.littleEndian(crc, into: &central)                // crc32
         Self.littleEndian(UInt32(data.count), into: &central) // compressed size
         Self.littleEndian(UInt32(data.count), into: &central) // uncompressed size
         Self.littleEndian(UInt16(nameData.count), into: &central) // name len

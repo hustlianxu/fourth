@@ -262,7 +262,13 @@ func sanitizeFileName(_ name: String) -> String {
 
 func xmlEscape(_ s: String?) -> String {
     guard let s = s else { return "" }
-    return s
+    // 过滤 XML 1.0 非法控制字符（< 0x20 且非 \t\n\r）：
+    // 严格解析器（iOS QuickLook / WPS）遇到会拒绝整个文件
+    let scalars = s.unicodeScalars.filter {
+        $0.value >= 0x20 || $0.value == 0x9 || $0.value == 0xA || $0.value == 0xD
+    }
+    let cleaned = String(String.UnicodeScalarView(scalars))
+    return cleaned
         .replacingOccurrences(of: "&", with: "&amp;")
         .replacingOccurrences(of: "<", with: "&lt;")
         .replacingOccurrences(of: ">", with: "&gt;")

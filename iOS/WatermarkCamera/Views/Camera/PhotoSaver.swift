@@ -26,7 +26,9 @@ enum PhotoSaver {
                                                      image: image,
                                                      customX: p.customX,
                                                      customY: p.customY,
-                                                     customScale: p.scale)
+                                                     customScale: p.scale,
+                                                     customScaleX: p.scaleX,
+                                                     customScaleY: p.scaleY)
         else { return nil }
 
         let id = genId(prefix: "r")
@@ -94,7 +96,9 @@ enum PhotoSaver {
                                                      image: image,
                                                      customX: p.customX,
                                                      customY: p.customY,
-                                                     customScale: p.scale)
+                                                     customScale: p.scale,
+                                                     customScaleX: p.scaleX,
+                                                     customScaleY: p.scaleY)
         else { return false }
 
         let wmURL = storage.imageFileURL(recordID: recordID, name: StorageManager.wmFile)
@@ -148,7 +152,9 @@ enum PhotoSaver {
                                                      image: image,
                                                      customX: p.customX,
                                                      customY: p.customY,
-                                                     customScale: p.scale) else { return false }
+                                                     customScale: p.scale,
+                                                     customScaleX: p.scaleX,
+                                                     customScaleY: p.scaleY) else { return false }
 
         let wmURL = storage.imageFileURL(recordID: recordID, name: StorageManager.wmFile)
         if let j = wmImage.jpegData(compressionQuality: 0.9) {
