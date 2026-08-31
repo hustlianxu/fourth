@@ -129,9 +129,21 @@ fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
     var toast by remember { mutableStateOf<String?>(null) }
 
     // ImageCapture 实例（限制输出分辨率，避免华为等大底传感器输出 40MP+ 导致 OOM）
+    // 注：setTargetResolution 已废弃且在部分华为机型上被忽略（按全分辨率出图），
+    // 改用 ResolutionSelector + ResolutionStrategy，保证出图长边约 2048。
     val imageCapture = remember {
         ImageCapture.Builder()
-            .setTargetResolution(android.util.Size(2048, 2048))
+            .setResolutionSelector(
+                androidx.camera.core.resolutionselector.ResolutionSelector.Builder()
+                    .setResolutionStrategy(
+                        androidx.camera.core.resolutionselector.ResolutionStrategy(
+                            android.util.Size(2048, 2048),
+                            androidx.camera.core.resolutionselector.ResolutionStrategy
+                                .FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                        )
+                    )
+                    .build()
+            )
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .build()
     }
@@ -197,47 +209,64 @@ fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
         val f = File(context.cacheDir,
             "capture_${SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())}.jpg")
         val options = ImageCapture.OutputFileOptions.Builder(f).build()
-        imageCapture.takePicture(
-            options,
-            ContextCompat.getMainExecutor(context),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(results: ImageCapture.OutputFileResults) {
-                    scope.launch {
-                        val rec = withContext(Dispatchers.IO) {
-                            // 解码（含 EXIF 摆正、长边 ≤2048 防 OOM）
-                            val image = StorageManager.decodeScaled(f, 2048)
-                            var saved: com.watermark.camera.core.Record? = null
-                            if (image != null) {
-                                saved = try {
-                                    PhotoSaver.save(
-                                        image = image, template = template, values = values,
-                                        placement = placement,
-                                        canvasW = containerW, canvasH = containerH,
-                                        folderId = null
-                                    )
-                                } catch (_: Exception) { null }
-                                catch (_: OutOfMemoryError) { null }
-                                // 解码位图用完即释放
-                                image.recycle()
+        // takePicture 在相机未成功绑定（如部分华为机型 bind 失败）时会同步抛异常，必须防护
+        runCatching {
+            imageCapture.takePicture(
+                options,
+                ContextCompat.getMainExecutor(context),
+                object : ImageCapture.OnImageSavedCallback {
+                    override fun onImageSaved(results: ImageCapture.OutputFileResults) {
+                        scope.launch {
+                            // 协程内任何未捕获异常/Error 都会导致闪退，必须兜底
+                            try {
+                                val rec = withContext(Dispatchers.IO) {
+                                    // 解码（含 EXIF 摆正、长边 ≤2048 防 OOM）
+                                    val image = StorageManager.decodeScaled(f, 2048)
+                                    var saved: com.watermark.camera.core.Record? = null
+                                    if (image != null) {
+                                        saved = try {
+                                            PhotoSaver.save(
+                                                image = image, template = template, values = values,
+                                                placement = placement,
+                                                canvasW = containerW, canvasH = containerH,
+                                                folderId = null
+                                            )
+                                        } catch (_: Exception) { null }
+                                        catch (_: OutOfMemoryError) { null }
+                                        // 解码位图用完即释放
+                                        image.recycle()
+                                    }
+                                    f.delete()
+                                    saved
+                                }
+                                capturing = false
+                                if (rec != null) {
+                                    onClose()
+                                } else {
+                                    toast = "保存失败，请重试"
+                                }
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (_: OutOfMemoryError) {
+                                capturing = false
+                                toast = "内存不足，保存失败"
+                            } catch (_: Exception) {
+                                capturing = false
+                                toast = "保存失败，请重试"
                             }
-                            f.delete()
-                            saved
-                        }
-                        capturing = false
-                        if (rec != null) {
-                            onClose()
-                        } else {
-                            toast = "保存失败，请重试"
                         }
                     }
-                }
 
-                override fun onError(exception: ImageCaptureException) {
-                    capturing = false
-                    toast = "拍照失败：${exception.message ?: "未知错误"}"
+                    override fun onError(exception: ImageCaptureException) {
+                        capturing = false
+                        toast = "拍照失败：${exception.message ?: "未知错误"}"
+                    }
                 }
-            }
-        )
+            )
+        }.onFailure {
+            capturing = false
+            toast = "拍照失败：相机未就绪"
+        }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {

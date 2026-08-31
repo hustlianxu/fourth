@@ -15,7 +15,8 @@
         android:icon="@android:drawable/ic_menu_camera"
         android:theme="@style/Theme.WatermarkCamera"
         android:allowBackup="true"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:largeHeap="true">
 
         <activity
             android:name=".MainActivity"

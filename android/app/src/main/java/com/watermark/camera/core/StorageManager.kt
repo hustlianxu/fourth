@@ -129,39 +129,54 @@ object StorageManager {
     fun originalImage(record: Record): Bitmap? =
         (record.originalPath?.let { fileFor(it) } ?: fileFor(record.imagePath))?.let { decodeScaled(it, 2048) }
 
+    /**
+     * 解码并限制长边。必须捕获 OutOfMemoryError：
+     * 调用方多在协程/produceState 中，Error 未被捕获会直接闪退（华为大底传感器场景高发）。
+     * OOM 时自动把目标尺寸减半重试一次。
+     */
     fun decodeScaled(f: File, maxDim: Int): Bitmap? {
         if (!f.exists()) return null
         return try {
-            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(f.absolutePath, opts)
-            val srcMax = max(opts.outWidth, opts.outHeight)
-            if (srcMax <= 0) return null
-
-            // 降采样：让解码后长边 ≤ maxDim（修复原公式 > maxDim*2 导致大图不降采样的 OOM）
-            var sample = 1
-            while (srcMax / sample > maxDim) sample *= 2
-
-            val real = BitmapFactory.Options().apply {
-                inSampleSize = sample
-                inPreferredConfig = Bitmap.Config.ARGB_8888
+            decodeScaledInternal(f, maxDim)
+        } catch (_: OutOfMemoryError) {
+            try {
+                decodeScaledInternal(f, maxOf(maxDim / 2, 512))
+            } catch (_: Throwable) {
+                null
             }
-            val bmp = BitmapFactory.decodeFile(f.absolutePath, real) ?: return null
-
-            // 精确缩放：保证长边严格 ≤ maxDim
-            val decodedMax = max(bmp.width, bmp.height)
-            val scaled = if (decodedMax > maxDim) {
-                val s = maxDim.toFloat() / decodedMax
-                val sw = (bmp.width * s).toInt().coerceAtLeast(1)
-                val sh = (bmp.height * s).toInt().coerceAtLeast(1)
-                val r = Bitmap.createScaledBitmap(bmp, sw, sh, true)
-                if (r !== bmp) bmp.recycle()
-                r
-            } else bmp
-
-            applyExifRotation(f, scaled)
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun decodeScaledInternal(f: File, maxDim: Int): Bitmap? {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(f.absolutePath, opts)
+        val srcMax = max(opts.outWidth, opts.outHeight)
+        if (srcMax <= 0) return null
+
+        // 降采样：让解码后长边 ≤ maxDim
+        var sample = 1
+        while (srcMax / sample > maxDim) sample *= 2
+
+        val real = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val bmp = BitmapFactory.decodeFile(f.absolutePath, real) ?: return null
+
+        // 精确缩放：保证长边严格 ≤ maxDim
+        val decodedMax = max(bmp.width, bmp.height)
+        val scaled = if (decodedMax > maxDim) {
+            val s = maxDim.toFloat() / decodedMax
+            val sw = (bmp.width * s).toInt().coerceAtLeast(1)
+            val sh = (bmp.height * s).toInt().coerceAtLeast(1)
+            val r = Bitmap.createScaledBitmap(bmp, sw, sh, true)
+            if (r !== bmp) bmp.recycle()
+            r
+        } else bmp
+
+        return applyExifRotation(f, scaled)
     }
 
     /** 按 EXIF 方向摆正（相册选图/拍摄照片常带旋转标记） */

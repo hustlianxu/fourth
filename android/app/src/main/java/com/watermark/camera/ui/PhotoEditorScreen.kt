@@ -100,10 +100,15 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
     var canvasH by remember { mutableStateOf(0f) }
 
     // 预解码原图（后台、限制长边避免大图 OOM）
+    // 注：保存管线（WatermarkRenderer.render）本身会把长边压到 2048，
+    // 这里按 2048 解码即可，4096 在华为 EMUI 堆内存下极易 OOM 闪退。
+    var loadFailed by remember { mutableStateOf(false) }
     val bitmap by produceState<Bitmap?>(null, filePath) {
-        value = withContext(Dispatchers.IO) {
-            filePath?.let { StorageManager.decodeScaled(java.io.File(it), 4096) }
+        val bmp = withContext(Dispatchers.IO) {
+            filePath?.let { StorageManager.decodeScaled(java.io.File(it), 2048) }
         }
+        if (bmp == null && filePath != null) loadFailed = true
+        value = bmp
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -113,9 +118,15 @@ fun PhotoEditorScreen(onDone: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                CircularProgressIndicator(color = Color.White)
-                Spacer(Modifier.height(12.dp))
-                Text("加载中…", color = Color.White.copy(alpha = 0.7f))
+                if (loadFailed) {
+                    Text("图片加载失败", color = Color.White)
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(onClick = onDone) { Text("返回", color = Color.White) }
+                } else {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(Modifier.height(12.dp))
+                    Text("加载中…", color = Color.White.copy(alpha = 0.7f))
+                }
             }
         } else {
             val bmp = bitmap!!

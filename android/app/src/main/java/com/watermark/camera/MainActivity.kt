@@ -29,12 +29,29 @@ import com.watermark.camera.ui.TrashScreen
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installCrashLogger()
         StorageManager.init(this)
         AppSettings.init(this)
         setContent {
             WatermarkCameraTheme {
                 AppNav()
             }
+        }
+    }
+
+    /** 把未捕获异常写入 files/crash_last.log，便于真机拉取堆栈定位问题 */
+    private fun installCrashLogger() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            try {
+                val text = buildString {
+                    append(java.util.Date().toString()).append('\n')
+                    append(thread.name).append('\n')
+                    append(android.util.Log.getStackTraceString(error))
+                }
+                java.io.File(filesDir, "crash_last.log").writeText(text)
+            } catch (_: Throwable) { }
+            defaultHandler?.uncaughtException(thread, error)
         }
     }
 }

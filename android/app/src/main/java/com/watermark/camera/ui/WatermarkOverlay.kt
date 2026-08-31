@@ -79,11 +79,22 @@ fun WatermarkOverlay(
         )
     }
     val blockBitmap = remember(renderKey) {
-        WatermarkRenderer.blockPreview(
-            template, values, containerWidth,
-            placement.scale.toFloat(), placement.scaleX.toFloat(), placement.scaleY.toFloat(),
-            density = 2f
-        )
+        // 位图创建可能 OOM（组合期间主线程未捕获的 Error 会直接闪退），失败时退化为不显示内容图
+        try {
+            WatermarkRenderer.blockPreview(
+                template, values, containerWidth,
+                placement.scale.toFloat(), placement.scaleX.toFloat(), placement.scaleY.toFloat(),
+                density = 2f
+            )
+        } catch (_: OutOfMemoryError) {
+            try {
+                WatermarkRenderer.blockPreview(
+                    template, values, containerWidth,
+                    placement.scale.toFloat(), placement.scaleX.toFloat(), placement.scaleY.toFloat(),
+                    density = 1f
+                )
+            } catch (_: Throwable) { null }
+        } catch (_: Exception) { null }
     }
 
     val centerX = containerWidth / 2 + placement.dx.toFloat() * containerWidth

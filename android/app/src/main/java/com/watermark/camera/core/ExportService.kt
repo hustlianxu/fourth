@@ -60,7 +60,12 @@ object PhotoSaver {
                     wmTemplateID = template.id,
                     wmPlacement = placement
                 )
-                StorageManager.addRecord(rec)
+                // Compose 状态（records）必须在主线程修改：
+                // 后台线程直接改可观察状态在部分机型（EMUI 调度差异）会抛
+                // "Unsupported concurrent change during composition" 导致闪退
+                withContext(Dispatchers.Main) {
+                    StorageManager.addRecord(rec)
+                }
 
                 // 拍照后自动保存到系统相册（对齐 iOS autoSaveAlbum）
                 if (AppSettings.autoSaveAlbum) {
@@ -115,7 +120,9 @@ object PhotoSaver {
                     record.width = wmImage.width
                     record.height = wmImage.height
                     record.updatedAt = System.currentTimeMillis() / 1000
-                    StorageManager.updateRecord(record)
+                    withContext(Dispatchers.Main) {
+                        StorageManager.updateRecord(record)
+                    }
                     true
                 } finally {
                     if (wmImage !== image) wmImage.recycle()
@@ -159,7 +166,9 @@ object PhotoSaver {
                     rec.width = wmImage.width
                     rec.height = wmImage.height
                     rec.updatedAt = System.currentTimeMillis() / 1000
-                    StorageManager.updateRecord(rec)
+                    withContext(Dispatchers.Main) {
+                        StorageManager.updateRecord(rec)
+                    }
 
                     // 编辑保存时自动备份水印图到系统相册（对齐 iOS autoSaveEditAlbum）
                     if (AppSettings.autoSaveEditAlbum) {
