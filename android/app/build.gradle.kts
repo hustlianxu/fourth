@@ -56,7 +56,9 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.01.00")
+    // 注意：material3 与 animation 必须来自同一个 BOM，否则会出现
+    // NoSuchMethodError（KeyframesSpec$KeyframesSpecConfig.at）运行时崩溃
+    val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
