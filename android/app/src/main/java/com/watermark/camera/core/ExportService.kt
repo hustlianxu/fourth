@@ -32,12 +32,16 @@ object PhotoSaver {
                      canvasW: Float, canvasH: Float,
                      folderId: String?): Record? = withContext(Dispatchers.IO) {
         try {
+            // renderParams 在字段值全空时为 null —— 兜底走模板预设位置渲染，
+            // 避免相册选图/自定义模板无默认值时“保存失败，请重试”
             val params = OverlayMapper.renderParams(template, values, placement,
                 canvasW, canvasH, image.width.toFloat(), image.height.toFloat())
-                ?: return@withContext null
-            val wmImage = WatermarkRenderer.render(template, values, image,
-                params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
-                ?: return@withContext null
+            val wmImage = if (params != null) {
+                WatermarkRenderer.render(template, values, image,
+                    params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
+            } else {
+                WatermarkRenderer.render(template, values, image)
+            } ?: return@withContext null
 
             try {
                 val id = genId("r")
@@ -100,7 +104,7 @@ object PhotoSaver {
             val origFile = record.originalPath?.let { StorageManager.fileFor(it) }
                 ?: StorageManager.fileFor(record.imagePath)
                 ?: return@withContext false
-            val image = StorageManager.decodeScaled(origFile, 2048) ?: return@withContext false
+            val image = StorageManager.decodeScaled(origFile, 4096) ?: return@withContext false
 
             try {
                 // 用保存时记录的画布比例反推 canvasPoints，保证位置一致：
@@ -108,11 +112,14 @@ object PhotoSaver {
                 val placement = record.wmPlacement ?: OverlayPlacement()
                 val params = OverlayMapper.renderParams(template, values, placement,
                     image.width * 1f, image.height * 1f, image.width.toFloat(), image.height.toFloat())
-                    ?: return@withContext false
-                // renderParams 以画布=全图计算，等价于按记录位置重绘
-                val wmImage = WatermarkRenderer.render(template, values, image,
-                    params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
-                    ?: return@withContext false
+                // renderParams 以画布=全图计算，等价于按记录位置重绘；
+                // 字段全空时 params 为 null，兜底按模板预设位置（render 返回原图）
+                val wmImage = if (params != null) {
+                    WatermarkRenderer.render(template, values, image,
+                        params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
+                } else {
+                    WatermarkRenderer.render(template, values, image)
+                } ?: return@withContext false
                 try {
                     val wmFile = StorageManager.fileFor(record.imagePath) ?: return@withContext false
                     wmFile.writeBytes(bitmapBytes(wmImage, 90))
@@ -146,12 +153,15 @@ object PhotoSaver {
         withContext(Dispatchers.IO) {
             try {
                 val rec = StorageManager.record(recordID) ?: return@withContext false
+                // 字段全空时 renderParams 为 null —— 兜底按模板预设位置渲染（同 save）
                 val params = OverlayMapper.renderParams(template, values, placement,
                     canvasW, canvasH, image.width.toFloat(), image.height.toFloat())
-                    ?: return@withContext false
-                val wmImage = WatermarkRenderer.render(template, values, image,
-                    params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
-                    ?: return@withContext false
+                val wmImage = if (params != null) {
+                    WatermarkRenderer.render(template, values, image,
+                        params.customX, params.customY, params.scale, params.scaleX, params.scaleY)
+                } else {
+                    WatermarkRenderer.render(template, values, image)
+                } ?: return@withContext false
 
                 try {
                     val dir = StorageManager.recordDir(recordID)

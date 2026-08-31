@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,10 +65,16 @@ fun WatermarkOverlay(
     // 手柄拖动基准（手势开始时的块尺寸）
     var handleBase by remember { mutableStateOf<Pair<Float, Float>?>(null) }
 
+    // 字段值全为空时 blockSize 为 null —— 此时也必须显示占位块，
+    // 否则水印“消失”（既无法点按唤出编辑，保存也会因 renderParams 为 null 失败）
+    val hasContent = WatermarkRenderer.blockSize(
+        template, values, containerWidth,
+        placement.scale.toFloat(), placement.scaleX.toFloat(), placement.scaleY.toFloat()
+    ) != null
     val size = WatermarkRenderer.blockSize(
         template, values, containerWidth,
         placement.scale.toFloat(), placement.scaleX.toFloat(), placement.scaleY.toFloat()
-    ) ?: return
+    ) ?: (containerWidth * template.widthRatio.toFloat() to 80f)
 
     // 预览位图：scale/内容变化时重渲染（scale 量化到 5% 步进，降低重建频率）
     val renderKey = remember(placement.scale, placement.scaleX, placement.scaleY,
@@ -123,13 +131,31 @@ fun WatermarkOverlay(
                 bitmap = bmp.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // 无内容占位提示（字段值全空）：保证水印块可见、可点按唤出编辑
+        if (blockBitmap == null && interactive) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    "点按输入水印内容",
+                    color = Color.White.copy(alpha = 0.9f),
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+
+        // 手势层：独立于内容位图（占位态也要可拖动/缩放/点按）
+        if (interactive) {
+            Box(
+                Modifier
                     .fillMaxSize()
-                    .pointerInput(interactive, containerWidth, containerHeight) {
+                    .pointerInput(containerWidth, containerHeight) {
                         detectTapGestures { onTap?.invoke() }
                     }
-                    .pointerInput(interactive, containerWidth, containerHeight) {
-                        if (!interactive) return@pointerInput
+                    .pointerInput(containerWidth, containerHeight) {
                         detectTransformGestures { _, pan, zoom, _ ->
                             val p = currentPlacement
                             val newDx = p.dx + pan.x / containerWidth
@@ -143,7 +169,7 @@ fun WatermarkOverlay(
             )
         }
 
-        if (interactive) {
+        if (interactive && hasContent) {
             // 四个边缘手柄：拖动开始时记录当前块尺寸作为缩放基准
             val startHandle: () -> Unit = { handleBase = size.first to size.second }
             EdgeHandle(Edge.LEFT, Modifier.align(Alignment.CenterStart), startHandle) { total ->

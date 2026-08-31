@@ -36,7 +36,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -120,8 +119,19 @@ fun HomeScreen(onOpenRecord: (String) -> Unit,
         },
         floatingActionButton = {
             if (!selectionMode) {
-                FloatingActionButton(onClick = onOpenCamera) {
-                    Icon(Icons.Filled.CameraAlt, "拍摄")
+                // 对齐 iOS cameraButton：胶囊 + 相机图标 + “拍照”
+                Button(
+                    onClick = onOpenCamera,
+                    shape = CircleShape,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 24.dp, vertical = 14.dp)
+                ) {
+                    Icon(Icons.Filled.CameraAlt, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("拍照")
                 }
             }
         }
@@ -398,6 +408,7 @@ private fun groupHeader(title: String, key: String, count: Int,
 private fun RecordRow(rec: Record, selectionMode: Boolean, isSelected: Boolean,
                       onClick: () -> Unit, onDelete: () -> Unit, onMove: () -> Unit) {
     var showMenu by remember { mutableStateOf(false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
             Modifier.fillMaxWidth().clickable { onClick() }.padding(12.dp),
@@ -420,22 +431,38 @@ private fun RecordRow(rec: Record, selectionMode: Boolean, isSelected: Boolean,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    formatDateTime(rec.updatedAt),
+                    buildString {
+                        append(formatDateTime(rec.updatedAt))
+                        if (rec.width > 0 && rec.height > 0) append(" · ${rec.width}×${rec.height}")
+                        StorageManager.fileFor(rec.imagePath)?.let {
+                            append(" · ${formatBytes(it.length())}")
+                        }
+                    },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
             }
             if (!selectionMode) {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, "更多")
-                }
-                DropdownMenu(showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(text = { Text("移入回收站") }, onClick = {
-                        showMenu = false; onDelete()
-                    })
-                    DropdownMenuItem(text = { Text("移动到文件夹") }, onClick = {
-                        showMenu = false; onMove()
-                    })
+                // Box 包裹：让 DropdownMenu 锚定在按钮位置（此前锚定到整行左侧，位置突兀）
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, "更多")
+                    }
+                    DropdownMenu(showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(text = { Text("保存到相册") }, onClick = {
+                            showMenu = false
+                            StorageManager.image(rec)?.let {
+                                AlbumSaver.saveToAlbum(ctx, it)
+                            }
+                        })
+                        DropdownMenuItem(text = { Text("移入回收站") }, onClick = {
+                            showMenu = false; onDelete()
+                        })
+                        DropdownMenuItem(text = { Text("移动到文件夹") }, onClick = {
+                            showMenu = false; onMove()
+                        })
+                    }
                 }
             }
         }

@@ -128,18 +128,19 @@ fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
     var capturing by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
 
-    // ImageCapture 实例（限制输出分辨率，避免华为等大底传感器输出 40MP+ 导致 OOM）
+    // ImageCapture 实例（分辨率对齐 iOS .photo 预设：优先 4096 以内的最大档，
+    // 典型输出 12MP 级别（如 4000x3000/3648x2736），保证成品与导出不降质）
     // 注：setTargetResolution 已废弃且在部分华为机型上被忽略（按全分辨率出图），
-    // 改用 ResolutionSelector + ResolutionStrategy，保证出图长边约 2048。
+    // 使用 ResolutionSelector + ResolutionStrategy；解码/渲染端另有 OOM 自动降档兜底。
     val imageCapture = remember {
         ImageCapture.Builder()
             .setResolutionSelector(
                 androidx.camera.core.resolutionselector.ResolutionSelector.Builder()
                     .setResolutionStrategy(
                         androidx.camera.core.resolutionselector.ResolutionStrategy(
-                            android.util.Size(2048, 2048),
+                            android.util.Size(4096, 4096),
                             androidx.camera.core.resolutionselector.ResolutionStrategy
-                                .FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                                .FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
                         )
                     )
                     .build()
@@ -220,8 +221,8 @@ fun CameraScreen(onClose: () -> Unit, onPicked: () -> Unit) {
                             // 协程内任何未捕获异常/Error 都会导致闪退，必须兜底
                             try {
                                 val rec = withContext(Dispatchers.IO) {
-                                    // 解码（含 EXIF 摆正、长边 ≤2048 防 OOM）
-                                    val image = StorageManager.decodeScaled(f, 2048)
+                                    // 解码（含 EXIF 摆正、长边 ≤4096 防 OOM，对齐 iOS）
+                                    val image = StorageManager.decodeScaled(f, 4096)
                                     var saved: com.watermark.camera.core.Record? = null
                                     if (image != null) {
                                         saved = try {

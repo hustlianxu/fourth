@@ -51,6 +51,7 @@ import com.watermark.camera.core.BuiltinTemplates
 import com.watermark.camera.core.OverlayPlacement
 import com.watermark.camera.core.PhotoSaver
 import com.watermark.camera.core.StorageManager
+import com.watermark.camera.core.formatBytes
 import com.watermark.camera.core.formatDateTime
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -166,19 +167,11 @@ fun RecordDetailScreen(recordId: String,
 
             // 信息与字段区
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "拍摄于 ${formatDateTime(record.createdAt)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "更新于 ${formatDateTime(record.updatedAt)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     OutlinedButton(onClick = {
                         PendingCapture.apply {
                             filePath = record.originalPath?.let { storage.fileFor(it)?.absolutePath }
@@ -193,6 +186,24 @@ fun RecordDetailScreen(recordId: String,
                         Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("重新编辑水印")
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // 元信息卡片（对齐 iOS RecordDetailView 的元信息区）
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp)) {
+                        MetaRow("创建时间", formatDateTime(record.createdAt))
+                        MetaRow("更新时间", formatDateTime(record.updatedAt))
+                        MetaRow("尺寸", "${record.width} × ${record.height}")
+                        StorageManager.fileFor(record.imagePath)?.let {
+                            MetaRow("文件大小", formatBytes(it.length()))
+                        }
                     }
                 }
 
@@ -236,6 +247,18 @@ fun RecordDetailScreen(recordId: String,
                 Text(msg, color = Color.White, modifier = Modifier.padding(14.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun MetaRow(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.labelMedium)
     }
 }
 
