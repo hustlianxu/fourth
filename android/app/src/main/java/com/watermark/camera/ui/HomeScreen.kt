@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SaveAlt
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -103,7 +103,9 @@ fun HomeScreen(onOpenRecord: (String) -> Unit,
                     if (!selectionMode) {
                         if (storage.records.isNotEmpty()) {
                             IconButton(onClick = onOpenExport) {
-                                Icon(Icons.Filled.SaveAlt, "导出 Excel")
+                                // 分享图标（对齐 iOS square.and.arrow.up），
+                                // 语义是“导出并发送”，避免下载图标的误解
+                                Icon(Icons.Filled.Share, "导出 Excel")
                             }
                         }
                         IconButton(onClick = { showNewFolder = true }) {

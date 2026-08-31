@@ -24,8 +24,17 @@ private class ZipStoreWriter(out: File) {
     private var entryCount = 0
     private var localOffset = 0L
 
-    private fun u16(v: Int) = stream.writeShort(v.toInt() and 0xFFFF)
-    private fun u32(v: Long) = stream.writeInt((v and 0xFFFFFFFFL).toInt())
+    // ZIP 规范要求小端字节序；Java DataOutputStream 的 writeShort/writeInt
+    // 是大端，直接使用会导致 local header/EOCD 全部字节颠倒、整个包损坏
+    // （WPS/Office 报“无法识别的格式”的直接原因），必须手工按小端写。
+    private fun u16(v: Int) {
+        stream.write(v and 0xFF); stream.write((v shr 8) and 0xFF)
+    }
+    private fun u32(v: Long) {
+        val i = (v and 0xFFFFFFFFL).toInt()
+        stream.write(i and 0xFF); stream.write((i shr 8) and 0xFF)
+        stream.write((i shr 16) and 0xFF); stream.write((i shr 24) and 0xFF)
+    }
 
     private fun cu16(v: Int) { central.write(v and 0xFF); central.write((v shr 8) and 0xFF) }
     private fun cu32(v: Long) {
@@ -42,7 +51,7 @@ private class ZipStoreWriter(out: File) {
         val dosDate = 0x0021
 
         // ---- local file header ----
-        stream.writeInt(0x04034b50)          // sig
+        u32(0x04034b50L)                     // sig（小端写出即 "PK\x03\x04"）
         u16(20)                               // version needed
         u16(0)                                // flags
         u16(0)                                // method: 0 = store
@@ -84,7 +93,7 @@ private class ZipStoreWriter(out: File) {
         val cdSize = central.size().toLong()
 
         // EOCD
-        stream.writeInt(0x06054b50)
+        u32(0x06054b50L)                     // sig（小端写出即 "PK\x05\x06"）
         u16(0); u16(0)
         u16(entryCount); u16(entryCount)
         u32(cdSize)
